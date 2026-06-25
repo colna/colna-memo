@@ -43,6 +43,11 @@ cargo build            # 首次会下载 zvec 预编译库
 ./colna search "怎么跨设备同步"      # 混合检索(向量 + FTS 关键词,RRF 融合)
 ./colna search "xxx" --topk 8       # 指定返回条数
 ./colna search "xxx" --semantic-only # 只用向量语义检索,关闭 FTS
+
+./colna add "标题" -b "正文" -t "tag1,tag2"  # 新建笔记到 memory/notes/ 并自动增量索引
+echo "正文" | ./colna add "标题"            # 正文留空则从 stdin 读取
+./colna sync                               # 跨设备同步:pull --rebase → reindex → commit → push
+./colna sync -m "今天的笔记"                # 指定提交说明
 ```
 
 ### 增量索引
@@ -80,6 +85,21 @@ cargo build            # 首次会下载 zvec 预编译库
 }
 ```
 
+### 写笔记 & 跨设备同步
+
+`colna add` 把一篇笔记写进 `memory/notes/`(自动加 `title` / `date` / `tags`
+front-matter,文件名按标题生成且重名自动去冲突),写完顺手做一次增量索引。
+
+`colna sync` 把跨设备同步收成一条命令:
+
+1. `git pull --rebase` 拉远端最新(真源对齐);
+2. reindex 吸收拉下来的变更;
+3. `git add memory/` + 有改动则 commit;
+4. 再 reindex 吸收本地新内容;
+5. `git push`。
+
+无远端 / 无上游分支时 pull 步骤会友好跳过,不影响本地索引。
+
 ## 目录
 
 ```
@@ -94,7 +114,8 @@ src/
   state.rs         增量索引状态(指纹比对)
   store.rs         zvec 封装(建库/写入/向量+FTS 检索)
   mcp.rs           MCP server(stdio JSON-RPC,kb_search / kb_get)
-  main.rs          CLI(index / search / mcp)
+  gitsync.rs       colna add / sync(git 封装 + 自动 reindex)
+  main.rs          CLI(index / search / mcp / add / sync)
 colna              运行包装脚本(自动设置 dylib 路径)
 ```
 
@@ -103,4 +124,4 @@ colna              运行包装脚本(自动设置 dylib 路径)
 - [x] **P0**:md → 切块 → 本地 embedding → zvec → CLI 语义检索
 - [x] **P1**:增量索引(按 hash 只重嵌入变化块)+ FTS 混合检索(RRF 融合)
 - [x] **P2**:MCP server,Claude 直接调用 `kb_search` / `kb_get`
-- [ ] **P3**:`colna add` / `colna sync`(封装 git add/commit/push/pull + 自动 reindex)
+- [x] **P3**:`colna add` / `colna sync`(封装 git add/commit/push/pull + 自动 reindex)

@@ -9,6 +9,7 @@
 
 mod chunker;
 mod embedder;
+mod gitsync;
 mod mcp;
 mod state;
 mod store;
@@ -55,6 +56,23 @@ enum Command {
     },
     /// 以 MCP server(stdio)运行,供 Claude 调用 kb_search / kb_get
     Mcp,
+    /// 新建一篇笔记到 memory/notes/ 并自动增量重建索引
+    Add {
+        /// 笔记标题(同时决定文件名)
+        title: String,
+        /// 正文(留空则从 stdin 读取)
+        #[arg(short, long)]
+        body: Option<String>,
+        /// 标签(逗号分隔)
+        #[arg(short, long, default_value = "")]
+        tags: String,
+    },
+    /// 跨设备同步:git pull --rebase → reindex → add/commit → push
+    Sync {
+        /// 提交说明
+        #[arg(short, long, default_value = "colna sync")]
+        message: String,
+    },
 }
 
 fn main() -> Result<()> {
@@ -68,6 +86,8 @@ fn main() -> Result<()> {
             semantic_only,
         } => cmd_search(&cli.root, query, *topk, !*semantic_only),
         Command::Mcp => mcp::serve(&cli.root),
+        Command::Add { title, body, tags } => cmd_add(&cli.root, title, body.as_deref(), tags),
+        Command::Sync { message } => cmd_sync(&cli.root, message),
     };
     // 无论成功失败都尝试关闭运行时
     let _ = store::shutdown();
@@ -264,4 +284,31 @@ fn cmd_search(root: &Path, query: &str, topk: usize, hybrid: bool) -> Result<()>
         println!("    {}\n", snippet.replace('\n', " "));
     }
     Ok(())
+}
+
+/// 增量重建索引(供 add / sync 复用):等价于 `colna index`。
+fn reindex(root: &Path) -> Result<()> {
+    cmd_index(root, false)
+}
+
+/// colna add:新建笔记 + 自动增量索引。正文留空时从 stdin 读取。
+fn cmd_add(root: &Path, title: &str, body: Option<&str>, tags: &str) -> Result<()> {
+    let body = match body {
+        Some(b) => b.to_string(),
+        None => {
+            use std::io::Read;
+            let mut buf = String::new();
+            std::io::stdin()
+                .read_to_string(&mut buf)
+                .context("从 stdin 读取正文失败")?;
+            buf
+        }
+    };
+    gitsync::add_note(root, title, tags, &body, reindex)?;
+    Ok(())
+}
+
+/// colna sync:git pull --rebase → reindex → add/commit → push。
+fn cmd_sync(root: &Path, message: &str) -> Result<()> {
+    gitsync::sync(root, message, reindex)
 }
