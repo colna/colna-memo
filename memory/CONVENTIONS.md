@@ -7,7 +7,7 @@ tags: meta, conventions
 # memory/ 书写约定
 
 本目录是 colna-memo 的**唯一真源**(走 git 跨设备同步),`.colna/` 索引是派生物、可随时重建。
-笔记约定与 Obsidian 知识库规则保持一致。
+所有内容是普通 Markdown(PARA + Inbox + Daily 组织)。
 
 ## 目录结构(PARA + Inbox + Daily)
 
@@ -34,7 +34,7 @@ tags: 标签1, 标签2
 
 - `title` 缺省时回退到第一个 H1,再回退到文件名。
 - `tags` 用逗号分隔。
-- 其余 Obsidian 属性(aliases、cssclasses 等)可写,但不参与索引。
+- 其余 front-matter 属性可写,但不参与索引。
 
 ## 切块规则
 
@@ -42,10 +42,9 @@ tags: 标签1, 标签2
 - chunk 文本 = 标题 + 该段正文;空段跳过。
 - 稳定 id = `source_path + heading + 序号` 的 sha256。
 
-## 链接与语法
+## 链接
 
-- 笔记间链接用 Obsidian wikilink:`[[note-name]]` 或 `[[path/note|别名]]`。
-- callout、embed 等 Obsidian 特有语法可用,但只有纯文本参与向量/FTS 检索。
+- 笔记间链接用相对路径 Markdown 链接:`[别名](path/note.md)`。
 
 ## 操作约定
 
