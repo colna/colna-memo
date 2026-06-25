@@ -38,21 +38,41 @@ cargo build            # 首次会下载 zvec 预编译库
 仓库提供了 `./colna` 包装脚本自动处理:
 
 ```bash
-./colna index                      # 扫描 memory/ 全量重建本地语义索引
-./colna search "怎么跨设备同步"      # 语义检索
+./colna index                      # 增量更新本地索引(只重嵌入变化的文件)
+./colna index --full               # 强制全量重建
+./colna search "怎么跨设备同步"      # 混合检索(向量 + FTS 关键词,RRF 融合)
 ./colna search "xxx" --topk 8       # 指定返回条数
+./colna search "xxx" --semantic-only # 只用向量语义检索,关闭 FTS
 ```
+
+### 增量索引
+
+`colna index` 默认增量:用 `.colna/state.json` 记录每个文件内容的 sha256,
+只对**新增 / 变更 / 删除**的文件做切块、嵌入与 upsert/delete,首次或 `--full` 才全量重建。
+
+### 混合检索
+
+`colna search` 默认混合检索:同时跑
+
+- **向量召回**:HNSW + cosine,语义近邻;
+- **FTS 召回**:`text` 字段的全文索引,关键词精确命中;
+
+再用 RRF(Reciprocal Rank Fusion)融合两路排名。中文 FTS 依赖分词器,
+召回为空时自动退化为纯向量,不影响结果。
 
 ## 目录
 
 ```
 memory/            真源 Markdown(入 git)
   notes/           笔记
-.colna/            本地 zvec 索引(不入 git)
+.colna/            本地派生(不入 git)
+  index.zvec       zvec 向量索引
+  state.json       增量索引指纹(source_path → sha256)
 src/
   chunker.rs       Markdown 切块 + front-matter 元数据
   embedder.rs      fastembed 本地 E5 向量
-  store.rs         zvec 封装(建库/写入/检索)
+  state.rs         增量索引状态(指纹比对)
+  store.rs         zvec 封装(建库/写入/向量+FTS 检索)
   main.rs          CLI(index / search)
 colna              运行包装脚本(自动设置 dylib 路径)
 ```
@@ -60,7 +80,6 @@ colna              运行包装脚本(自动设置 dylib 路径)
 ## 路线图
 
 - [x] **P0**:md → 切块 → 本地 embedding → zvec → CLI 语义检索
-- [ ] **P1**:增量索引(按 mtime/hash 只重嵌入变化块)+ FTS 混合检索
+- [x] **P1**:增量索引(按 hash 只重嵌入变化块)+ FTS 混合检索(RRF 融合)
 - [ ] **P2**:MCP server,Claude 直接调用 `kb_search` / `kb_get`
 - [ ] **P3**:`colna add` / `colna sync`(封装 git add/commit/push/pull + 自动 reindex)
-```
