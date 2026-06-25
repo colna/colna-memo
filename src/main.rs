@@ -9,6 +9,7 @@
 
 mod chunker;
 mod embedder;
+mod mcp;
 mod state;
 mod store;
 
@@ -52,6 +53,8 @@ enum Command {
         #[arg(long)]
         semantic_only: bool,
     },
+    /// 以 MCP server(stdio)运行,供 Claude 调用 kb_search / kb_get
+    Mcp,
 }
 
 fn main() -> Result<()> {
@@ -64,6 +67,7 @@ fn main() -> Result<()> {
             topk,
             semantic_only,
         } => cmd_search(&cli.root, query, *topk, !*semantic_only),
+        Command::Mcp => mcp::serve(&cli.root),
     };
     // 无论成功失败都尝试关闭运行时
     let _ = store::shutdown();

@@ -60,6 +60,26 @@ cargo build            # 首次会下载 zvec 预编译库
 再用 RRF(Reciprocal Rank Fusion)融合两路排名。中文 FTS 依赖分词器,
 召回为空时自动退化为纯向量,不影响结果。
 
+### MCP server(给 Claude 用)
+
+`colna mcp` 以 MCP 的 stdio transport(JSON-RPC 2.0,逐行)运行,暴露两个工具:
+
+- `kb_search(query, topk?, semantic_only?)` — 检索知识库,返回最相关的内容块;
+- `kb_get(source_path)` — 取回某个 Markdown 文件全文(相对 `memory/`)。
+
+在 Claude / 客户端的 MCP 配置中加入(用绝对路径,`./colna` 会自动设好 dylib 路径):
+
+```json
+{
+  "mcpServers": {
+    "colna-memo": {
+      "command": "/绝对路径/colna-memo/colna",
+      "args": ["--root", "/绝对路径/colna-memo", "mcp"]
+    }
+  }
+}
+```
+
 ## 目录
 
 ```
@@ -73,7 +93,8 @@ src/
   embedder.rs      fastembed 本地 E5 向量
   state.rs         增量索引状态(指纹比对)
   store.rs         zvec 封装(建库/写入/向量+FTS 检索)
-  main.rs          CLI(index / search)
+  mcp.rs           MCP server(stdio JSON-RPC,kb_search / kb_get)
+  main.rs          CLI(index / search / mcp)
 colna              运行包装脚本(自动设置 dylib 路径)
 ```
 
@@ -81,5 +102,5 @@ colna              运行包装脚本(自动设置 dylib 路径)
 
 - [x] **P0**:md → 切块 → 本地 embedding → zvec → CLI 语义检索
 - [x] **P1**:增量索引(按 hash 只重嵌入变化块)+ FTS 混合检索(RRF 融合)
-- [ ] **P2**:MCP server,Claude 直接调用 `kb_search` / `kb_get`
+- [x] **P2**:MCP server,Claude 直接调用 `kb_search` / `kb_get`
 - [ ] **P3**:`colna add` / `colna sync`(封装 git add/commit/push/pull + 自动 reindex)
