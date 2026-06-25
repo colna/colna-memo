@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# colna 包装脚本:自动定位 zvec 预编译动态库并设好 DYLD_LIBRARY_PATH,再执行真正的二进制。
+# 用法与子命令同 ./target/<profile>/colna,如:  ./colna index   ./colna search "xxx"
+set -euo pipefail
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROFILE="${COLNA_PROFILE:-debug}"
+BIN="$DIR/target/$PROFILE/colna"
+
+if [[ ! -x "$BIN" ]]; then
+  echo "未找到二进制 $BIN,请先运行: cargo build${PROFILE:+ }${PROFILE/debug/}" >&2
+  echo "  (release 版用 cargo build --release 并设 COLNA_PROFILE=release)" >&2
+  exit 1
+fi
+
+LIB="$(find "$DIR/target" -name libzvec_c_api.dylib 2>/dev/null | head -1 || true)"
+if [[ -n "$LIB" ]]; then
+  export DYLD_LIBRARY_PATH="$(dirname "$LIB"):${DYLD_LIBRARY_PATH:-}"
+fi
+
+exec "$BIN" "$@"
