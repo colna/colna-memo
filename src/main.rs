@@ -56,7 +56,7 @@ enum Command {
     },
     /// 以 MCP server(stdio)运行,供 Claude 调用 kb_search / kb_get
     Mcp,
-    /// 新建一篇笔记到 memory/notes/ 并自动增量重建索引
+    /// 新建一篇笔记到 memory/00-Inbox/ 并自动增量重建索引
     Add {
         /// 笔记标题(同时决定文件名)
         title: String,
@@ -94,7 +94,8 @@ fn main() -> Result<()> {
     result
 }
 
-/// 收集 memory/ 下所有 .md 文件,返回 (相对路径, 绝对路径)
+/// 收集 memory/ 下所有 .md 文件,返回 (相对路径, 绝对路径)。
+/// 跳过 `_` 前缀的系统目录(_templates / _attachments,Obsidian 约定,不入索引)。
 fn collect_markdown(memory_root: &Path) -> Vec<(String, PathBuf)> {
     let mut files = Vec::new();
     for entry in WalkDir::new(memory_root).into_iter().filter_map(|e| e.ok()) {
@@ -105,6 +106,10 @@ fn collect_markdown(memory_root: &Path) -> Vec<(String, PathBuf)> {
                 .unwrap_or(path)
                 .to_string_lossy()
                 .to_string();
+            // 跳过任意一级以 "_" 开头的目录(系统目录)
+            if rel.split('/').any(|seg| seg.starts_with('_')) {
+                continue;
+            }
             files.push((rel, path.to_path_buf()));
         }
     }

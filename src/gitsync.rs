@@ -8,7 +8,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const MEMORY_DIR: &str = "memory";
-const NOTES_DIR: &str = "notes";
+// 新笔记默认落收件箱(PARA 约定,见 memory/CONVENTIONS.md),后续整理
+const NOTES_DIR: &str = "00-Inbox";
 
 /// 在 root 下执行一条 git 命令,返回 stdout(去尾换行)。失败则带上 stderr 报错。
 fn git(root: &Path, args: &[&str]) -> Result<String> {
@@ -58,7 +59,7 @@ fn slugify(title: &str) -> String {
     }
 }
 
-/// `colna add`:在 memory/notes/ 下新建一篇带 front-matter 的笔记,然后增量重建索引。
+/// `colna add`:在 memory/00-Inbox/ 下新建一篇带 front-matter 的笔记,然后增量重建索引。
 ///
 /// body 为正文(可来自 --body 或 stdin);date 用今天;不自动 git 提交(交给 sync)。
 pub fn add_note(
