@@ -26,6 +26,37 @@ fn git(root: &Path, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&out.stdout).trim_end().to_string())
 }
 
+/// 提交前守卫:扫描 memory/ 是否残留 git 冲突标记(`<<<<<<<` / `>>>>>>>`)。
+/// 命中即中止 sync,避免把未解决的冲突文件提交并同步出去(rebase 半途留下的脏文件)。
+///
+/// 用 `git grep` 而非 `git()` helper:无匹配时 git grep 退出码为 1(`git()` 会误判为失败)。
+/// 退出码语义:0 = 找到冲突标记 → 中止;1 = 无匹配 → 干净;其它 = 真错。
+/// 同时扫 untracked,新建但未跟踪的文件也覆盖。
+fn check_conflict_markers(root: &Path) -> Result<()> {
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args([
+            "grep", "-n", "--untracked", "-e", "^<<<<<<<", "-e", "^>>>>>>>", "--", MEMORY_DIR,
+        ])
+        .output()
+        .context("执行 git grep 失败(git 是否安装?)")?;
+    match out.status.code() {
+        Some(0) => {
+            let hits = String::from_utf8_lossy(&out.stdout);
+            bail!(
+                "检测到未解决的冲突标记,已中止 sync(未提交、未 push)。\n请先解决以下位置再重试:\n{}",
+                hits.trim()
+            );
+        }
+        Some(1) => Ok(()),
+        _ => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            bail!("冲突标记检测失败: {}", stderr.trim());
+        }
+    }
+}
+
 /// 检查 root 是不是 git 仓库。
 fn ensure_repo(root: &Path) -> Result<()> {
     let out = Command::new("git")
@@ -111,9 +142,10 @@ pub fn add_note(
 /// 步骤:
 ///   1. git pull --rebase(拉远端最新,真源对齐)
 ///   2. reindex(把拉下来的变更吸收进本地索引)
-///   3. git add memory/ + 有改动则 commit
-///   4. reindex(把本地新改动也吸收进索引)
-///   5. git push
+///   3. 冲突标记守卫:memory/ 残留 `<<<<<<<` / `>>>>>>>` 则中止
+///   4. git add memory/ + 有改动则 commit
+///   5. reindex(把本地新改动也吸收进索引)
+///   6. git push
 fn run_sync(root: &Path, message: &str, reindex: &dyn Fn(&Path) -> Result<()>) -> Result<()> {
     ensure_repo(root)?;
 
@@ -131,7 +163,10 @@ fn run_sync(root: &Path, message: &str, reindex: &dyn Fn(&Path) -> Result<()>) -
     // 2. 拉完先 reindex,保证本地索引含远端内容
     reindex(root)?;
 
-    // 3. 暂存 memory/ 下的真源改动
+    // 3. 提交前守卫:有未解决的冲突标记就中止,不让脏文件进版本库
+    check_conflict_markers(root)?;
+
+    // 4. 暂存 memory/ 下的真源改动
     git(root, &["add", MEMORY_DIR])?;
     let staged = git(root, &["status", "--porcelain", "--", MEMORY_DIR])?;
     if staged.is_empty() {
