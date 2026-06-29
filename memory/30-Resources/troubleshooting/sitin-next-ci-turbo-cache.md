@@ -40,3 +40,23 @@ turbo 缓存纯本地 `.turbo`(gitignore):
 - 依赖 Jenkins 为**固定持久节点**(docker daemon/磁盘持久)→ cache-dir 与 BuildKit cache mount 才能跨构建存活。若上**弹性 agent**,本地缓存失效 → 须 **Turbo Remote Cache**。
 - 宿主缓存(cache-dir)与 Docker 缓存(BuildKit mount)是**两套独立缓存**,不共享;同一包被两边各编各缓存。全 monorepo 一套统一缓存只有 Remote Cache 能做到。
 - 全 20 个 jenkins 项目里只有 **sitin-next + sitin-monorepo** 用 turbo;其余 Gradle。sitin-monorepo 已删外层 build.cmd(无双重构建),但其各服务 Dockerfile 同样缺 cache mount,要生效需单独同样处理。
+
+## 已落地与实测(2026-06-29 验证通过)
+
+三轮改动,minerva 单次构建(暖)~6min → ~3.5–4min:
+
+| 优化 | 手段 | 实测 |
+|---|---|---|
+| **A turbo 缓存 + 修双重构建** | 宿主 `--cache-dir`(躲 cleanWs)+ Docker BuildKit `--mount=type=cache,target=/app/.turbo`;`build.cmd` 收窄去掉 minerva | turbo 74s(冷)→33s(暖);minerva 不再宿主+Docker 双编 |
+| **B-1 精简镜像** | `pnpm --filter=app-minerva-server deploy --prod --legacy /app/deploy` + `package.json "files":["build","prisma"]`;runner 扁平 `COPY /app/deploy ./` + `CMD node build/index.js` | **导出 110s→13s、COPY node_modules 52s→1.4s** |
+| **C 类型安全** | tsconfig 排 test;删 prisma symlink(import +1 `../`);去 `{ tsc \|\| true; }` | tsc 0 错;堵住坏类型静默上线 |
+
+**真瓶颈认知**:导出+拷贝(162s,占 45%)= node_modules 体积;不是 install(~42s)、不是 turbo。`pnpm deploy` 治本。
+
+**关键坑**:
+- `pnpm deploy` 下 build/ 被 gitignore → 必须 `files:["build","prisma"]` 显式纳入,否则 deploy 不带,容器起不来。prisma musl 引擎随 build/ 进 deploy(`binaryTargets` 已含 `linux-musl-openssl-3.0.x`),dev-213 Pod 实证能连。
+- 扁平化后 `PKG_ROOT = build/.. = /app`,`.env` 放 `/app/.env`、`CMD node build/index.js`。
+- prisma symlink 的 TS2322 **只在 alpine 复现**(macOS realpath 自动合一),本地不是可靠 oracle,靠 CI 验。
+- 去 `\|\| true` 的潜在类型错**分支+OS 特定**,本地穷举不了;decision-executor 真错只在 release/test-admin(带群发代码)出现并修复(用 `isDispatchHandled()`)。
+
+**验证**:#213 tsc 0 错 + dev-213 Pod `Server listening :3000`、0 error。PR #481(colna)。
