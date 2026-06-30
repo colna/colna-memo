@@ -59,4 +59,4 @@ turbo 缓存纯本地 `.turbo`(gitignore):
 - prisma symlink 的 TS2322 **只在 alpine 复现**(macOS realpath 自动合一),本地不是可靠 oracle,靠 CI 验。
 - 去 `\|\| true` 的潜在类型错**分支+OS 特定**,本地穷举不了;decision-executor 真错只在 release/test-admin(带群发代码)出现并修复(用 `isDispatchHandled()`)。
 
-**验证**:#213 tsc 0 错 + dev-213 Pod `Server listening :3000`、0 error。PR #481(colna)。
+**验证**:#213 tsc 0 错 + dev-213 Pod `Server listening :3000`、0 error。PR [#481](https://github.com/presence-io/sitin-next/pull/481)(colna)**已 merged 上线**(2026-06-30,merge commit `811c809c`,by Sahadev → `feature/admin`)。
