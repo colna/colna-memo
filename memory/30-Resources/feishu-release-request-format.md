@@ -51,13 +51,25 @@ tags: [飞书, 上线申请, 规范, lark-cli, sitin-next]
 
 ## 已发实例
 
-- PR [#484](https://github.com/presence-io/sitin-next/pull/484)(修 minerva-server prod 构建失败)上线申请,2026-06-29 发到「前端」群。详见 [[sitin-next-ci-turbo-cache]] 里的 prod 构建 FAILURE 排错。
+- PR [#484](https://github.com/presence-io/sitin-next/pull/484)(修 minerva-server prod 构建失败)上线申请,2026-06-29 发到「前端」群。详见 [sitin-next-ci-turbo-cache](./sitin-next-ci-turbo-cache.md) 里的 prod 构建 FAILURE 排错。
+- PR [#471](https://github.com/presence-io/sitin-next/pull/471)(social-proxy 控制台 3 块改:devices 修复 + actions V3 重构 + online-stats 5 项统计修复)上线申请,2026-06-30 14:53 发到「前端」群,文末 @尚斌。
+
+## 关键应用配置(2026-06-30 沉淀)
+
+- **必须用应用 `cli_a948f5747e3b9ccc`**(名 `COLNA's Unrestricted 4.7`,正式应用@Presence)发,这是当前唯一启用了 `im:message.send_as_user` scope 的应用。lark-cli 默认安装绑的 `cli_a96365d9983e5bb5` 没启 send_as_user,在那上面发会卡客户端 + 服务端双重校验(230027 / missing_scope),没有绕过路径。
+- profile 切换:`lark-cli profile use colna-unrestricted`(若没建过先 `lark-cli profile add --app-id cli_a948f5747e3b9ccc --name colna-unrestricted --app-secret-stdin --use`)。
+- 张峥在 `cli_a948f5747e3b9ccc` 下的 open_id 是 `ou_a4268eb6ac93f7281b30bf37ff6d3fba`(open_id 是 per-app 的,跟另一个应用不同)。
 
 ## 发送命令示例
 
 ```bash
-# 文案写进变量后用 --markdown 发(--as user = 张峥)
+# 切到 COLNA 应用(已 add 过)
+lark-cli profile use colna-unrestricted
+
+# 文案写进变量后用 --markdown 发(--as user = 张峥);@人用 <at id="ou_xxx"></at>
 lark-cli im +messages-send --as user \
   --chat-id "oc_3aabdcfa9738eec37152a5a65dcca0c5" \
   --markdown "$MSG"
 ```
+
+@人示例:文末加 `<at id="ou_a205a4983cb1afe62a2fd69a4fa5f464"></at>` 即 @尚斌(尚斌的 open_id 同样是 `cli_a948f5747e3b9ccc` 应用下的;换应用要重查)。
