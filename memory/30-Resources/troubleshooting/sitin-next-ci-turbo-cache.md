@@ -60,3 +60,16 @@ turbo 缓存纯本地 `.turbo`(gitignore):
 - 去 `\|\| true` 的潜在类型错**分支+OS 特定**,本地穷举不了;decision-executor 真错只在 release/test-admin(带群发代码)出现并修复(用 `isDispatchHandled()`)。
 
 **验证**:#213 tsc 0 错 + dev-213 Pod `Server listening :3000`、0 error。PR [#481](https://github.com/presence-io/sitin-next/pull/481)(colna)**已 merged 上线**(2026-06-30,merge commit `811c809c`,by Sahadev → `feature/admin`)。
+
+## 后续:去 `|| true` 挡下的第一个真错(prod #482 构建 FAILURE)
+
+`release/online-admin` @ `38dabcb8`(Merge #482 from feature/admin)prod 构建 **FAILURE**:
+```
+src/_koa-perm/routes/guild/users.ts(10,24): error TS2307:
+  Cannot find module '../../generated/prisma/index.js'
+```
+- **不是 #481 的回归**,而是 #481「删 symlink + 去 `tsc || true`」按预期把别人 **#482 新带进来的**一处坏 import 挡在了上线前(以前会被吞掉静默出镜像)。
+- **层数规则**:`_koa-perm` 下 generated 相对路径层数 = 文件目录深度。`routes/guild/*` 要 **3 层** `../../../generated`;`services/*`、`utils/*` 是 **2 层** `../../generated`。`guild/users.ts` 误写 2 层(指向已删 symlink 旧位)→ TS2307。同目录 `observatory.ts`/`script-configs.ts`/`gateway-device.ts` 都是正确的 3 层,唯独它漏网。
+- **作者无感原因**:写它的人本地 symlink 还在 + macOS realpath 不报错 → 本地/其分支不复现,合进 online-admin 才炸。又一例「分支+OS 特定」。
+- **修复**:从 `feature/admin` 切 `personal/zz/fix-koa-prisma-import`,`users.ts:10` 2→3 层,commit `683b0cee`。`tsc.koa` 0 错。
+- **防再犯**:eslint `no-restricted-imports` 限制 `_koa-perm` 手写 `../../generated`,或上 `@/generated` 路径别名。
