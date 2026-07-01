@@ -10,6 +10,7 @@ tags: [tech-proposal, sensemars, sensetime, pwa, sitin-next, trtc, video-call, b
 **目标分支**:`sitin-next feature/pwa`
 **目标包**:`packages/app-pwa`
 **基础项目**:[shangtang-sdk-demo](README.md)
+**可视化版本**:[shangtang-beauty-pwa-tech-proposal.html](../../_attachments/shangtang-beauty-pwa-tech-proposal.html)(light 风格 HTML,含彩色 Mermaid 流程图 + 粒子动效,浏览器直接打开)
 
 ## 零、核心业务价值验证:对方能看到美颜吗?
 

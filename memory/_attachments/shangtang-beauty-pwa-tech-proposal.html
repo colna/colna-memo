@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>商汤 SenseMARS 美颜集成 · sitin-next PWA 技术方案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+SC:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<style>
+  :root{
+    --bg: #fafbff;
+    --bg-soft: #f2f4fb;
+    --card: #ffffff;
+    --card-glass: rgba(255,255,255,.72);
+    --border: #e6e9f4;
+    --text: #1a1f36;
+    --text-2: #4a5578;
+    --text-3: #8891ae;
+    --brand-1: #7c3aed;
+    --brand-2: #ec4899;
+    --brand-3: #3b82f6;
+    --brand-4: #06b6d4;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --shadow-sm: 0 1px 2px rgba(16,24,40,.04), 0 1px 3px rgba(16,24,40,.06);
+    --shadow-md: 0 4px 12px rgba(16,24,40,.05), 0 12px 32px rgba(16,24,40,.06);
+    --shadow-lg: 0 12px 48px rgba(124,58,237,.10), 0 4px 16px rgba(16,24,40,.06);
+    --grad-brand: linear-gradient(135deg, #7c3aed 0%, #ec4899 55%, #f59e0b 100%);
+    --grad-cool: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+    --grad-warm: linear-gradient(135deg, #f97316 0%, #ec4899 100%);
+    --grad-mint: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+  }
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter','Noto Sans SC',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.7;overflow-x:hidden;}
+  /* ============ 背景装饰 ============ */
+  .bg-decor{position:fixed;inset:0;z-index:-2;overflow:hidden;pointer-events:none;}
+  .bg-decor::before,.bg-decor::after{
+    content:"";position:absolute;border-radius:50%;filter:blur(80px);opacity:.5;
+    animation:float 22s ease-in-out infinite;
+  }
+  .bg-decor::before{
+    width:520px;height:520px;left:-120px;top:-80px;
+    background:radial-gradient(circle,rgba(124,58,237,.35) 0%,rgba(124,58,237,0) 70%);
+  }
+  .bg-decor::after{
+    width:600px;height:600px;right:-160px;top:22%;
+    background:radial-gradient(circle,rgba(236,72,153,.30) 0%,rgba(236,72,153,0) 70%);
+    animation-delay:-11s;
+  }
+  .bg-decor .blob-3{
+    position:absolute;width:480px;height:480px;left:38%;bottom:-160px;border-radius:50%;filter:blur(80px);opacity:.4;
+    background:radial-gradient(circle,rgba(59,130,246,.40) 0%,rgba(59,130,246,0) 70%);
+    animation:float 26s ease-in-out infinite -6s;
+  }
+  @keyframes float{
+    0%,100%{transform:translate(0,0) scale(1);}
+    33%{transform:translate(40px,-30px) scale(1.06);}
+    66%{transform:translate(-30px,40px) scale(.96);}
+  }
+  #particles{position:fixed;inset:0;z-index:-1;pointer-events:none;}
+  /* ============ 顶部滚动进度条 ============ */
+  .scroll-progress{
+    position:fixed;top:0;left:0;height:3px;width:0%;z-index:100;
+    background:var(--grad-brand);
+    box-shadow:0 0 10px rgba(236,72,153,.4);
+    transition:width .1s linear;
+  }
+  /* ============ 导航 ============ */
+  nav.toc{
+    position:fixed;top:24px;right:24px;z-index:50;
+    background:var(--card-glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid var(--border);border-radius:16px;padding:14px 16px;
+    box-shadow:var(--shadow-md);max-width:220px;
+    transform:translateX(0);transition:transform .4s cubic-bezier(.16,1,.3,1),opacity .3s;
+  }
+  nav.toc h4{margin:0 0 8px;font-size:11px;letter-spacing:.12em;color:var(--text-3);text-transform:uppercase;font-weight:700;}
+  nav.toc ol{margin:0;padding:0;list-style:none;counter-reset:step;}
+  nav.toc li{counter-increment:step;font-size:12.5px;padding:5px 0;position:relative;padding-left:20px;}
+  nav.toc li::before{
+    content:counter(step);position:absolute;left:0;top:6px;
+    width:15px;height:15px;border-radius:50%;
+    background:var(--bg-soft);color:var(--text-3);
+    font-size:9.5px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+    transition:all .3s;
+  }
+  nav.toc a{color:var(--text-2);text-decoration:none;transition:color .2s;}
+  nav.toc a:hover{color:var(--brand-1);}
+  nav.toc li.active::before{background:var(--grad-brand);color:#fff;box-shadow:0 2px 8px rgba(124,58,237,.4);}
+  nav.toc li.active a{color:var(--text);font-weight:600;}
+  @media(max-width:1100px){nav.toc{display:none;}}
+  /* ============ 页面容器 ============ */
+  .wrap{max-width:960px;margin:0 auto;padding:80px 32px 120px;position:relative;z-index:1;}
+  @media(max-width:640px){.wrap{padding:60px 20px 80px;}}
+  /* ============ Hero ============ */
+  .hero{text-align:center;margin-bottom:100px;position:relative;}
+  .hero-badge{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:6px 14px;border-radius:99px;
+    background:var(--card);border:1px solid var(--border);
+    font-size:12px;font-weight:600;color:var(--text-2);letter-spacing:.02em;
+    box-shadow:var(--shadow-sm);
+    margin-bottom:24px;
+    animation:slideDown .8s cubic-bezier(.16,1,.3,1);
+  }
+  .hero-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--brand-2);box-shadow:0 0 8px var(--brand-2);animation:pulse 2s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(1.3);}}
+  @keyframes slideDown{from{opacity:0;transform:translateY(-20px);}to{opacity:1;transform:translateY(0);}}
+  h1.hero-title{
+    font-family:'Inter','Noto Sans SC',sans-serif;
+    font-size:clamp(38px,5.8vw,68px);font-weight:800;line-height:1.1;letter-spacing:-.02em;
+    margin:0 0 20px;
+    background:var(--grad-brand);background-size:200% 100%;
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    animation:fadeUp .9s .1s cubic-bezier(.16,1,.3,1) backwards, shine 6s linear infinite;
+  }
+  @keyframes shine{to{background-position:200% 0;}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+  .hero-sub{
+    font-size:clamp(15px,1.6vw,18px);color:var(--text-2);max-width:640px;margin:0 auto 32px;
+    animation:fadeUp .9s .25s cubic-bezier(.16,1,.3,1) backwards;
+  }
+  .hero-meta{
+    display:flex;flex-wrap:wrap;justify-content:center;gap:10px;
+    animation:fadeUp .9s .4s cubic-bezier(.16,1,.3,1) backwards;
+  }
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:6px 12px;border-radius:99px;
+    background:var(--card);border:1px solid var(--border);
+    font-size:12px;color:var(--text-2);font-weight:500;
+    box-shadow:var(--shadow-sm);
+  }
+  .chip svg{opacity:.7;}
+  /* ============ Section ============ */
+  section.block{
+    margin-bottom:96px;opacity:0;transform:translateY(40px);
+    transition:opacity .9s cubic-bezier(.16,1,.3,1),transform .9s cubic-bezier(.16,1,.3,1);
+  }
+  section.block.in{opacity:1;transform:translateY(0);}
+  .section-head{margin-bottom:32px;}
+  .section-num{
+    display:inline-block;font-family:'JetBrains Mono',monospace;
+    font-size:12px;font-weight:700;color:var(--brand-1);letter-spacing:.15em;text-transform:uppercase;
+    margin-bottom:8px;
+    padding:4px 10px;background:rgba(124,58,237,.08);border-radius:6px;
+  }
+  h2{
+    font-size:clamp(28px,3.4vw,40px);font-weight:800;letter-spacing:-.01em;line-height:1.2;
+    margin:0 0 12px;color:var(--text);
+  }
+  h2 .accent{
+    background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .section-lead{font-size:16px;color:var(--text-2);max-width:640px;}
+  h3{font-size:20px;font-weight:700;margin:36px 0 12px;color:var(--text);letter-spacing:-.005em;}
+  h4{font-size:15px;font-weight:600;margin:24px 0 10px;color:var(--text);}
+  p{margin:0 0 14px;color:var(--text-2);font-size:15px;}
+  strong{color:var(--text);font-weight:600;}
+  code{
+    font-family:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    font-size:.86em;
+    background:var(--bg-soft);padding:2px 6px;border-radius:5px;color:var(--brand-1);
+    border:1px solid var(--border);
+  }
+  a{color:var(--brand-3);text-decoration:none;border-bottom:1px solid rgba(59,130,246,.3);transition:all .2s;}
+  a:hover{color:var(--brand-1);border-color:var(--brand-1);}
+  /* ============ 卡片 ============ */
+  .card{
+    background:var(--card);border:1px solid var(--border);border-radius:16px;
+    padding:24px 28px;box-shadow:var(--shadow-sm);
+    transition:transform .3s cubic-bezier(.16,1,.3,1),box-shadow .3s;
+    position:relative;overflow:hidden;
+  }
+  .card::before{
+    content:"";position:absolute;inset:0;border-radius:16px;padding:1px;
+    background:linear-gradient(135deg,rgba(124,58,237,0),rgba(236,72,153,0));
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude;
+    pointer-events:none;opacity:0;transition:opacity .3s;
+  }
+  .card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);}
+  .card:hover::before{
+    background:linear-gradient(135deg,rgba(124,58,237,.35),rgba(236,72,153,.35));
+    opacity:1;
+  }
+  .card-accent{
+    background:linear-gradient(135deg,rgba(124,58,237,.05),rgba(236,72,153,.05),rgba(59,130,246,.05));
+    border-color:rgba(124,58,237,.15);
+  }
+  /* ============ 亮点卡片(TL;DR) ============ */
+  .tldr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:20px;}
+  .tldr-item{
+    background:var(--card);border:1px solid var(--border);border-radius:14px;
+    padding:20px;position:relative;overflow:hidden;
+    transition:transform .3s,box-shadow .3s;
+  }
+  .tldr-item:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);}
+  .tldr-item .icon{
+    width:36px;height:36px;border-radius:10px;
+    display:flex;align-items:center;justify-content:center;
+    margin-bottom:14px;color:#fff;font-size:16px;font-weight:800;
+    box-shadow:var(--shadow-sm);
+  }
+  .tldr-item.i1 .icon{background:var(--grad-brand);}
+  .tldr-item.i2 .icon{background:var(--grad-cool);}
+  .tldr-item.i3 .icon{background:var(--grad-mint);}
+  .tldr-item.i4 .icon{background:var(--grad-warm);}
+  .tldr-item h4{margin:0 0 6px;font-size:14px;}
+  .tldr-item p{margin:0;font-size:13px;color:var(--text-2);line-height:1.55;}
+  /* ============ 关键指标(数字大) ============ */
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin:24px 0;}
+  .metric{
+    background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px 20px;text-align:left;
+    transition:all .3s;
+  }
+  .metric:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);}
+  .metric .label{font-size:11px;color:var(--text-3);letter-spacing:.1em;text-transform:uppercase;font-weight:700;margin-bottom:6px;}
+  .metric .value{
+    font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:800;letter-spacing:-.02em;
+    background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent;
+    line-height:1.1;
+  }
+  .metric .unit{font-size:14px;color:var(--text-3);font-weight:600;margin-left:4px;}
+  /* ============ 表格 ============ */
+  .tbl-wrap{overflow-x:auto;margin:16px 0 4px;border-radius:14px;border:1px solid var(--border);}
+  table{width:100%;border-collapse:collapse;background:var(--card);}
+  th,td{padding:12px 16px;text-align:left;font-size:14px;border-bottom:1px solid var(--border);}
+  th{
+    font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);
+    background:var(--bg-soft);
+  }
+  tr:last-child td{border-bottom:none;}
+  tbody tr{transition:background .2s;}
+  tbody tr:hover{background:linear-gradient(90deg,rgba(124,58,237,.03),rgba(236,72,153,.03));}
+  td strong{color:var(--text);}
+  /* ============ 路径对比卡片 ============ */
+  .path-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-top:20px;}
+  .path{
+    background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;
+    position:relative;overflow:hidden;transition:all .35s;
+  }
+  .path:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);}
+  .path.recommended{
+    border-color:transparent;
+    background:linear-gradient(var(--card),var(--card)) padding-box,
+               var(--grad-brand) border-box;
+    border:2px solid transparent;
+  }
+  .path .tag{
+    display:inline-block;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+    padding:3px 8px;border-radius:6px;margin-bottom:12px;
+  }
+  .path.p1 .tag{background:rgba(59,130,246,.12);color:var(--brand-3);}
+  .path.p2 .tag{background:rgba(245,158,11,.12);color:var(--warning);}
+  .path.p3 .tag{background:var(--grad-brand);color:#fff;box-shadow:0 4px 12px rgba(124,58,237,.3);}
+  .path h4{margin:0 0 10px;font-size:17px;}
+  .path .desc{font-size:13.5px;color:var(--text-2);margin-bottom:12px;}
+  .path ul.pill-list{list-style:none;padding:0;margin:8px 0 0;}
+  .path ul.pill-list li{
+    font-size:12.5px;padding:6px 0;color:var(--text-2);
+    display:flex;align-items:flex-start;gap:8px;
+  }
+  .path ul.pill-list li::before{
+    content:"";width:6px;height:6px;border-radius:50%;background:var(--brand-1);
+    flex-shrink:0;margin-top:8px;
+  }
+  .path.p2 ul.pill-list li::before{background:var(--brand-3);}
+  .path.p3 ul.pill-list li::before{background:var(--brand-2);}
+  /* ============ 引用/提示块 ============ */
+  .callout{
+    display:flex;gap:14px;padding:18px 20px;border-radius:14px;margin:20px 0;
+    border:1px solid;position:relative;overflow:hidden;
+  }
+  .callout .cico{
+    width:28px;height:28px;border-radius:8px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;
+  }
+  .callout .body{font-size:14px;line-height:1.65;color:var(--text-2);}
+  .callout .body strong{color:var(--text);}
+  .callout.info{background:linear-gradient(135deg,rgba(59,130,246,.05),rgba(6,182,212,.05));border-color:rgba(59,130,246,.2);}
+  .callout.info .cico{background:var(--grad-cool);}
+  .callout.warn{background:linear-gradient(135deg,rgba(245,158,11,.05),rgba(249,115,22,.05));border-color:rgba(245,158,11,.25);}
+  .callout.warn .cico{background:var(--grad-warm);}
+  .callout.success{background:linear-gradient(135deg,rgba(16,185,129,.05),rgba(6,182,212,.05));border-color:rgba(16,185,129,.2);}
+  .callout.success .cico{background:var(--grad-mint);}
+  .callout.danger{background:linear-gradient(135deg,rgba(239,68,68,.05),rgba(236,72,153,.05));border-color:rgba(239,68,68,.2);}
+  .callout.danger .cico{background:linear-gradient(135deg,#ef4444,#ec4899);}
+  /* ============ 代码块 ============ */
+  pre{
+    background:#0f172a;color:#e2e8f0;padding:18px 22px;border-radius:14px;overflow-x:auto;
+    font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.65;
+    box-shadow:var(--shadow-md);
+    border:1px solid rgba(255,255,255,.08);
+    position:relative;
+  }
+  pre::before{
+    content:"";position:absolute;top:12px;left:16px;
+    width:10px;height:10px;border-radius:50%;background:#ef4444;
+    box-shadow:16px 0 #f59e0b, 32px 0 #10b981;
+  }
+  pre code{background:transparent;color:inherit;border:none;padding:0;font-size:inherit;display:block;padding-top:14px;}
+  pre .k{color:#c084fc;}
+  pre .s{color:#86efac;}
+  pre .c{color:#64748b;font-style:italic;}
+  pre .n{color:#fbbf24;}
+  pre .f{color:#60a5fa;}
+  /* ============ Mermaid 容器 ============ */
+  .mm-wrap{
+    background:var(--card);border:1px solid var(--border);border-radius:16px;
+    padding:28px 20px;margin:24px 0;
+    box-shadow:var(--shadow-sm);
+    overflow-x:auto;
+    position:relative;
+  }
+  .mm-wrap::before{
+    content:attr(data-title);position:absolute;top:10px;left:16px;
+    font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);
+  }
+  .mm-wrap .mermaid{display:flex;justify-content:center;min-height:200px;padding-top:16px;}
+  /* ============ 列表 ============ */
+  ul.styled,ol.styled{padding-left:0;list-style:none;}
+  ul.styled li,ol.styled li{
+    position:relative;padding-left:28px;margin:8px 0;font-size:14.5px;color:var(--text-2);
+  }
+  ul.styled li::before{
+    content:"";position:absolute;left:6px;top:11px;width:6px;height:6px;border-radius:50%;
+    background:var(--grad-brand);box-shadow:0 0 0 3px rgba(124,58,237,.1);
+  }
+  ol.styled{counter-reset:li;}
+  ol.styled li{counter-increment:li;}
+  ol.styled li::before{
+    content:counter(li);position:absolute;left:0;top:2px;
+    width:20px;height:20px;border-radius:50%;background:var(--grad-brand);
+    color:#fff;font-size:11px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 6px rgba(124,58,237,.3);
+  }
+  /* ============ 底部 ============ */
+  footer{
+    text-align:center;padding:60px 20px 20px;
+    color:var(--text-3);font-size:12.5px;letter-spacing:.02em;
+  }
+  footer .heart{color:var(--brand-2);animation:pulse 1.8s ease-in-out infinite;display:inline-block;}
+  /* ============ 悬停发光 ============ */
+  @keyframes glow-border{
+    0%,100%{box-shadow:0 0 0 rgba(124,58,237,0);}
+    50%{box-shadow:0 0 24px rgba(124,58,237,.3);}
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-decor"><div class="blob-3"></div></div>
+<canvas id="particles"></canvas>
+<div class="scroll-progress" id="scrollProgress"></div>
+
+<nav class="toc">
+  <h4>目录</h4>
+  <ol>
+    <li><a href="#value">核心业务价值</a></li>
+    <li><a href="#tldr">结论 TL;DR</a></li>
+    <li><a href="#context">上下文</a></li>
+    <li><a href="#options">方案对比</a></li>
+    <li><a href="#design">技术设计</a></li>
+    <li><a href="#downlink">下行美颜</a></li>
+    <li><a href="#effort">工作量</a></li>
+    <li><a href="#open">开放问题</a></li>
+    <li><a href="#next">下一步</a></li>
+  </ol>
+</nav>
+
+<div class="wrap">
+
+  <!-- ===== Hero ===== -->
+  <div class="hero">
+    <span class="hero-badge"><span class="dot"></span>Tech Proposal · v1 · 2026-07-01</span>
+    <h1 class="hero-title">商汤 SenseMARS 美颜<br/>集成 sitin-next PWA</h1>
+    <p class="hero-sub">
+      基于 <strong>TRTC v5 自定义视频源</strong> + <strong>商汤 4 类 SDK</strong>(effects · makeup · hair · nail)接入 heyhru PWA 端主播美颜,含上行美颜与下行"对方无感"美颜两条链路的完整技术方案。
+    </p>
+    <div class="hero-meta">
+      <span class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3z"/></svg>Target: feature/pwa · packages/app-pwa</span>
+      <span class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>License: SenseMARS WebEffects 2.3 · 有效期 2026-07-26</span>
+      <span class="chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Stack: React 19 · Vite · TRTC v5 · TUICallEngine v3</span>
+    </div>
+  </div>
+
+  <!-- ===== 0. 核心业务价值 ===== -->
+  <section class="block" id="value">
+    <div class="section-head">
+      <span class="section-num">§ 0 · Value</span>
+      <h2>核心业务价值验证:<span class="accent">对方能看到美颜吗?</span></h2>
+      <p class="section-lead">这是方案的核心业务价值,不是加分项。答案是<strong>能</strong>,因为咱们改的是上行流本身,不是本地滤镜。</p>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th style="width:36%">做法</th><th style="width:20%">对方能看到吗</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>❌ 本地 CSS 滤镜 / 只改 <code>&lt;video&gt;</code> 显示</strong></td>
+            <td>看不到</td>
+            <td>上行推流用的还是原始摄像头帧,只是本地渲染多加了一层 filter</td>
+          </tr>
+          <tr>
+            <td><strong>✅ 改上行流本身(咱们方案)</strong></td>
+            <td>一定看得到</td>
+            <td>商汤处理后的 canvas → <code>captureStream()</code> → MediaStreamTrack → TRTC 推流,推的就是美颜后的帧</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>端到端数据流</h3>
+    <div class="mm-wrap" data-title="上行美颜 · 主播 → 对方">
+    <div class="mermaid">
+flowchart TD
+  A([主播摄像头]):::cam --> B[getUserMedia<br/>原始 MediaStream]:::stream
+  B --> C{{商汤 SDK 处理<br/>美颜/滤镜/贴纸/美妆}}:::sdk
+  C --> D[美颜后的 canvas]:::canvas
+  D -->|本地预览| E([主播 &lt;video&gt;]):::view
+  D -->|captureStream| F[美颜后的<br/>MediaStreamTrack]:::stream
+  F --> G[trtc.startLocalVideo<br/>videoTrack: processedTrack]:::trtc
+  G --> H[(腾讯 TRTC 服务器)]:::server
+  H --> I[对方 TRTC SDK]:::trtc
+  I --> J([对方 &lt;video&gt;<br/>看到美颜后的主播 ✅]):::view
+
+  classDef cam fill:#fbcfe8,stroke:#ec4899,stroke-width:2px,color:#831843;
+  classDef stream fill:#e0e7ff,stroke:#6366f1,stroke-width:2px,color:#1e1b4b;
+  classDef sdk fill:#fef3c7,stroke:#f59e0b,stroke-width:2.5px,color:#78350f;
+  classDef canvas fill:#d1fae5,stroke:#10b981,stroke-width:2px,color:#064e3b;
+  classDef trtc fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;
+  classDef server fill:#f3e8ff,stroke:#a855f7,stroke-width:2px,color:#581c87;
+  classDef view fill:#fce7f3,stroke:#ec4899,stroke-width:2px,color:#831843;
+    </div>
+    </div>
+
+    <div class="tldr-grid" style="margin-top:24px;">
+      <div class="tldr-item i1"><div class="icon">1</div><h4>对方零负担</h4><p>美颜全在主播侧算,对方拿到已美颜好的视频帧,不需装 SDK、不耗对方 CPU、带宽不变。</p></div>
+      <div class="tldr-item i2"><div class="icon">2</div><h4>对方 App 不用改</h4><p>只主播端 PWA 集成一次,对方无论 PWA / iOS / Android / Web 只要能收 TRTC 流就能看。</p></div>
+      <div class="tldr-item i3"><div class="icon">3</div><h4>主播自拍所见即所得</h4><p>本地预览和上行流是同一份 canvas,主播看到什么效果对方就看到什么,零落差。</p></div>
+      <div class="tldr-item i4"><div class="icon">4</div><h4>音频独立链路</h4><p>美颜只作用在视频流,音频不受影响;音变/降噪走 TRTC 的 <code>voice-changer</code> 插件。</p></div>
+    </div>
+  </section>
+
+  <!-- ===== 1. TL;DR ===== -->
+  <section class="block" id="tldr">
+    <div class="section-head">
+      <span class="section-num">§ 1 · TL;DR</span>
+      <h2>结论:<span class="accent">可以接,技术路径通</span></h2>
+    </div>
+
+    <div class="callout success">
+      <div class="cico">✓</div>
+      <div class="body">
+        <strong>推荐:路径 C — 自定义 videoTrack + 商汤 SDK。</strong>裁剪范围只接
+        <strong>effects · makeup · hair · nail</strong> 4 类,<strong>不接</strong> tryon 系(手表/眼镜/戒指/鞋)—— 视频通话场景无意义,SDK 体积大。
+        先做 <strong>P0 MVP</strong>(基础美颜 + 3-5 个滤镜)验证性能和链路,再决策 P1+。
+      </div>
+    </div>
+
+    <ul class="styled">
+      <li>TRTC v5 官方原生支持自定义 <code>videoTrack: MediaStreamTrack</code>,商汤 SDK 处理后的 canvas 走 <code>captureStream()</code> 即可上行。</li>
+      <li>app-pwa 已有 <code>useCameraStream</code> hook 自主管理 <code>getUserMedia</code>,已引入 <code>@mediapipe/tasks-vision</code>,技术栈天然兼容。</li>
+      <li>底层 <code>_trtc</code> 实例已经通过 <code>this.trtc = this.engine?.getTRTCCloudInstance()?._trtc</code> 暴露,可绕开 TUICallEngine 高层 <code>openCamera</code> 用自定义源。</li>
+    </ul>
+
+    <div class="metrics">
+      <div class="metric"><div class="label">P0 前端工时</div><div class="value">8-10<span class="unit">人天</span></div></div>
+      <div class="metric"><div class="label">SDK 数量</div><div class="value">4<span class="unit">类</span></div></div>
+      <div class="metric"><div class="label">首屏影响</div><div class="value">0<span class="unit">MB</span></div></div>
+      <div class="metric"><div class="label">License 到期</div><div class="value">07-26</div></div>
+    </div>
+  </section>
+
+  <!-- ===== 2. 上下文 ===== -->
+  <section class="block" id="context">
+    <div class="section-head">
+      <span class="section-num">§ 2 · Context</span>
+      <h2>上下文</h2>
+    </div>
+
+    <h3>目标产品</h3>
+    <p>sitin-next <code>app-pwa</code> 是 heyhru 的 PWA 端(H5 女主播端,视频通话主要发生在这里)。视频通话走腾讯云 TRTC。<strong>当前视频通话没有美颜</strong>,女主播上镜前必须自己修图,产品需要通话内实时美颜/滤镜/贴纸能力。</p>
+
+    <h3>参考实现</h3>
+    <p>商汤 <code>shangtang-sdk-demo</code> 已拿到 <strong>SenseMARS WebEffects 2.3</strong> 授权(license 到 2026-07-26),里面 8 类 SDK 全部本地可跑,可作集成参考。</p>
+
+    <h3>现有栈评估</h3>
+    <div class="tbl-wrap">
+      <table>
+        <tbody>
+          <tr><td style="width:26%"><strong>框架</strong></td><td>React 19 + Vite + Zustand,和商汤 demo Vue 3 不同,但纯浏览器 SDK 不受框架约束</td></tr>
+          <tr><td><strong>视频通话</strong></td><td><code>trtc-sdk-v5 ^5.15.2</code> + <code>tuicall-engine-webrtc ^3.1.7</code></td></tr>
+          <tr><td><strong>帧处理能力</strong></td><td><code>@mediapipe/tasks-vision ^0.10.32</code>(说明已能处理 WASM + WebGL 视频帧,商汤 SDK 是同类)</td></tr>
+          <tr><td><strong>相机流管理</strong></td><td><code>hooks/useCameraStream.ts</code> 已自主 <code>getUserMedia</code> + 共享 stream 单例(Live/MockCall);通话时走 TUICallEngine <code>openCamera(viewId)</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== 3. 方案对比 ===== -->
+  <section class="block" id="options">
+    <div class="section-head">
+      <span class="section-num">§ 3 · Options</span>
+      <h2>三条<span class="accent">技术路径</span>对比</h2>
+      <p class="section-lead">TRTC v5 官方内置两个美颜插件 + 支持自定义视频源,合计三条路径。</p>
+    </div>
+
+    <div class="path-grid">
+      <div class="path p1">
+        <span class="tag">路径 A · 兜底</span>
+        <h4>TRTC BasicBeauty(官方内置)</h4>
+        <div class="desc"><strong>能力</strong>:magnitude / brightness / ruddy 三项基础美颜</div>
+        <ul class="pill-list">
+          <li>成本:TRTC v5 内置,不用商汤,不用授权</li>
+          <li>短板:能力单一,没有细分美妆 / 滤镜 / 贴纸</li>
+          <li>定位:<strong>SDK 加载失败 / 弱机时的降级兜底</strong></li>
+        </ul>
+      </div>
+
+      <div class="path p2">
+        <span class="tag">路径 B · 官方高级</span>
+        <h4>TRTC Beauty(付费包)</h4>
+        <div class="desc"><strong>能力</strong>:whiten / dermabrasion / lift / shave / eye / chin + Effect[] 滤镜贴纸</div>
+        <ul class="pill-list">
+          <li>成本:需腾讯单独购买(sdkAppId + userId + userSig 授权)</li>
+          <li>短板:能力薄于商汤,没 11 类细分美妆 / 染发 / 美甲 / AR 试戴</li>
+          <li>定位:不做主选</li>
+        </ul>
+      </div>
+
+      <div class="path p3">
+        <span class="tag">★ 路径 C · 推荐</span>
+        <h4>自定义 videoTrack + 商汤 SDK</h4>
+        <div class="desc"><strong>能力</strong>:商汤 4 类 SDK 完整特效栈</div>
+        <ul class="pill-list">
+          <li><strong>effects</strong>:美颜 / 美形 / 微整形 / 滤镜 / 贴纸 / 整妆 / 背景虚化</li>
+          <li><strong>makeup</strong>:口红 · 唇线 · 眼影 · 眼线 · 睫毛 · 腮红 · 修容 · 粉底 · 眉毛 …</li>
+          <li><strong>hair</strong> 染发 · <strong>nail</strong> 美甲</li>
+          <li>成本:商汤 license(已有,需商务续期 + OSS 分发路径)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout info">
+      <div class="cico">i</div>
+      <div class="body">
+        <strong>结论:</strong>路径 C 是唯一能覆盖产品完整需求的方案。路径 A 作为<strong>降级兜底</strong>(SDK 加载失败 / 弱机时退回 BasicBeauty,不影响通话)。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 4. 技术设计 ===== -->
+  <section class="block" id="design">
+    <div class="section-head">
+      <span class="section-num">§ 4 · Design</span>
+      <h2>技术设计:<span class="accent">路径 C 全景</span></h2>
+    </div>
+
+    <h3>4.1 数据流(上行链路)</h3>
+    <div class="mm-wrap" data-title="上行链路 · 商汤处理 → TRTC 推流">
+    <div class="mermaid">
+flowchart LR
+  A([getUserMedia]):::start --> B[MediaStream]:::stream
+  B --> C[HTMLVideoElement]:::el
+  C --> D{Webar 类<br/>st-ar-effects.js<br/>WASM + WebGL}:::sdk
+  D --> E[tempCanvas<br/>已处理]:::canvas
+  E --> F[canvas.captureStream fps]:::capture
+  F --> G[processed<br/>MediaStreamTrack]:::stream
+  G --> H[trtc.startLocalVideo<br/>view: local-video<br/>option.videoTrack: track<br/>profile: 480p_1]:::trtc
+  H --> I[(TRTC 上行推流)]:::server
+
+  classDef start fill:#fce7f3,stroke:#ec4899,stroke-width:2px,color:#831843;
+  classDef stream fill:#e0e7ff,stroke:#6366f1,stroke-width:2px,color:#1e1b4b;
+  classDef el fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#881337;
+  classDef sdk fill:#fef3c7,stroke:#f59e0b,stroke-width:2.5px,color:#78350f;
+  classDef canvas fill:#d1fae5,stroke:#10b981,stroke-width:2px,color:#064e3b;
+  classDef capture fill:#ccfbf1,stroke:#14b8a6,stroke-width:2px,color:#134e4a;
+  classDef trtc fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;
+  classDef server fill:#f3e8ff,stroke:#a855f7,stroke-width:2px,color:#581c87;
+    </div>
+    </div>
+
+    <h3>4.2 关键组件改造</h3>
+
+    <h4>新增(4 个文件)</h4>
+    <ol class="styled">
+      <li><code>packages/app-pwa/src/services/beautySdkManager.ts</code> — 商汤 SDK 单例封装:<code>preload()</code> · <code>startBeauty(source, opts)</code> · <code>updateEffect(type, params)</code> · <code>stopBeauty()</code> · <code>isAvailable()</code>(iOS Safari 版本 / WebGL2 / SharedArrayBuffer 能力探测)</li>
+      <li><code>packages/app-pwa/src/services/beautyBridge.ts</code> — canvas → MediaStreamTrack 桥接</li>
+      <li><code>packages/app-pwa/src/hooks/useBeauty.ts</code> — React 侧订阅美颜状态 + 面板控制</li>
+      <li><code>packages/app-pwa/src/components/BeautyPanel.tsx</code> — 通话中调节 UI</li>
+    </ol>
+
+    <h4>改造</h4>
+    <ol class="styled">
+      <li><code>webCallManager.tsx · startLocalVideo(viewId)</code> 分叉:启用美颜时 <code>getUserMedia → beautySdkManager.startBeauty → trtc.startLocalVideo({option.videoTrack})</code>;否则保持 <code>engine.openCamera(viewId)</code>。<code>hangup()</code> 里 <code>beautySdkManager.stopBeauty()</code>。</li>
+      <li><code>vite.config.ts</code>:商汤 SDK js/wasm 放 <code>public/sdk/{effects,makeup,hair,nail}/</code> 或 CDN。</li>
+      <li><code>index.html</code> / SW:workbox-precaching 排除 <code>sdk/*.wasm</code>。</li>
+      <li><code>public/sdk/*/WebAR.lic</code>:每个 SDK 目录一份 license,共 4 份。</li>
+    </ol>
+
+    <h3>4.3 SDK 加载策略</h3>
+    <div class="callout warn">
+      <div class="cico">!</div>
+      <div class="body">商汤单个 SDK ≈ 2-5MB(js + wasm + data),4 类合计 <strong>15-20MB</strong>。<strong>不能首屏加载。</strong></div>
+    </div>
+    <ul class="styled">
+      <li>登录后 <code>requestIdleCallback</code> 里<strong>只预热 effects</strong>(最常用)。</li>
+      <li>makeup / hair / nail <strong>懒加载</strong>:用户点击「细节美妆」时才 <code>import()</code>。</li>
+      <li>通话开始时若 SDK 未加载完,<strong>先降 BasicBeauty 上行</strong>,后台继续加载,完成后 <code>updateLocalVideo({option.videoTrack: newTrack})</code> 热切换。</li>
+    </ul>
+
+    <h3>4.4 License 管理</h3>
+    <ul class="styled">
+      <li><strong>dev</strong>:<code>public/sdk/*/WebAR.lic</code> 直接放本地(商汤 demo 就是这么用)。</li>
+      <li><strong>test / prod</strong>:走自有 OSS(<strong>需商汤商务开通</strong>,demo 的 <code>cdf-tryon.oss-cn-hangzhou.aliyuncs.com/sdk/softsugar/*</code> 是 softsugar 客户的,不能直接用)。</li>
+      <li>代码里 makeup/hair/nail 走 <code>checkLicenseFromPath(sdkPath)</code> 显式校验,effects/tryon 隐式校验。</li>
+      <li><strong>续期</strong>:到期前 7 天(<code>2026-07-19</code>)找许佳续,同步升级到 2.4+ 如有。</li>
+    </ul>
+
+    <h3>4.5 性能与降级</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>风险</th><th>场景</th><th>缓解</th></tr></thead>
+        <tbody>
+          <tr><td><strong>iOS Safari 15- 不支持 captureStream</strong></td><td>老 iPhone / iOS 14</td><td>探测 <code>HTMLCanvasElement.prototype.captureStream</code> 不支持自动 BasicBeauty</td></tr>
+          <tr><td><strong>双 SDK 并行掉帧</strong></td><td>低端 Android / 弱机</td><td>帧率检测 &lt;20fps 持续 3s → 自动降 BasicBeauty + Toast</td></tr>
+          <tr><td><strong>电池 / 发热</strong></td><td>长通话 &gt;15min</td><td>通话时长阈值 + 温度探测,超阈值降级</td></tr>
+          <tr><td><strong>前后置切换卡顿</strong></td><td>用户切镜头</td><td>stop 老 track → 换 <code>facingMode</code> 重新 <code>getUserMedia</code> → SDK reinit(300-500ms 黑屏,加过渡动画)</td></tr>
+          <tr><td><strong>SharedArrayBuffer 未启用</strong></td><td>eyeglasses 多线程版(本次不接)</td><td>不受影响,普通 SDK 单线程</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>降级链</h3>
+    <div class="mm-wrap" data-title="三级降级链 · 保证通话不断">
+    <div class="mermaid">
+flowchart LR
+  A[[自定义商汤流<br/>完整效果]]:::level1 -.失败/掉帧.-> B[[BasicBeauty<br/>TRTC 官方基础美颜]]:::level2
+  B -.失败.-> C[[裸流<br/>无美颜,通话正常]]:::level3
+
+  classDef level1 fill:#f3e8ff,stroke:#a855f7,stroke-width:2.5px,color:#581c87;
+  classDef level2 fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;
+  classDef level3 fill:#e5e7eb,stroke:#6b7280,stroke-width:2px,color:#1f2937;
+    </div>
+    </div>
+
+    <h3>4.6 兼容 TUICallEngine</h3>
+    <p><code>TUICallEngine.accept()</code> 内部走 <code>TRTC.enterRoom</code>,视频推流由 <code>TUICallEngine.openCamera(viewId)</code> 触发。接自定义流:</p>
+    <ul class="styled">
+      <li><strong>不能</strong>同时用 <code>openCamera</code> 和 <code>trtc.startLocalVideo</code> —— 前者会覆盖后者。</li>
+      <li>方案:<code>accept()</code> 之后<strong>跳过</strong> <code>openCamera</code>,直接 <code>this.trtc.startLocalVideo({view, publish: true, option: {videoTrack}})</code>,view 传本地预览 DOM ID。</li>
+      <li>只 hack <code>webCallManager.startLocalVideo</code> 分叉,<strong>不改 TUICallEngine 或 TRTC 库本身</strong>。</li>
+    </ul>
+  </section>
+
+  <!-- ===== 5. 下行美颜 ===== -->
+  <section class="block" id="downlink">
+    <div class="section-head">
+      <span class="section-num">§ 5 · Downlink</span>
+      <h2>下行美颜:<span class="accent">给主播看到的对方加美颜(对方无感知)</span></h2>
+      <p class="section-lead">独立可选扩展。ROI 明显低于上行,建议只做「环境增强档」,不做「改脸档」。</p>
+    </div>
+
+    <h3>5.1 场景定义</h3>
+    <div class="tbl-wrap">
+      <table>
+        <tbody>
+          <tr><td style="width:30%"><strong>上行美颜(§0-4)</strong></td><td>主播摄像头帧被商汤 SDK 处理后再推流 → 对方看到美颜后的主播 · <strong>对方能看到</strong></td></tr>
+          <tr><td><strong>下行美颜(本节)</strong></td><td>主播 SDK 收到对方视频后,<strong>在主播端本地</strong>做处理 → 主播 UI 上渲染的是美颜后的对方;对方 App/CPU/带宽完全不变,<strong>对方无感知</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>5.2 技术可行性:一手证据核验</h3>
+    <div class="callout success">
+      <div class="cico">✓</div>
+      <div class="body"><strong>TRTC v5 官方原生支持,不需要任何 hack。</strong>关键 API:<code>trtc.getVideoTrack({ userId })</code> 直接返回远端 <code>MediaStreamTrack</code>,可塞给商汤 SDK 处理。</div>
+    </div>
+
+    <p style="font-size:13px;color:var(--text-3);">
+      <strong>核验证据</strong>(直接来自本仓库已装 SDK 类型定义,不是搜索或记忆):<br/>
+      文件 <code>sitin-next/node_modules/trtc-sdk-v5/index.d.ts:2216</code> · SDK 版本 <code>5.15.3-beta.9</code>(与 <code>app-pwa/package.json</code> 声明的 <code>^5.15.2</code> 一致)
+    </p>
+
+<pre><code><span class="c">// 官方注释原文:</span>
+<span class="c">// If not passed or passed an empty string, get the local videoTrack.</span>
+<span class="c">// Pass the userId of the remote user to get the remote user's videoTrack.</span>
+
+<span class="k">getVideoTrack</span>(config?: {
+  userId?: <span class="k">string</span>;              <span class="c">// 传对方 userId 拿远端 track</span>
+  streamType?: <span class="n">TRTCStreamType</span>;  <span class="c">// MAIN 摄像头 / SUB 屏幕共享,都能拿</span>
+  processed?: <span class="k">boolean</span>;           <span class="c">// v5.8.2+,是否要 SDK 处理后的 track</span>
+}): <span class="n">MediaStreamTrack</span> | <span class="k">null</span>;</code></pre>
+
+    <p style="font-size:13px;color:var(--text-2);margin-top:14px;">顺带核验到:<code>getAudioTrack</code> 同样支持传 remote userId(<code>index.d.ts:2207</code>),意味着「下行音频降噪 / 变声」技术路径也通,虽然本方案不做。</p>
+
+    <h3>5.3 端到端数据流(下行链路)</h3>
+    <div class="mm-wrap" data-title="下行链路 · 主播侧美化对方 · 对方无感">
+    <div class="mermaid">
+flowchart TD
+  A([对方摄像头<br/>对方 App 播的是他自己的原相机]):::insensible --> B[TRTC 上行推流]:::trtc
+  B --> C[(腾讯 TRTC 服务器)]:::server
+  C --> D[主播 TRTC SDK<br/>收到 remoteVideoTrack]:::trtc
+  D --> E["trtc.getVideoTrack<br/>{ userId: 'male-123' }"]:::api
+  E --> F[远端原始<br/>MediaStreamTrack]:::stream
+  F --> G[隐藏 &lt;video&gt; 播放]:::el
+  G --> H[抓帧进 canvas]:::canvas
+  H --> I{商汤 SDK 处理<br/>共享上行 SDK 单例}:::sdk
+  I --> J[美颜后的 canvas]:::canvas
+  J --> K([主播屏幕<br/>看到美颜后的对方 ✅]):::view
+
+  classDef insensible fill:#fef3c7,stroke:#f59e0b,stroke-width:2px,color:#78350f,stroke-dasharray: 5 5;
+  classDef trtc fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;
+  classDef server fill:#f3e8ff,stroke:#a855f7,stroke-width:2px,color:#581c87;
+  classDef api fill:#fce7f3,stroke:#ec4899,stroke-width:2.5px,color:#831843;
+  classDef stream fill:#e0e7ff,stroke:#6366f1,stroke-width:2px,color:#1e1b4b;
+  classDef el fill:#ffe4e6,stroke:#f43f5e,stroke-width:2px,color:#881337;
+  classDef canvas fill:#d1fae5,stroke:#10b981,stroke-width:2px,color:#064e3b;
+  classDef sdk fill:#fef3c7,stroke:#f59e0b,stroke-width:2.5px,color:#78350f;
+  classDef view fill:#fce7f3,stroke:#ec4899,stroke-width:2px,color:#831843;
+    </div>
+    </div>
+
+    <p><strong>关键性质</strong>:美颜完全在主播设备本地算,<strong>对方那边播的还是他自己的原相机</strong>,不知道也不需要知道你在美化他。对方 App 不用改、不装 SDK、不消耗对方 CPU、带宽也不变。</p>
+
+    <h3>5.4 工程实现(复用上行 SDK 单例)</h3>
+    <p>§4.2 已设计好 <code>beautySdkManager</code>,下行只是把同一个 SDK 单例用在另一路 stream 上:</p>
+
+<pre><code><span class="c">// 在 beautySdkManager 上扩:</span>
+<span class="c">// 输入:任一 remote track;输出:美颜后 canvas 对应的 MediaStreamTrack</span>
+
+<span class="k">startRemoteBeauty</span>(
+  remoteTrack: <span class="n">MediaStreamTrack</span>,
+  opts: { effects: <span class="s">'env-only'</span> | <span class="s">'face'</span> }   <span class="c">// 分级见 5.5</span>
+): <span class="n">Promise</span>&lt;<span class="n">HTMLCanvasElement</span>&gt;;
+
+<span class="k">stopRemoteBeauty</span>(remoteUserId: <span class="k">string</span>): <span class="k">void</span>;</code></pre>
+
+    <p><strong>UI 侧改造</strong>(<code>webCallManager</code> 里挂 remote 视图那段):</p>
+    <ul class="styled">
+      <li>原来:<code>trtc.startRemoteVideo({ userId, view: 'remote-video' })</code> 让 SDK 自动挂 <code>&lt;video&gt;</code>。</li>
+      <li>改成:拿 <code>getVideoTrack({ userId })</code> → 塞给 <code>startRemoteBeauty</code> → 拿到 canvas → 主播 UI 渲染 canvas(隐藏 SDK 挂的 <code>&lt;video&gt;</code>,或用 <code>option.view: null</code> 让 SDK 别挂)。</li>
+    </ul>
+    <p><strong>估算</strong>:<code>+2-3 人天</code> 集成到 P1 里(SDK 单例已有,是复用不是新写)。</p>
+
+    <h3>5.5 产品分级建议 <span style="font-size:14px;font-weight:500;color:var(--text-3);">— 关键:技术能做 ≠ 产品该做</span></h3>
+
+    <div class="path-grid">
+      <div class="path p1" style="border-color:rgba(16,185,129,.35);">
+        <span class="tag" style="background:rgba(16,185,129,.12);color:var(--success);">档 A · 推荐做</span>
+        <h4>环境增强档</h4>
+        <div class="desc">背景虚化 bokeh · 亮度/曝光补偿 · 时域降噪</div>
+        <ul class="pill-list">
+          <li>男用户环境昏暗 / 房间乱 / 光线差 → 让主播看清对方,减少视觉疲劳</li>
+          <li>弱网 480p 下行画质差 → 降噪缓解</li>
+          <li><strong>不改脸,不影响主播对对方真实长相的判断</strong></li>
+        </ul>
+      </div>
+
+      <div class="path p2" style="border-color:rgba(239,68,68,.25);">
+        <span class="tag" style="background:rgba(239,68,68,.10);color:var(--danger);">档 B · 不推荐</span>
+        <h4>改脸档</h4>
+        <div class="desc">磨皮 · 美白 · 瘦脸 · 眼线 · 唇线 · 贴纸</div>
+        <ul class="pill-list">
+          <li>下行 480p → 商汤关键点精度掉,精细美妆基本不能用</li>
+          <li>主播看到的对方被美化 → 线下/其他场景暴露真实长相 → 情感判断错位(heyhru 讲主播粘性,这个落差有风险)</li>
+          <li>双向都开美颜,GPU/CPU 翻倍,弱机掉帧 ×2</li>
+          <li>ROI 弱:「让男用户顺眼」→「主播接单」因果链条弱</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="callout info">
+      <div class="cico">→</div>
+      <div class="body">
+        <strong>最终建议:</strong><br/>
+        <strong>P0</strong> — 只做上行(主播美颜)。<br/>
+        <strong>P1</strong> — 追加下行 <strong>A 档「环境增强」</strong>(bokeh + 亮度 + 降噪),对主播实际体验有帮助且无落差风险。<br/>
+        <strong>P2</strong> — 产品坚持时才考虑下行 <strong>B 档「改脸」</strong>,只开磨皮/美白,回避精度问题。
+      </div>
+    </div>
+
+    <h3>5.6 还没核验的两点(诚实标注)</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>断言</th><th>状态</th><th>怎么补证</th></tr></thead>
+        <tbody>
+          <tr><td>商汤 <code>effects</code> 具体含 bokeh + 亮度补偿 + 降噪滤镜</td><td>⏳ 未核验</td><td>进 <code>shangtang-sdk-demo/</code> 看导出的 effects 清单,或查官方 API</td></tr>
+          <tr><td>480p 下行流商汤关键点精度明显下降(眼线/唇线不能用)</td><td>⏳ 经验判断</td><td>查商汤官方「最低分辨率建议」,或跑一次 spike 实测</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== 6. 工作量 ===== -->
+  <section class="block" id="effort">
+    <div class="section-head">
+      <span class="section-num">§ 6 · Effort</span>
+      <h2>工作量估算</h2>
+      <p class="section-lead">按 <strong>1 前端 + 0.3 后端</strong>(license/OSS 商务)<strong> + 0.5 测试</strong> 计。</p>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>阶段</th><th>交付物</th><th style="width:22%">前端工时</th></tr></thead>
+        <tbody>
+          <tr><td><strong>P0</strong>(1.5-2 周)</td><td>基础美颜(effects/baseSkinCare)+ 3 个滤镜 + 通话内开关 + 降级链 + 移动端兼容测试</td><td><strong>8-10 人天</strong></td></tr>
+          <tr><td><strong>P1</strong>(1 周)</td><td>美形 / 微整形 / 更多滤镜 / 贴纸 · <strong>+ 下行环境增强(bokeh + 亮度 + 降噪)</strong></td><td><strong>5 人天</strong> + 2-3 人天</td></tr>
+          <tr><td><strong>P2</strong>(1 周)</td><td>makeup 11 类细分美妆(口红/眼影/腮红等)</td><td><strong>5 人天</strong></td></tr>
+          <tr><td><strong>P3</strong>(可选,3-5 天)</td><td>染发 hair / 美甲 nail</td><td><strong>3 人天</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout info">
+      <div class="cico">i</div>
+      <div class="body"><strong>建议先只交付 P0</strong>,上线后看指标(通话质量、掉线率、GPU 占用、女主播接单意愿变化)再决定 P1+。</div>
+    </div>
+  </section>
+
+  <!-- ===== 7. 开放问题 ===== -->
+  <section class="block" id="open">
+    <div class="section-head">
+      <span class="section-num">§ 7 · Open Q</span>
+      <h2>开放问题(需要决策)</h2>
+    </div>
+
+    <ol class="styled">
+      <li><strong>License 商务</strong>:是否已经和商汤签了 sitin/heyhru 的独立授权?邮件里的是 softsugar 客户 lic,直接用可能有法律风险。<strong>建议尽快找许佳确认商务口径。</strong></li>
+      <li><strong>OSS 分发</strong>:走商汤给的 OSS 还是自建 CDN?自建每次新版 SDK 要自己上传/更新。</li>
+      <li><strong>腾讯 vs 商汤</strong>:如果只做基础美颜+简单滤镜,BasicBeauty 免费直接用 ROI 更高;有没有细分美妆/贴纸/AR 的强诉求?</li>
+      <li><strong>PWA 首屏体积影响</strong>:每加一类 SDK 增加 2-5MB。懒加载能规避首屏影响,但用户首次进美妆面板会有 2-3s loading,能否接受?</li>
+      <li><strong>iOS 兼容底线</strong>:app-pwa 目前最低支持哪个 iOS 版本?iOS 14 不支持 <code>canvas.captureStream()</code> 会强制走 BasicBeauty。</li>
+      <li><strong>与现有 useCameraStream 单例的关系</strong>:通话时是共用同一份 <code>getUserMedia</code>(商汤消费一份、预览消费一份),还是新开一份?共用省资源但要处理引用计数。</li>
+    </ol>
+  </section>
+
+  <!-- ===== 8. 下一步 ===== -->
+  <section class="block" id="next">
+    <div class="section-head">
+      <span class="section-num">§ 8 · Next</span>
+      <h2>下一步(如果立项)</h2>
+    </div>
+
+    <div class="tldr-grid">
+      <div class="tldr-item i1"><div class="icon">01</div><h4>产品对齐</h4><p>与产品对齐 P0 效果清单和 UI 交互(优先级最高)。</p></div>
+      <div class="tldr-item i2"><div class="icon">02</div><h4>商务续期</h4><p>商汤商务续期 + OSS 分发路径确认(找许佳)。</p></div>
+      <div class="tldr-item i3"><div class="icon">03</div><h4>技术 Spike</h4><p>找一台低端 Android + 老 iPhone(iOS 15/16)先做 2-3 天原型验证,决定 P0 范围能否扩到 P1。</p></div>
+      <div class="tldr-item i4"><div class="icon">04</div><h4>开分支 · 先文档</h4><p>在 <code>feature/pwa</code> 开 <code>feat/pwa-beauty-sensetime</code>,按 sitin-next CLAUDE.md 硬规则「先 doc 后 code」提 PR。</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Made <span class="heart">◆</span> zhangzheng workspace &nbsp;·&nbsp; 2026-07-01 &nbsp;·&nbsp; based on <code>tech-proposal-pwa-integration.md</code></p>
+  </footer>
+
+</div>
+
+<script>
+  /* ============ 粒子动效 ============ */
+  (function(){
+    const canvas = document.getElementById('particles');
+    const ctx = canvas.getContext('2d');
+    let W, H, particles = [], mouse = {x: -9999, y: -9999};
+    const COLORS = [
+      'rgba(124,58,237,',   // 紫
+      'rgba(236,72,153,',   // 粉
+      'rgba(59,130,246,',   // 蓝
+      'rgba(6,182,212,',    // 青
+    ];
+    function resize(){
+      W = canvas.width = window.innerWidth * devicePixelRatio;
+      H = canvas.height = window.innerHeight * devicePixelRatio;
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+    }
+    function initParticles(){
+      const count = Math.min(70, Math.floor(window.innerWidth / 22));
+      particles = [];
+      for(let i=0;i<count;i++){
+        particles.push({
+          x: Math.random()*W,
+          y: Math.random()*H,
+          vx: (Math.random()-.5)*.3 * devicePixelRatio,
+          vy: (Math.random()-.5)*.3 * devicePixelRatio,
+          r: (Math.random()*2 + 1.2) * devicePixelRatio,
+          c: COLORS[i % COLORS.length],
+          a: Math.random()*.5 + .3,
+        });
+      }
+    }
+    function tick(){
+      ctx.clearRect(0,0,W,H);
+      // 连线
+      for(let i=0;i<particles.length;i++){
+        const p = particles[i];
+        for(let j=i+1;j<particles.length;j++){
+          const q = particles[j];
+          const dx = p.x - q.x, dy = p.y - q.y;
+          const d2 = dx*dx + dy*dy;
+          const maxD = 140 * devicePixelRatio;
+          if(d2 < maxD*maxD){
+            const alpha = (1 - Math.sqrt(d2)/maxD) * .22;
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(124,58,237,${alpha})`;
+            ctx.lineWidth = .6 * devicePixelRatio;
+            ctx.moveTo(p.x,p.y);
+            ctx.lineTo(q.x,q.y);
+            ctx.stroke();
+          }
+        }
+      }
+      // 粒子 + 鼠标交互
+      for(const p of particles){
+        // 鼠标斥力
+        const mx = mouse.x - p.x, my = mouse.y - p.y;
+        const md = Math.sqrt(mx*mx + my*my);
+        const radius = 110 * devicePixelRatio;
+        if(md < radius && md > 0){
+          const force = (1 - md/radius) * .8;
+          p.vx -= (mx/md) * force;
+          p.vy -= (my/md) * force;
+        }
+        // 阻尼
+        p.vx *= .985;
+        p.vy *= .985;
+        // 保底速度
+        const spd = Math.hypot(p.vx, p.vy);
+        if(spd < .05 * devicePixelRatio){
+          p.vx += (Math.random()-.5)*.06 * devicePixelRatio;
+          p.vy += (Math.random()-.5)*.06 * devicePixelRatio;
+        }
+        p.x += p.vx;
+        p.y += p.vy;
+        // 边界回环
+        if(p.x < 0) p.x = W;
+        if(p.x > W) p.x = 0;
+        if(p.y < 0) p.y = H;
+        if(p.y > H) p.y = 0;
+        // 画粒子
+        ctx.beginPath();
+        ctx.fillStyle = p.c + p.a + ')';
+        ctx.shadowColor = p.c + '.6)';
+        ctx.shadowBlur = 8 * devicePixelRatio;
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      requestAnimationFrame(tick);
+    }
+    window.addEventListener('resize', () => { resize(); initParticles(); });
+    window.addEventListener('mousemove', (e) => {
+      mouse.x = e.clientX * devicePixelRatio;
+      mouse.y = e.clientY * devicePixelRatio;
+    });
+    window.addEventListener('mouseleave', () => { mouse.x = -9999; mouse.y = -9999; });
+    window.addEventListener('touchmove', (e) => {
+      if(e.touches[0]){
+        mouse.x = e.touches[0].clientX * devicePixelRatio;
+        mouse.y = e.touches[0].clientY * devicePixelRatio;
+      }
+    }, {passive:true});
+    resize();
+    initParticles();
+    tick();
+  })();
+
+  /* ============ 滚动进度 ============ */
+  const progress = document.getElementById('scrollProgress');
+  window.addEventListener('scroll', () => {
+    const h = document.documentElement;
+    const p = h.scrollTop / (h.scrollHeight - h.clientHeight);
+    progress.style.width = (p*100) + '%';
+  }, {passive:true});
+
+  /* ============ Section 淡入 + ToC 高亮 ============ */
+  const sections = document.querySelectorAll('section.block');
+  const tocLinks = document.querySelectorAll('nav.toc li');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if(e.isIntersecting){
+        e.target.classList.add('in');
+      }
+    });
+  }, {threshold: .12});
+  sections.forEach(s => io.observe(s));
+
+  const activeIO = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if(e.isIntersecting){
+        const id = e.target.id;
+        tocLinks.forEach(li => {
+          const a = li.querySelector('a');
+          if(a && a.getAttribute('href') === '#' + id){
+            li.classList.add('active');
+          } else {
+            li.classList.remove('active');
+          }
+        });
+      }
+    });
+  }, {rootMargin: '-40% 0px -50% 0px'});
+  sections.forEach(s => activeIO.observe(s));
+
+  /* ============ Mermaid ============ */
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#EEF2FF',
+      primaryTextColor: '#1E293B',
+      primaryBorderColor: '#818CF8',
+      lineColor: '#94A3B8',
+      secondaryColor: '#FCE7F3',
+      tertiaryColor: '#DBEAFE',
+      fontFamily: "'Inter','Noto Sans SC',sans-serif",
+      fontSize: '14px',
+    },
+    flowchart: {
+      curve: 'basis',
+      nodeSpacing: 45,
+      rankSpacing: 55,
+      htmlLabels: true,
+      useMaxWidth: true,
+    },
+  });
+
+  /* ============ 平滑滚动 ============ */
+  document.querySelectorAll('nav.toc a').forEach(a => {
+    a.addEventListener('click', (e) => {
+      const href = a.getAttribute('href');
+      if(href.startsWith('#')){
+        e.preventDefault();
+        const el = document.querySelector(href);
+        if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+      }
+    });
+  });
+</script>
+</body>
+</html>
