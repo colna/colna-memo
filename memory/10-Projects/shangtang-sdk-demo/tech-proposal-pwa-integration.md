@@ -248,3 +248,116 @@ navigator.mediaDevices.getUserMedia()      │
 2. 商汤商务续期 + OSS 分发路径确认
 3. 找一台低端 Android + 老 iPhone(iOS 15/16)先做**技术可行性 spike**:2-3 天原型验证性能上限,决定 P0 范围能不能扩到 P1
 4. 在 `feature/pwa` 上开新分支(建议 `feat/pwa-beauty-sensetime`)按 `feature/pwa` 的规范提 PR:先 doc 后 code(sitin-next CLAUDE.md 硬规则)
+
+---
+
+## 八、下行美颜:给主播看到的对方加美颜(对方无感知)
+
+> 上行美颜(主播自己)一定要做;下行美颜是**独立可选扩展**,ROI 明显低于上行,建议只做"环境增强"这一档,**不做"改脸"档**。
+
+### 8.1 场景定义
+
+- **上行美颜**(前面 0-7 节):主播摄像头帧被商汤 SDK 处理后再推流 → 对方看到美颜后的主播 ✅ 对方能看到
+- **下行美颜**(本节):主播 SDK 收到对方推来的视频后,在**主播端本地**做处理 → 主播 UI 上渲染的是"美颜后的对方",**对方那边的画面/App/CPU/带宽完全不变**,对方无感知
+
+### 8.2 技术可行性:已核验(SDK 一手证据)
+
+**结论:TRTC v5 官方原生支持,不需要任何 hack。**
+
+关键 API:`trtc.getVideoTrack({ userId })` 直接返回远端用户的 `MediaStreamTrack`,可以塞给商汤 SDK 处理。
+
+证据(直接来自本仓库已安装的 SDK 类型定义,不是搜索或记忆):
+
+- **文件**:`sitin-next/node_modules/trtc-sdk-v5/index.d.ts:2216`
+- **SDK 版本**:`5.15.3-beta.9`(与 `app-pwa/package.json` 声明的 `^5.15.2` 一致)
+- **官方注释原文**:
+  > If not passed or passed an empty string, get the local videoTrack.
+  > Pass the userId of the remote user to get the remote user's videoTrack.
+
+```ts
+getVideoTrack(config?: {
+  userId?: string;                    // 传对方 userId 拿远端 track
+  streamType?: TRTCStreamType;        // STREAM_TYPE_MAIN(摄像头) / SUB(屏幕共享),都能拿
+  processed?: boolean;                // v5.8.2+,拿"SDK 处理后"的 track(虚拟背景/镜像/水印之后)
+}): MediaStreamTrack | null;
+```
+
+顺带核验到:`getAudioTrack` 同样支持传 remote userId(index.d.ts:2207),意味着"下行音频降噪/变声"技术路径也通,虽然本方案不做。
+
+### 8.3 端到端数据流
+
+```
+[对方摄像头] ← 对方 App 里播的是他自己的原相机,零变化
+      │
+      ↓ TRTC 上行推流
+[腾讯 TRTC 服务器]
+      │
+      ↓ 下行到主播
+[主播 TRTC SDK 收到 remoteVideoTrack]
+      │
+      ↓ trtc.getVideoTrack({ userId: 'male-123' })
+      │
+[远端原始 MediaStreamTrack]
+      │
+      ↓ new MediaStream([remoteTrack]) → 隐藏 <video> 播放
+      ↓ 每帧抓进 canvas
+      │
+[商汤 SDK 处理(和上行共享同一个 SDK 单例)]
+      │
+      ↓
+[美颜后的 canvas]
+      │
+      ↓ 主播 UI 渲染这个 canvas,原始 <video> 隐藏
+      │
+[主播屏幕:看到"美颜后的对方"] ✅
+```
+
+**关键性质**:美颜完全在主播设备本地算,对方那边**播的还是他自己的原相机**,不知道也不需要知道你在美化他。对方 App 不用改、不装 SDK、不消耗对方 CPU、带宽也不变。
+
+### 8.4 工程实现(复用上行 SDK 单例,边际成本很低)
+
+前面 4.2 已设计好 `beautySdkManager`,下行只是把同一个 SDK 单例用在另一路 stream 上:
+
+**新增 API(在 `beautySdkManager` 上扩)**:
+
+```ts
+// 输入:任一 remote track;输出:美颜后 canvas 对应的 MediaStreamTrack
+startRemoteBeauty(
+  remoteTrack: MediaStreamTrack,
+  opts: { effects: 'env-only' | 'face' }   // 见 8.5 分级
+): Promise<HTMLCanvasElement>;
+
+stopRemoteBeauty(remoteUserId: string): void;
+```
+
+**UI 侧改造**(`webCallManager` 里挂 remote 视图那段):
+
+- 原来:`this.trtc.startRemoteVideo({ userId, view: 'remote-video' })` 让 SDK 自动挂 `<video>`
+- 改成:拿 `trtc.getVideoTrack({ userId: remoteUserId })` → 塞给 `beautySdkManager.startRemoteBeauty` → 拿到 canvas → 把 remote 视图容器渲染这个 canvas(隐藏 SDK 挂的 `<video>`,或用 `option.view: null` 让 SDK 别挂)
+
+**估算**:+2-3 人天集成到 P1 里(SDK 单例已有,是复用不是新写)。
+
+### 8.5 产品分级建议(**关键**:技术能做 ≠ 产品该做)
+
+按"改不改人脸"分两档,建议分开决策:
+
+| 档位 | 内容 | 商汤 SDK | 建议 | 理由 |
+|---|---|---|---|---|
+| **A. 环境增强档(推荐做)** | 背景虚化 bokeh、亮度/曝光补偿、时域降噪 | `effects` 的 bokeh / filter | ✅ P1 做 | 男用户环境昏暗/房间乱/光线差 → 让主播看清对方,减少视觉疲劳,续单友好;弱网 480p 下行画质差 → 降噪缓解;**不改脸,不影响主播对对方真实长相的判断** |
+| **B. 改脸档(不推荐)** | 磨皮、美白、瘦脸、眼线、唇线、贴纸 | `effects` + `makeup` | ❌ 至多 P2,且只上磨皮/美白 | ①下行是 480p 默认,商汤关键点精度明显下降,眼线/唇线/贴纸这类精细效果基本不能用;②主播看到的对方被美化,和其他场景/线下见面的落差会造成情感判断错位(heyhru 讲主播粘性,这个落差有风险);③双向都开美颜,GPU/CPU 翻倍,弱机掉帧 ×2;④"让男用户顺眼"和"让主播接单"因果链条弱,ROI 不如把资源投在上行 |
+
+**最终建议**:
+
+- **P0** — 只做上行(主播美颜),不做下行(0-7 节的方案不变)
+- **P1** — 追加下行 A 档「环境增强」(bokeh + 亮度 + 降噪),对主播实际体验有帮助,又没有"改脸带来的预期落差"风险
+- **P2** — 如果产品坚持要下行 B 档「改脸」,只开磨皮/美白两档,不上精细美妆,回避精度问题
+
+### 8.6 还没核验的两点(诚实标注)
+
+写进正式立项前需要补证:
+
+| 断言 | 状态 | 怎么补证 |
+|---|---|---|
+| 商汤 `effects` 具体包含 bokeh 背景虚化 + 亮度补偿 + 降噪滤镜 | ⏳ 未核验 | 进 `shangtang-sdk-demo/` 看它导出的 effects 清单,或查商汤官方 API |
+| 480p 下行流商汤关键点精度会明显下降(眼线/唇线不能用) | ⏳ 经验判断非文档结论 | 查商汤官方"最低分辨率建议",或跑一次 spike 实测 |
+
