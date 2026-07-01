@@ -135,3 +135,4 @@ npm run build:prod     # 走 OSS release
 
 - 线上 demo:https://tryon.softsugar.com/
 - WebEffects2.3 SDK 包(30 天短链):https://deliverycenter.sensetime.com/deliverycenter/download/s2/4b96eaf0-75f2-4d3a-82ee-39f176a0fa2e(提取码 `JjkSSmfa`)
+- 集成到 sitin-next PWA 的技术方案 → [tech-proposal-pwa-integration](tech-proposal-pwa-integration.md)
