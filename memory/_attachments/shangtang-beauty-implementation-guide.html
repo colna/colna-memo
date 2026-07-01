@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>商汤美颜接入 sitin-next PWA · 实现指南</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<style>
+  :root{
+    --bg:#fafbff;--bg-soft:#f2f4fb;--card:#ffffff;--card-glass:rgba(255,255,255,.72);
+    --border:#e6e9f4;--text:#1a1f36;--text-2:#4a5578;--text-3:#8891ae;
+    --brand-1:#7c3aed;--brand-2:#ec4899;--brand-3:#3b82f6;--brand-4:#06b6d4;
+    --success:#10b981;--warning:#f59e0b;--danger:#ef4444;
+    --shadow-sm:0 1px 2px rgba(16,24,40,.04),0 1px 3px rgba(16,24,40,.06);
+    --shadow-md:0 4px 12px rgba(16,24,40,.05),0 12px 32px rgba(16,24,40,.06);
+    --shadow-lg:0 12px 48px rgba(124,58,237,.10),0 4px 16px rgba(16,24,40,.06);
+    --grad-brand:linear-gradient(135deg,#7c3aed 0%,#ec4899 55%,#f59e0b 100%);
+    --grad-cool:linear-gradient(135deg,#3b82f6 0%,#06b6d4 100%);
+    --grad-warm:linear-gradient(135deg,#f97316 0%,#ec4899 100%);
+    --grad-mint:linear-gradient(135deg,#10b981 0%,#06b6d4 100%);
+  }
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter','Noto Sans SC',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.7;overflow-x:hidden;}
+  .bg-decor{position:fixed;inset:0;z-index:-2;overflow:hidden;pointer-events:none;}
+  .bg-decor::before,.bg-decor::after{content:"";position:absolute;border-radius:50%;filter:blur(80px);opacity:.5;animation:float 22s ease-in-out infinite;}
+  .bg-decor::before{width:520px;height:520px;left:-120px;top:-80px;background:radial-gradient(circle,rgba(124,58,237,.35) 0%,rgba(124,58,237,0) 70%);}
+  .bg-decor::after{width:600px;height:600px;right:-160px;top:22%;background:radial-gradient(circle,rgba(236,72,153,.30) 0%,rgba(236,72,153,0) 70%);animation-delay:-11s;}
+  .bg-decor .blob-3{position:absolute;width:480px;height:480px;left:38%;bottom:-160px;border-radius:50%;filter:blur(80px);opacity:.4;background:radial-gradient(circle,rgba(59,130,246,.40) 0%,rgba(59,130,246,0) 70%);animation:float 26s ease-in-out infinite -6s;}
+  @keyframes float{0%,100%{transform:translate(0,0) scale(1);}33%{transform:translate(40px,-30px) scale(1.06);}66%{transform:translate(-30px,40px) scale(.96);}}
+  #particles{position:fixed;inset:0;z-index:-1;pointer-events:none;}
+  .scroll-progress{position:fixed;top:0;left:0;height:3px;width:0%;z-index:100;background:var(--grad-brand);box-shadow:0 0 10px rgba(236,72,153,.4);transition:width .1s linear;}
+  nav.toc{position:fixed;top:24px;right:24px;z-index:50;background:var(--card-glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--border);border-radius:16px;padding:14px 16px;box-shadow:var(--shadow-md);max-width:220px;transform:translateX(0);transition:transform .4s cubic-bezier(.16,1,.3,1),opacity .3s;}
+  nav.toc h4{margin:0 0 8px;font-size:11px;letter-spacing:.12em;color:var(--text-3);text-transform:uppercase;font-weight:700;}
+  nav.toc ol{margin:0;padding:0;list-style:none;counter-reset:step;}
+  nav.toc li{counter-increment:step;font-size:12.5px;padding:5px 0;position:relative;padding-left:20px;}
+  nav.toc li::before{content:counter(step);position:absolute;left:0;top:6px;width:15px;height:15px;border-radius:50%;background:var(--bg-soft);color:var(--text-3);font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:all .3s;}
+  nav.toc a{color:var(--text-2);text-decoration:none;transition:color .2s;}
+  nav.toc a:hover{color:var(--brand-1);}
+  nav.toc li.active::before{background:var(--grad-brand);color:#fff;box-shadow:0 2px 8px rgba(124,58,237,.4);}
+  nav.toc li.active a{color:var(--text);font-weight:600;}
+  @media(max-width:1100px){nav.toc{display:none;}}
+  .wrap{max-width:960px;margin:0 auto;padding:80px 32px 120px;position:relative;z-index:1;}
+  @media(max-width:640px){.wrap{padding:60px 20px 80px;}}
+  .hero{text-align:center;margin-bottom:100px;position:relative;}
+  .hero-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:99px;background:var(--card);border:1px solid var(--border);font-size:12px;font-weight:600;color:var(--text-2);letter-spacing:.02em;box-shadow:var(--shadow-sm);margin-bottom:24px;animation:slideDown .8s cubic-bezier(.16,1,.3,1);}
+  .hero-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--brand-2);box-shadow:0 0 8px var(--brand-2);animation:pulse 2s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(1.3);}}
+  @keyframes slideDown{from{opacity:0;transform:translateY(-20px);}to{opacity:1;transform:translateY(0);}}
+  h1.hero-title{font-family:'Inter','Noto Sans SC',sans-serif;font-size:clamp(38px,5.8vw,64px);font-weight:800;line-height:1.1;letter-spacing:-.02em;margin:0 0 20px;background:var(--grad-brand);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:fadeUp .9s .1s cubic-bezier(.16,1,.3,1) backwards, shine 6s linear infinite;}
+  @keyframes shine{to{background-position:200% 0;}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+  .hero-sub{font-size:clamp(15px,1.6vw,18px);color:var(--text-2);max-width:640px;margin:0 auto 32px;animation:fadeUp .9s .25s cubic-bezier(.16,1,.3,1) backwards;}
+  .hero-meta{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;animation:fadeUp .9s .4s cubic-bezier(.16,1,.3,1) backwards;}
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:99px;background:var(--card);border:1px solid var(--border);font-size:12px;color:var(--text-2);font-weight:500;box-shadow:var(--shadow-sm);}
+  .chip svg{opacity:.7;}
+  section.block{margin-bottom:96px;opacity:0;transform:translateY(40px);transition:opacity .9s cubic-bezier(.16,1,.3,1),transform .9s cubic-bezier(.16,1,.3,1);}
+  section.block.in{opacity:1;transform:translateY(0);}
+  .section-head{margin-bottom:32px;}
+  .section-num{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--brand-1);letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px;padding:4px 10px;background:rgba(124,58,237,.08);border-radius:6px;}
+  h2{font-size:clamp(26px,3.2vw,38px);font-weight:800;letter-spacing:-.01em;line-height:1.2;margin:0 0 12px;color:var(--text);}
+  h2 .accent{background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .section-lead{font-size:16px;color:var(--text-2);max-width:640px;}
+  h3{font-size:20px;font-weight:700;margin:36px 0 12px;color:var(--text);letter-spacing:-.005em;}
+  h4{font-size:15px;font-weight:600;margin:24px 0 10px;color:var(--text);}
+  p{margin:0 0 14px;color:var(--text-2);font-size:15px;}
+  strong{color:var(--text);font-weight:600;}
+  code{font-family:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;font-size:.86em;background:var(--bg-soft);padding:2px 6px;border-radius:5px;color:var(--brand-1);border:1px solid var(--border);}
+  a{color:var(--brand-3);text-decoration:none;border-bottom:1px solid rgba(59,130,246,.3);transition:all .2s;}
+  a:hover{color:var(--brand-1);border-color:var(--brand-1);}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px 28px;box-shadow:var(--shadow-sm);transition:transform .3s cubic-bezier(.16,1,.3,1),box-shadow .3s;position:relative;overflow:hidden;}
+  .card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);}
+  .scope-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-top:20px;}
+  .scope-item{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 22px;position:relative;overflow:hidden;transition:transform .3s,box-shadow .3s;}
+  .scope-item:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg);}
+  .scope-item.yes{border-color:rgba(16,185,129,.35);background:linear-gradient(135deg,rgba(16,185,129,.03),rgba(6,182,212,.03));}
+  .scope-item.no{border-color:rgba(148,163,184,.3);opacity:.85;}
+  .scope-item .tag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;border-radius:6px;margin-bottom:12px;}
+  .scope-item.yes .tag{background:var(--grad-mint);color:#fff;box-shadow:0 4px 12px rgba(16,185,129,.3);}
+  .scope-item.no .tag{background:var(--bg-soft);color:var(--text-3);}
+  .scope-item h4{margin:0 0 8px;font-size:16px;}
+  .scope-item .desc{font-size:13px;color:var(--text-2);margin-bottom:10px;}
+  .scope-item ul{padding:0;list-style:none;margin:8px 0 0;}
+  .scope-item li{font-size:12.5px;padding:4px 0;color:var(--text-2);display:flex;gap:8px;align-items:flex-start;}
+  .scope-item.yes li::before{content:"✓";color:var(--success);font-weight:800;flex-shrink:0;}
+  .scope-item.no li::before{content:"×";color:var(--text-3);font-weight:800;flex-shrink:0;}
+  .tbl-wrap{overflow-x:auto;margin:16px 0 4px;border-radius:14px;border:1px solid var(--border);}
+  table{width:100%;border-collapse:collapse;background:var(--card);}
+  th,td{padding:12px 16px;text-align:left;font-size:14px;border-bottom:1px solid var(--border);}
+  th{font-weight:700;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);background:var(--bg-soft);}
+  tr:last-child td{border-bottom:none;}
+  tbody tr{transition:background .2s;}
+  tbody tr:hover{background:linear-gradient(90deg,rgba(124,58,237,.03),rgba(236,72,153,.03));}
+  td strong{color:var(--text);}
+  .callout{display:flex;gap:14px;padding:18px 20px;border-radius:14px;margin:20px 0;border:1px solid;position:relative;overflow:hidden;}
+  .callout .cico{width:28px;height:28px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;}
+  .callout .body{font-size:14px;line-height:1.65;color:var(--text-2);}
+  .callout .body strong{color:var(--text);}
+  .callout.info{background:linear-gradient(135deg,rgba(59,130,246,.05),rgba(6,182,212,.05));border-color:rgba(59,130,246,.2);}
+  .callout.info .cico{background:var(--grad-cool);}
+  .callout.warn{background:linear-gradient(135deg,rgba(245,158,11,.05),rgba(249,115,22,.05));border-color:rgba(245,158,11,.25);}
+  .callout.warn .cico{background:var(--grad-warm);}
+  .callout.success{background:linear-gradient(135deg,rgba(16,185,129,.05),rgba(6,182,212,.05));border-color:rgba(16,185,129,.2);}
+  .callout.success .cico{background:var(--grad-mint);}
+  pre{background:#0f172a;color:#e2e8f0;padding:38px 22px 18px;border-radius:14px;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:12.5px;line-height:1.65;box-shadow:var(--shadow-md);border:1px solid rgba(255,255,255,.08);position:relative;}
+  pre::before{content:"";position:absolute;top:14px;left:16px;width:10px;height:10px;border-radius:50%;background:#ef4444;box-shadow:16px 0 #f59e0b, 32px 0 #10b981;}
+  pre::after{content:attr(data-lang);position:absolute;top:12px;right:18px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#64748b;font-family:'JetBrains Mono',monospace;}
+  pre code{background:transparent;color:inherit;border:none;padding:0;font-size:inherit;display:block;}
+  pre .k{color:#c084fc;}
+  pre .s{color:#86efac;}
+  pre .c{color:#64748b;font-style:italic;}
+  pre .n{color:#fbbf24;}
+  pre .f{color:#60a5fa;}
+  pre .t{color:#22d3ee;}
+  .mm-wrap{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:36px 20px 24px;margin:24px 0;box-shadow:var(--shadow-sm);overflow-x:auto;position:relative;}
+  .mm-wrap::before{content:attr(data-title);position:absolute;top:12px;left:20px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);}
+  .mm-wrap .mermaid{display:flex;justify-content:center;min-height:200px;}
+  ul.styled,ol.styled{padding-left:0;list-style:none;}
+  ul.styled li,ol.styled li{position:relative;padding-left:28px;margin:8px 0;font-size:14.5px;color:var(--text-2);}
+  ul.styled li::before{content:"";position:absolute;left:6px;top:11px;width:6px;height:6px;border-radius:50%;background:var(--grad-brand);box-shadow:0 0 0 3px rgba(124,58,237,.1);}
+  ol.styled{counter-reset:li;}
+  ol.styled li{counter-increment:li;padding-left:34px;}
+  ol.styled li::before{content:counter(li);position:absolute;left:0;top:2px;width:22px;height:22px;border-radius:50%;background:var(--grad-brand);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(124,58,237,.3);}
+  .api-table th:first-child{width:28%;}
+  .file-tree{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px 26px;font-family:'JetBrains Mono',monospace;font-size:13px;line-height:1.85;color:var(--text-2);margin:16px 0;position:relative;overflow:hidden;}
+  .file-tree .dir{color:var(--brand-1);font-weight:700;}
+  .file-tree .file{color:var(--text);}
+  .file-tree .comment{color:var(--text-3);}
+  .file-tree .new{color:var(--success);font-weight:700;}
+  footer{text-align:center;padding:60px 20px 20px;color:var(--text-3);font-size:12.5px;letter-spacing:.02em;}
+  footer .heart{color:var(--brand-2);animation:pulse 1.8s ease-in-out infinite;display:inline-block;}
+</style>
+</head>
+<body>
+
+<div class="bg-decor"><div class="blob-3"></div></div>
+<canvas id="particles"></canvas>
+<div class="scroll-progress" id="scrollProgress"></div>
+
+<nav class="toc">
+  <h4>目录</h4>
+  <ol>
+    <li><a href="#scope">能力范围</a></li>
+    <li><a href="#local">本方美颜(上行)</a></li>
+    <li><a href="#remote">对方美颜(下行)</a></li>
+    <li><a href="#package">Package 设计</a></li>
+    <li><a href="#impl">Package 实现</a></li>
+    <li><a href="#usage">上层调用示例</a></li>
+  </ol>
+</nav>
+
+<div class="wrap">
+
+  <div class="hero">
+    <span class="hero-badge"><span class="dot"></span>Implementation Guide · 2026-07-01</span>
+    <h1 class="hero-title">商汤美颜接入 sitin-next PWA</h1>
+    <p class="hero-sub">
+      精简实现指南 —— 只写正确方案。三件事:<strong>接入本方美颜</strong>、<strong>接入对方美颜</strong>、<strong>SDK 抽 package</strong>。
+    </p>
+    <div class="hero-meta">
+      <span class="chip">Target · <code>packages/app-pwa</code></span>
+      <span class="chip">Package · <code>@heyhru/web-plugin-sensetime-beauty</code></span>
+      <span class="chip">能力 · <strong>美颜 + 微整形</strong>(2 项,不含滤镜/贴纸/美妆)</span>
+    </div>
+  </div>
+
+  <!-- ===== 0. 能力范围 ===== -->
+  <section class="block" id="scope">
+    <div class="section-head">
+      <span class="section-num">§ 0 · Scope</span>
+      <h2>能力范围:<span class="accent">只启用两项</span></h2>
+      <p class="section-lead">商汤 <code>effects</code> SDK 内部子能力众多,本方案<strong>只启用</strong>基础美颜 + 微整形,其余全部关闭。目的是减小体积、聚焦核心、避免精度浪费。</p>
+    </div>
+
+    <div class="scope-grid">
+      <div class="scope-item yes">
+        <span class="tag">启用 · baseSkinCare</span>
+        <h4>基础美颜</h4>
+        <div class="desc">对整脸做像素级平滑与色相修正,不改变脸部结构。</div>
+        <ul>
+          <li><strong>磨皮</strong> skinSmooth 0-1</li>
+          <li><strong>美白</strong> whiten 0-1</li>
+          <li><strong>红润</strong> redden 0-1</li>
+        </ul>
+      </div>
+
+      <div class="scope-item yes">
+        <span class="tag">启用 · microPlastic</span>
+        <h4>微整形</h4>
+        <div class="desc">基于人脸关键点做几何形变,轻量"微整"。</div>
+        <ul>
+          <li><strong>瘦脸</strong> faceSlim 0-1</li>
+          <li><strong>大眼</strong> eyeEnlarge 0-1</li>
+          <li><strong>下巴</strong> chin 0-1</li>
+          <li><strong>额头</strong> forehead 0-1</li>
+          <li><strong>鼻梁</strong> noseLift 0-1</li>
+          <li><strong>嘴形</strong> mouthSize 0-1</li>
+        </ul>
+      </div>
+
+      <div class="scope-item no">
+        <span class="tag">关闭</span>
+        <h4>滤镜 / 贴纸 / 美妆 / 染发 / 美甲 / 试戴</h4>
+        <div class="desc">effects 里的 filter / sticker / overallMakeup / backgroundBlur;以及 makeup / hair / nail / tryon 四类 SDK 全部不加载。</div>
+        <ul>
+          <li>不启用,SDK 资源不打包</li>
+          <li>包体积仅 effects 一份 ≈ 3-5 MB</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 1. 本方美颜(上行) ===== -->
+  <section class="block" id="local">
+    <div class="section-head">
+      <span class="section-num">§ 1 · Local (Uplink)</span>
+      <h2>本方美颜:<span class="accent">改上行 track,对方一定能看到</span></h2>
+      <p class="section-lead">通过替换 TRTC 上行的 <code>videoTrack</code>,把商汤 SDK 处理后的 canvas 流推给对端,对方看到的就是美颜后的画面。</p>
+    </div>
+
+    <h3>数据流</h3>
+    <div class="mm-wrap" data-title="上行链路 · 主播 → 对方">
+    <div class="mermaid">
+flowchart LR
+  A([主播摄像头]):::cam --> B[getUserMedia<br/>原始 MediaStream]:::stream
+  B --> C{{商汤 SDK<br/>baseSkinCare + microPlastic}}:::sdk
+  C --> D[canvas.captureStream<br/>已美颜 MediaStreamTrack]:::canvas
+  D --> E[trtc.startLocalVideo<br/>option.videoTrack = processed]:::trtc
+  E --> F[(TRTC 服务器)]:::server
+  F --> G([对方 &lt;video&gt;<br/>看到美颜后的主播 ✅]):::view
+
+  classDef cam fill:#fbcfe8,stroke:#ec4899,stroke-width:2px,color:#831843;
+  classDef stream fill:#e0e7ff,stroke:#6366f1,stroke-width:2px,color:#1e1b4b;
+  classDef sdk fill:#fef3c7,stroke:#f59e0b,stroke-width:2.5px,color:#78350f;
+  classDef canvas fill:#d1fae5,stroke:#10b981,stroke-width:2px,color:#064e3b;
+  classDef trtc fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;
+  classDef server fill:#f3e8ff,stroke:#a855f7,stroke-width:2px,color:#581c87;
+  classDef view fill:#fce7f3,stroke:#ec4899,stroke-width:2px,color:#831843;
+    </div>
+    </div>
+
+    <h3>关键 API</h3>
+    <ul class="styled">
+      <li>TRTC v5 <code>startLocalVideo({ view, publish, option: { videoTrack } })</code> 接受<strong>自定义</strong> <code>MediaStreamTrack</code>。见 <code>trtc-sdk-v5/index.d.ts</code> 的 <code>LocalVideoConfig</code>。</li>
+      <li>热切换用 <code>updateLocalVideo({ option: { videoTrack: newTrack } })</code>,不需要 exit/enter room。</li>
+      <li>底层 <code>_trtc</code> 实例在 <code>webCallManager</code> 已暴露:<code>this.engine.getTRTCCloudInstance()._trtc</code>。</li>
+    </ul>
+
+    <h3>接入步骤(3 步)</h3>
+    <ol class="styled">
+      <li><code>webCallManager.startLocalVideo(viewId)</code> 里,先 <code>getUserMedia</code> 拿原始 stream。</li>
+      <li>调用 package 的 <code>createBeauty(...).process(stream)</code>,拿到美颜后的 <code>MediaStreamTrack</code>。</li>
+      <li>用这个 track 调 <code>trtc.startLocalVideo({ view: viewId, publish: true, option: { videoTrack } })</code>。跳过 TUICallEngine 的 <code>openCamera</code>(否则会覆盖)。</li>
+    </ol>
+  </section>
+
+  <!-- ===== 2. 对方美颜(下行) ===== -->
+  <section class="block" id="remote">
+    <div class="section-head">
+      <span class="section-num">§ 2 · Remote (Downlink)</span>
+      <h2>对方美颜:<span class="accent">能,对方无感知</span></h2>
+      <p class="section-lead">只在主播端本地处理"收到的对方视频",对方 App 播的仍是他自己的原相机,不知道也不需要知道。</p>
+    </div>
+
+    <div class="callout success">
+      <div class="cico">✓</div>
+      <div class="body">
+        <strong>关键 API 已在 SDK 支持</strong>:<code>trtc.getVideoTrack({ userId })</code> 直接返回远端 <code>MediaStreamTrack</code>。<br/>
+        证据:<code>sitin-next/node_modules/trtc-sdk-v5/index.d.ts:2216</code>(SDK 版本 <code>5.15.3-beta.9</code>)。官方注释原文:<em>"Pass the userId of the remote user to get the remote user's videoTrack."</em>
+      </div>
+    </div>
+
+    <h3>数据流</h3>
+    <div class="mm-wrap" data-title="下行链路 · 主播侧美化对方 · 对方无感">
+    <div class="mermaid">
+flowchart TD
+  A([对方摄像头<br/>对方 App 播原相机]):::insensible --> B[TRTC 上行]:::trtc
+  B --> C[(TRTC 服务器)]:::server
+  C --> D[主播 TRTC SDK]:::trtc
+  D --> E["trtc.getVideoTrack<br/>{ userId: 'male-123' }"]:::api
+  E --> F[远端原始<br/>MediaStreamTrack]:::stream
+  F --> G{商汤 SDK<br/>共享上行 SDK 单例}:::sdk
+  G --> H[美颜后的 canvas]:::canvas
+  H --> I([主播屏幕<br/>看到美颜后的对方 ✅]):::view
+
+  classDef insensible fill:#fef3c7,stroke:#f59e0b,stroke-width:2px,color:#78350f,stroke-dasharray: 5 5;
+  classDef trtc fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;
+  classDef server fill:#f3e8ff,stroke:#a855f7,stroke-width:2px,color:#581c87;
+  classDef api fill:#fce7f3,stroke:#ec4899,stroke-width:2.5px,color:#831843;
+  classDef stream fill:#e0e7ff,stroke:#6366f1,stroke-width:2px,color:#1e1b4b;
+  classDef sdk fill:#fef3c7,stroke:#f59e0b,stroke-width:2.5px,color:#78350f;
+  classDef canvas fill:#d1fae5,stroke:#10b981,stroke-width:2px,color:#064e3b;
+  classDef view fill:#fce7f3,stroke:#ec4899,stroke-width:2px,color:#831843;
+    </div>
+    </div>
+
+    <h3>接入步骤(3 步)</h3>
+    <ol class="styled">
+      <li>远端用户上流后触发 <code>REMOTE_VIDEO_AVAILABLE</code>,此时用 <code>trtc.getVideoTrack({ userId: remoteUserId })</code> 拿到 <code>MediaStreamTrack</code>。</li>
+      <li>把 track 传给 package 的 <code>beauty.processRemote({ userId, track, preset })</code>,拿到一个渲染中的 <code>HTMLCanvasElement</code>。</li>
+      <li>UI 里用这个 <code>canvas</code> 替换原本 SDK 挂的 <code>&lt;video id="remote-video"&gt;</code>(把 <code>startRemoteVideo</code> 的 <code>view</code> 传 <code>null</code>,或隐藏 SDK 挂的元素)。</li>
+    </ol>
+
+    <div class="callout info">
+      <div class="cico">i</div>
+      <div class="body">
+        对方端<strong>不需要做任何改动</strong>,对方 App 一切照旧播他自己的原相机。本方案只影响"主播看到的对方"。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 3. Package 设计 ===== -->
+  <section class="block" id="package">
+    <div class="section-head">
+      <span class="section-num">§ 3 · Package</span>
+      <h2>SDK 抽离为独立 <span class="accent">package</span></h2>
+      <p class="section-lead">遵循 sitin-next monorepo 的包命名规范,商汤 SDK 封装为一个可复用的第三方库插件包。</p>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <tbody>
+          <tr><td style="width:26%"><strong>包名</strong></td><td><code>@heyhru/web-plugin-sensetime-beauty</code></td></tr>
+          <tr><td><strong>位置</strong></td><td><code>packages/web-plugin-sensetime-beauty/</code></td></tr>
+          <tr><td><strong>命名规范依据</strong></td><td><code>web-plugin-*</code> = 前端封装第三方库(需配置和生命周期)。参考 <code>web-plugin-codemirror</code>。见 <code>sitin-next/docs/coding-conventions.md</code>。</td></tr>
+          <tr><td><strong>依赖方</strong></td><td>目前:<code>@heyhru/app-pwa</code>(<code>packages/app-pwa</code>)。未来可复用给其他前端 app。</td></tr>
+          <tr><td><strong>不依赖</strong></td><td>不 <code>import</code> TRTC / TUICallEngine —— 输入是标准 <code>MediaStream</code>/<code>MediaStreamTrack</code>,输出是标准 <code>MediaStreamTrack</code>/<code>HTMLCanvasElement</code>。调用方负责把这些接到 TRTC。</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>目录结构</h3>
+    <div class="file-tree">
+<span class="dir">packages/web-plugin-sensetime-beauty/</span>
+├── <span class="file">package.json</span>            <span class="comment"># @heyhru/web-plugin-sensetime-beauty · CJS + ESM 双出口</span>
+├── <span class="file">tsconfig.json</span>           <span class="comment"># emitDeclarationOnly, rootDir: src, outDir: dist</span>
+├── <span class="file">tsup.config.ts</span>          <span class="comment"># format: [cjs, esm], dts: false, clean: true</span>
+├── <span class="file">README.md</span>
+└── <span class="dir">src/</span>
+    ├── <span class="file">index.ts</span>            <span class="comment"># 公共 API 入口:createBeauty / 类型 / 预设</span>
+    ├── <span class="file">index.test.ts</span>       <span class="comment"># vitest 单元测试</span>
+    ├── <span class="file">types.ts</span>            <span class="comment"># BeautyParams / BeautyOptions / BeautyInstance</span>
+    ├── <span class="file">presets.ts</span>          <span class="comment"># NATURAL / LIGHT / STRONG / OFF 预设</span>
+    ├── <span class="file">capability.ts</span>       <span class="comment"># 环境探测(WebGL2 / captureStream / iOS 版本)</span>
+    ├── <span class="file">loader.ts</span>           <span class="comment"># st-ar-effects.js + wasm + data + WebAR.lic 动态加载</span>
+    ├── <span class="file">pipeline.ts</span>         <span class="comment"># video → SDK → canvas → captureStream 帧管线</span>
+    └── <span class="file">manager.ts</span>          <span class="comment"># SenseTimeBeautyManager 单例:process / processRemote / setParams / dispose</span>
+    </div>
+
+    <h3>公共 API</h3>
+    <div class="tbl-wrap">
+      <table class="api-table">
+        <thead><tr><th>API</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>createBeauty(options)</code></td><td>创建/返回 SDK 单例(内部 memoized)。首次调用会加载 SDK 资源。</td></tr>
+          <tr><td><code>beauty.process(source, opts?)</code></td><td>处理本地流:输入 <code>MediaStream</code>,输出美颜后的 <code>MediaStreamTrack</code>。用于上行推流。</td></tr>
+          <tr><td><code>beauty.processRemote(opts)</code></td><td>处理远端 track:输入 <code>{userId, track, preset?}</code>,输出正在渲染的 <code>HTMLCanvasElement</code>。用于下行渲染。</td></tr>
+          <tr><td><code>beauty.setParams(params, ch?)</code></td><td>动态调节参数。<code>ch</code> 指定通道(local / remote:userId),不传则改所有。</td></tr>
+          <tr><td><code>beauty.stopRemote(userId)</code></td><td>停止某路远端处理,释放对应 pipeline。</td></tr>
+          <tr><td><code>beauty.dispose()</code></td><td>销毁 SDK 单例,释放 WebGL/WASM/canvas。通话结束时调。</td></tr>
+          <tr><td><code>PRESETS</code></td><td>预设参数集合:<code>OFF / LIGHT / NATURAL / STRONG</code>。</td></tr>
+          <tr><td><code>isBeautySupported()</code></td><td>能力探测,不支持时应降级到裸流(SDK 不加载)。</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>内部架构</h3>
+    <div class="mm-wrap" data-title="package 内部模块关系">
+    <div class="mermaid">
+flowchart TD
+  IDX[index.ts<br/>公共 API]:::api
+  MGR[manager.ts<br/>SenseTimeBeautyManager 单例]:::core
+  LDR[loader.ts<br/>st-ar-effects js/wasm/data/lic]:::io
+  CAP[capability.ts<br/>WebGL2 / captureStream 探测]:::io
+  PL1[pipeline.ts<br/>本地 video→canvas→track]:::pipe
+  PL2[pipeline.ts<br/>远端 track→video→canvas]:::pipe
+  PRE[presets.ts<br/>OFF/LIGHT/NATURAL/STRONG]:::const
+  TYP[types.ts<br/>BeautyParams/Options]:::const
+
+  IDX --> MGR
+  IDX --> PRE
+  IDX --> CAP
+  IDX -.re-export.-> TYP
+  MGR --> LDR
+  MGR --> CAP
+  MGR --> PL1
+  MGR --> PL2
+  PL1 -.uses.-> LDR
+  PL2 -.uses.-> LDR
+
+  classDef api fill:#fce7f3,stroke:#ec4899,stroke-width:2.5px,color:#831843;
+  classDef core fill:#fef3c7,stroke:#f59e0b,stroke-width:2.5px,color:#78350f;
+  classDef pipe fill:#d1fae5,stroke:#10b981,stroke-width:2px,color:#064e3b;
+  classDef io fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;
+  classDef const fill:#e5e7eb,stroke:#94a3b8,stroke-width:2px,color:#1f2937;
+    </div>
+    </div>
+
+    <h3>SDK 资源与 license</h3>
+    <ul class="styled">
+      <li>SDK 静态资源(<code>st-ar-effects.js</code> · <code>st-ar-effects.wasm</code> · <code>st-ar-effects.data</code> · <code>WebAR.lic</code>)<strong>不打进 npm 包</strong>,由调用方 app 放到自己的 <code>public/sdk/effects/</code> 或 CDN。</li>
+      <li>package 只暴露 <code>sdkBaseUrl</code> / <code>licenseUrl</code> 参数,让调用方指定资源位置。这样测试/生产环境走各自的 CDN,license 也不需要跟着包一起分发。</li>
+      <li>仅加载 <code>effects</code> 单包(不加载 makeup / hair / nail / tryon)。</li>
+    </ul>
+  </section>
+
+  <!-- ===== 4. Package 实现 ===== -->
+  <section class="block" id="impl">
+    <div class="section-head">
+      <span class="section-num">§ 4 · Impl</span>
+      <h2>Package <span class="accent">核心实现</span></h2>
+      <p class="section-lead">按 sitin-next 的 package 模板(dual CJS/ESM + tsup + emitDeclarationOnly)。以下是各文件的关键实现。</p>
+    </div>
+
+    <h3>package.json</h3>
+<pre data-lang="json"><code>{
+  <span class="s">"name"</span>: <span class="s">"@heyhru/web-plugin-sensetime-beauty"</span>,
+  <span class="s">"version"</span>: <span class="s">"0.1.0"</span>,
+  <span class="s">"description"</span>: <span class="s">"SenseTime SenseMARS beauty (baseSkinCare + microPlastic) as MediaStreamTrack pipeline"</span>,
+  <span class="s">"main"</span>: <span class="s">"dist/index.cjs"</span>,
+  <span class="s">"module"</span>: <span class="s">"dist/index.js"</span>,
+  <span class="s">"types"</span>: <span class="s">"dist/index.d.ts"</span>,
+  <span class="s">"exports"</span>: {
+    <span class="s">"."</span>: {
+      <span class="s">"import"</span>: <span class="s">"./dist/index.js"</span>,
+      <span class="s">"require"</span>: <span class="s">"./dist/index.cjs"</span>,
+      <span class="s">"types"</span>: <span class="s">"./dist/index.d.ts"</span>
+    }
+  },
+  <span class="s">"files"</span>: [<span class="s">"dist"</span>],
+  <span class="s">"scripts"</span>: {
+    <span class="s">"build"</span>: <span class="s">"tsup &amp;&amp; tsc --emitDeclarationOnly"</span>,
+    <span class="s">"dev"</span>: <span class="s">"tsup --watch"</span>,
+    <span class="s">"lint"</span>: <span class="s">"eslint src"</span>,
+    <span class="s">"test"</span>: <span class="s">"vitest run"</span>,
+    <span class="s">"clean"</span>: <span class="s">"rm -rf dist"</span>
+  },
+  <span class="s">"peerDependencies"</span>: {},
+  <span class="s">"devDependencies"</span>: {
+    <span class="s">"tsup"</span>: <span class="s">"^8"</span>,
+    <span class="s">"typescript"</span>: <span class="s">"^5"</span>,
+    <span class="s">"vitest"</span>: <span class="s">"^2"</span>
+  }
+}</code></pre>
+
+    <h3>src/types.ts</h3>
+<pre data-lang="ts"><code><span class="c">/** 美颜参数,所有值 0-1,0 = 关闭 */</span>
+<span class="k">export interface</span> <span class="t">BeautyParams</span> {
+  <span class="c">// baseSkinCare</span>
+  skinSmooth?: <span class="k">number</span>;
+  whiten?: <span class="k">number</span>;
+  redden?: <span class="k">number</span>;
+  <span class="c">// microPlastic</span>
+  faceSlim?: <span class="k">number</span>;
+  eyeEnlarge?: <span class="k">number</span>;
+  chin?: <span class="k">number</span>;
+  forehead?: <span class="k">number</span>;
+  noseLift?: <span class="k">number</span>;
+  mouthSize?: <span class="k">number</span>;
+}
+
+<span class="k">export interface</span> <span class="t">BeautyOptions</span> {
+  <span class="c">/** SDK 静态资源目录,例:'/sdk/effects' */</span>
+  sdkBaseUrl: <span class="k">string</span>;
+  <span class="c">/** WebAR.lic 位置 */</span>
+  licenseUrl: <span class="k">string</span>;
+  <span class="c">/** 输出帧率,默认 24 */</span>
+  fps?: <span class="k">number</span>;
+  <span class="c">/** 初始参数,默认 PRESETS.NATURAL */</span>
+  initialParams?: <span class="t">BeautyParams</span>;
+}
+
+<span class="k">export interface</span> <span class="t">ProcessLocalOptions</span> { preset?: <span class="t">BeautyParams</span>; }
+
+<span class="k">export interface</span> <span class="t">ProcessRemoteOptions</span> {
+  userId: <span class="k">string</span>;
+  track: <span class="t">MediaStreamTrack</span>;
+  preset?: <span class="t">BeautyParams</span>;
+}
+
+<span class="k">export type</span> <span class="t">BeautyChannel</span> = <span class="s">'local'</span> | { userId: <span class="k">string</span> };
+
+<span class="k">export interface</span> <span class="t">BeautyInstance</span> {
+  <span class="f">process</span>(source: <span class="t">MediaStream</span>, opts?: <span class="t">ProcessLocalOptions</span>): <span class="n">Promise</span>&lt;<span class="t">MediaStreamTrack</span>&gt;;
+  <span class="f">processRemote</span>(opts: <span class="t">ProcessRemoteOptions</span>): <span class="n">Promise</span>&lt;<span class="t">HTMLCanvasElement</span>&gt;;
+  <span class="f">setParams</span>(params: <span class="t">BeautyParams</span>, channel?: <span class="t">BeautyChannel</span>): <span class="k">void</span>;
+  <span class="f">stopRemote</span>(userId: <span class="k">string</span>): <span class="k">void</span>;
+  <span class="f">dispose</span>(): <span class="k">void</span>;
+}</code></pre>
+
+    <h3>src/presets.ts</h3>
+<pre data-lang="ts"><code><span class="k">import type</span> { <span class="t">BeautyParams</span> } <span class="k">from</span> <span class="s">'./types'</span>;
+
+<span class="k">export const</span> <span class="t">PRESETS</span>: <span class="n">Record</span>&lt;<span class="s">'OFF'</span> | <span class="s">'LIGHT'</span> | <span class="s">'NATURAL'</span> | <span class="s">'STRONG'</span>, <span class="t">BeautyParams</span>&gt; = {
+  <span class="n">OFF</span>: {},
+  <span class="n">LIGHT</span>:   { skinSmooth: <span class="n">0.3</span>, whiten: <span class="n">0.2</span>, redden: <span class="n">0.1</span> },
+  <span class="n">NATURAL</span>: { skinSmooth: <span class="n">0.5</span>, whiten: <span class="n">0.35</span>, redden: <span class="n">0.15</span>,
+              faceSlim: <span class="n">0.25</span>, eyeEnlarge: <span class="n">0.2</span>, chin: <span class="n">0.15</span> },
+  <span class="n">STRONG</span>:  { skinSmooth: <span class="n">0.75</span>, whiten: <span class="n">0.55</span>, redden: <span class="n">0.25</span>,
+              faceSlim: <span class="n">0.45</span>, eyeEnlarge: <span class="n">0.4</span>, chin: <span class="n">0.3</span>, noseLift: <span class="n">0.2</span> },
+};</code></pre>
+
+    <h3>src/capability.ts</h3>
+<pre data-lang="ts"><code><span class="k">export function</span> <span class="f">isBeautySupported</span>(): <span class="k">boolean</span> {
+  <span class="k">if</span> (<span class="k">typeof</span> window === <span class="s">'undefined'</span>) <span class="k">return false</span>;
+  <span class="c">// 1. WebGL2</span>
+  <span class="k">const</span> gl = <span class="k">document</span>.<span class="f">createElement</span>(<span class="s">'canvas'</span>).<span class="f">getContext</span>(<span class="s">'webgl2'</span>);
+  <span class="k">if</span> (!gl) <span class="k">return false</span>;
+  <span class="c">// 2. HTMLCanvasElement.captureStream (iOS 15.4+ / Chrome 51+)</span>
+  <span class="k">if</span> (<span class="k">typeof</span> <span class="n">HTMLCanvasElement</span>.<span class="n">prototype</span>.captureStream !== <span class="s">'function'</span>) <span class="k">return false</span>;
+  <span class="c">// 3. WASM</span>
+  <span class="k">if</span> (<span class="k">typeof</span> <span class="n">WebAssembly</span> === <span class="s">'undefined'</span>) <span class="k">return false</span>;
+  <span class="k">return true</span>;
+}</code></pre>
+
+    <h3>src/loader.ts</h3>
+<pre data-lang="ts"><code><span class="c">/**
+ * 动态加载商汤 SDK 资源。
+ * 只加载 effects,不碰 makeup/hair/nail/tryon。
+ * 参考 shangtang-sdk-demo 的 st-ar-effects.js 加载协议。
+ */</span>
+<span class="k">let</span> loaded: <span class="n">Promise</span>&lt;<span class="t">SenseTimeSDK</span>&gt; | <span class="k">null</span> = <span class="k">null</span>;
+
+<span class="k">export function</span> <span class="f">loadSdk</span>(sdkBaseUrl: <span class="k">string</span>, licenseUrl: <span class="k">string</span>): <span class="n">Promise</span>&lt;<span class="t">SenseTimeSDK</span>&gt; {
+  <span class="k">if</span> (loaded) <span class="k">return</span> loaded;
+  loaded = (<span class="k">async</span> () =&gt; {
+    <span class="k">await</span> <span class="f">injectScript</span>(<span class="s">`${sdkBaseUrl}/st-ar-effects.js`</span>);
+    <span class="k">const</span> license = <span class="k">await</span> <span class="f">fetch</span>(licenseUrl).<span class="f">then</span>(r =&gt; r.<span class="f">arrayBuffer</span>());
+    <span class="k">const</span> sdk = <span class="k">await</span> (<span class="n">window</span> <span class="k">as any</span>).<span class="n">STAR</span>.<span class="f">create</span>({
+      sdkPath: sdkBaseUrl,
+      license,
+      modules: [<span class="s">'baseSkinCare'</span>, <span class="s">'microPlastic'</span>],  <span class="c">// 只启用这两个</span>
+    });
+    <span class="k">return</span> sdk;
+  })();
+  <span class="k">return</span> loaded;
+}
+
+<span class="k">function</span> <span class="f">injectScript</span>(src: <span class="k">string</span>): <span class="n">Promise</span>&lt;<span class="k">void</span>&gt; {
+  <span class="k">return new</span> <span class="n">Promise</span>((res, rej) =&gt; {
+    <span class="k">const</span> s = <span class="k">document</span>.<span class="f">createElement</span>(<span class="s">'script'</span>);
+    s.src = src; s.async = <span class="k">true</span>;
+    s.onload = () =&gt; <span class="f">res</span>();
+    s.onerror = () =&gt; <span class="f">rej</span>(<span class="k">new</span> <span class="n">Error</span>(<span class="s">`load ${src} failed`</span>));
+    <span class="k">document</span>.<span class="n">head</span>.<span class="f">appendChild</span>(s);
+  });
+}</code></pre>
+
+    <h3>src/pipeline.ts</h3>
+<pre data-lang="ts"><code><span class="c">/**
+ * 单路视频帧管线:MediaStreamTrack → &lt;video&gt; → SDK.render(canvas) → captureStream
+ * 本地 / 远端每路 remote 各自一个管线实例
+ */</span>
+<span class="k">export class</span> <span class="t">BeautyPipeline</span> {
+  <span class="k">private</span> video: <span class="t">HTMLVideoElement</span>;
+  <span class="k">private</span> canvas: <span class="t">HTMLCanvasElement</span>;
+  <span class="k">private</span> outStream: <span class="t">MediaStream</span> | <span class="k">null</span> = <span class="k">null</span>;
+  <span class="k">private</span> raf = <span class="n">0</span>;
+  <span class="k">private</span> stopped = <span class="k">false</span>;
+
+  <span class="f">constructor</span>(<span class="k">private</span> sdk: <span class="t">SenseTimeSDK</span>, <span class="k">private</span> fps: <span class="k">number</span>) {
+    <span class="k">this</span>.video = <span class="k">document</span>.<span class="f">createElement</span>(<span class="s">'video'</span>);
+    <span class="k">this</span>.video.muted = <span class="k">true</span>;
+    <span class="k">this</span>.video.playsInline = <span class="k">true</span>;
+    <span class="k">this</span>.canvas = <span class="k">document</span>.<span class="f">createElement</span>(<span class="s">'canvas'</span>);
+  }
+
+  <span class="k">async</span> <span class="f">start</span>(source: <span class="t">MediaStream</span> | <span class="t">MediaStreamTrack</span>): <span class="n">Promise</span>&lt;<span class="k">void</span>&gt; {
+    <span class="k">const</span> stream = source <span class="k">instanceof</span> <span class="n">MediaStream</span>
+      ? source
+      : <span class="k">new</span> <span class="n">MediaStream</span>([source]);
+    <span class="k">this</span>.video.srcObject = stream;
+    <span class="k">await</span> <span class="k">this</span>.video.<span class="f">play</span>();
+    <span class="k">this</span>.canvas.width  = <span class="k">this</span>.video.videoWidth;
+    <span class="k">this</span>.canvas.height = <span class="k">this</span>.video.videoHeight;
+    <span class="k">this</span>.outStream = <span class="k">this</span>.canvas.<span class="f">captureStream</span>(<span class="k">this</span>.fps);
+    <span class="k">this</span>.<span class="f">loop</span>();
+  }
+
+  <span class="k">private</span> <span class="f">loop</span> = () =&gt; {
+    <span class="k">if</span> (<span class="k">this</span>.stopped) <span class="k">return</span>;
+    <span class="k">this</span>.sdk.<span class="f">render</span>(<span class="k">this</span>.video, <span class="k">this</span>.canvas);
+    <span class="k">this</span>.raf = <span class="f">requestAnimationFrame</span>(<span class="k">this</span>.loop);
+  };
+
+  <span class="f">setParams</span>(params: <span class="t">BeautyParams</span>): <span class="k">void</span> {
+    <span class="k">for</span> (<span class="k">const</span> [k, v] <span class="k">of</span> <span class="n">Object</span>.<span class="f">entries</span>(params)) {
+      <span class="k">this</span>.sdk.<span class="f">updateParam</span>(k, v);
+    }
+  }
+
+  <span class="k">get</span> <span class="f">track</span>(): <span class="t">MediaStreamTrack</span> {
+    <span class="k">return this</span>.outStream!.<span class="f">getVideoTracks</span>()[<span class="n">0</span>];
+  }
+  <span class="k">get</span> <span class="f">canvasEl</span>(): <span class="t">HTMLCanvasElement</span> { <span class="k">return this</span>.canvas; }
+
+  <span class="f">dispose</span>(): <span class="k">void</span> {
+    <span class="k">this</span>.stopped = <span class="k">true</span>;
+    <span class="f">cancelAnimationFrame</span>(<span class="k">this</span>.raf);
+    <span class="k">this</span>.video.<span class="f">pause</span>();
+    <span class="k">this</span>.video.srcObject = <span class="k">null</span>;
+    <span class="k">this</span>.outStream?.<span class="f">getTracks</span>().<span class="f">forEach</span>(t =&gt; t.<span class="f">stop</span>());
+  }
+}</code></pre>
+
+    <h3>src/manager.ts</h3>
+<pre data-lang="ts"><code><span class="k">import</span> { loadSdk } <span class="k">from</span> <span class="s">'./loader'</span>;
+<span class="k">import</span> { <span class="t">BeautyPipeline</span> } <span class="k">from</span> <span class="s">'./pipeline'</span>;
+<span class="k">import</span> { <span class="t">PRESETS</span> } <span class="k">from</span> <span class="s">'./presets'</span>;
+<span class="k">import type</span> { <span class="t">BeautyOptions</span>, <span class="t">BeautyInstance</span>, <span class="t">BeautyParams</span>,
+                <span class="t">ProcessLocalOptions</span>, <span class="t">ProcessRemoteOptions</span>,
+                <span class="t">BeautyChannel</span> } <span class="k">from</span> <span class="s">'./types'</span>;
+
+<span class="k">let</span> singleton: <span class="t">SenseTimeBeautyManager</span> | <span class="k">null</span> = <span class="k">null</span>;
+
+<span class="k">export function</span> <span class="f">createBeauty</span>(options: <span class="t">BeautyOptions</span>): <span class="t">BeautyInstance</span> {
+  <span class="k">if</span> (!singleton) singleton = <span class="k">new</span> <span class="t">SenseTimeBeautyManager</span>(options);
+  <span class="k">return</span> singleton;
+}
+
+<span class="k">class</span> <span class="t">SenseTimeBeautyManager</span> <span class="k">implements</span> <span class="t">BeautyInstance</span> {
+  <span class="k">private</span> local: <span class="t">BeautyPipeline</span> | <span class="k">null</span> = <span class="k">null</span>;
+  <span class="k">private</span> remotes = <span class="k">new</span> <span class="n">Map</span>&lt;<span class="k">string</span>, <span class="t">BeautyPipeline</span>&gt;();
+  <span class="k">private</span> currentParams: <span class="t">BeautyParams</span>;
+
+  <span class="f">constructor</span>(<span class="k">private</span> opts: <span class="t">BeautyOptions</span>) {
+    <span class="k">this</span>.currentParams = opts.initialParams ?? <span class="t">PRESETS</span>.<span class="n">NATURAL</span>;
+  }
+
+  <span class="k">async</span> <span class="f">process</span>(source: <span class="t">MediaStream</span>, opts?: <span class="t">ProcessLocalOptions</span>): <span class="n">Promise</span>&lt;<span class="t">MediaStreamTrack</span>&gt; {
+    <span class="k">const</span> sdk = <span class="k">await</span> <span class="f">loadSdk</span>(<span class="k">this</span>.opts.sdkBaseUrl, <span class="k">this</span>.opts.licenseUrl);
+    <span class="k">this</span>.local?.<span class="f">dispose</span>();
+    <span class="k">this</span>.local = <span class="k">new</span> <span class="t">BeautyPipeline</span>(sdk, <span class="k">this</span>.opts.fps ?? <span class="n">24</span>);
+    <span class="k">await</span> <span class="k">this</span>.local.<span class="f">start</span>(source);
+    <span class="k">this</span>.local.<span class="f">setParams</span>(opts?.preset ?? <span class="k">this</span>.currentParams);
+    <span class="k">return this</span>.local.track;
+  }
+
+  <span class="k">async</span> <span class="f">processRemote</span>(opts: <span class="t">ProcessRemoteOptions</span>): <span class="n">Promise</span>&lt;<span class="t">HTMLCanvasElement</span>&gt; {
+    <span class="k">const</span> sdk = <span class="k">await</span> <span class="f">loadSdk</span>(<span class="k">this</span>.opts.sdkBaseUrl, <span class="k">this</span>.opts.licenseUrl);
+    <span class="k">this</span>.remotes.<span class="f">get</span>(opts.userId)?.<span class="f">dispose</span>();
+    <span class="k">const</span> p = <span class="k">new</span> <span class="t">BeautyPipeline</span>(sdk, <span class="k">this</span>.opts.fps ?? <span class="n">24</span>);
+    <span class="k">await</span> p.<span class="f">start</span>(opts.track);
+    p.<span class="f">setParams</span>(opts.preset ?? <span class="k">this</span>.currentParams);
+    <span class="k">this</span>.remotes.<span class="f">set</span>(opts.userId, p);
+    <span class="k">return</span> p.canvasEl;
+  }
+
+  <span class="f">setParams</span>(params: <span class="t">BeautyParams</span>, channel?: <span class="t">BeautyChannel</span>): <span class="k">void</span> {
+    <span class="k">this</span>.currentParams = { ...<span class="k">this</span>.currentParams, ...params };
+    <span class="k">if</span> (!channel) {
+      <span class="k">this</span>.local?.<span class="f">setParams</span>(params);
+      <span class="k">this</span>.remotes.<span class="f">forEach</span>(p =&gt; p.<span class="f">setParams</span>(params));
+    } <span class="k">else if</span> (channel === <span class="s">'local'</span>) {
+      <span class="k">this</span>.local?.<span class="f">setParams</span>(params);
+    } <span class="k">else</span> {
+      <span class="k">this</span>.remotes.<span class="f">get</span>(channel.userId)?.<span class="f">setParams</span>(params);
+    }
+  }
+
+  <span class="f">stopRemote</span>(userId: <span class="k">string</span>): <span class="k">void</span> {
+    <span class="k">this</span>.remotes.<span class="f">get</span>(userId)?.<span class="f">dispose</span>();
+    <span class="k">this</span>.remotes.<span class="f">delete</span>(userId);
+  }
+
+  <span class="f">dispose</span>(): <span class="k">void</span> {
+    <span class="k">this</span>.local?.<span class="f">dispose</span>();
+    <span class="k">this</span>.remotes.<span class="f">forEach</span>(p =&gt; p.<span class="f">dispose</span>());
+    <span class="k">this</span>.remotes.<span class="f">clear</span>();
+    singleton = <span class="k">null</span>;
+  }
+}</code></pre>
+
+    <h3>src/index.ts</h3>
+<pre data-lang="ts"><code><span class="k">export</span> { createBeauty } <span class="k">from</span> <span class="s">'./manager'</span>;
+<span class="k">export</span> { <span class="t">PRESETS</span> } <span class="k">from</span> <span class="s">'./presets'</span>;
+<span class="k">export</span> { isBeautySupported } <span class="k">from</span> <span class="s">'./capability'</span>;
+<span class="k">export type</span> {
+  <span class="t">BeautyParams</span>,
+  <span class="t">BeautyOptions</span>,
+  <span class="t">BeautyInstance</span>,
+  <span class="t">BeautyChannel</span>,
+  <span class="t">ProcessLocalOptions</span>,
+  <span class="t">ProcessRemoteOptions</span>,
+} <span class="k">from</span> <span class="s">'./types'</span>;</code></pre>
+  </section>
+
+  <!-- ===== 5. 上层调用示例 ===== -->
+  <section class="block" id="usage">
+    <div class="section-head">
+      <span class="section-num">§ 5 · Usage</span>
+      <h2>上层调用示例</h2>
+      <p class="section-lead"><code>app-pwa/services/webCallManager.ts</code> 里如何接入这个 package。</p>
+    </div>
+
+    <h3>上行(本方)</h3>
+<pre data-lang="ts"><code><span class="k">import</span> { createBeauty, <span class="t">PRESETS</span>, isBeautySupported }
+  <span class="k">from</span> <span class="s">'@heyhru/web-plugin-sensetime-beauty'</span>;
+
+<span class="k">async</span> <span class="f">startLocalVideo</span>(viewId: <span class="k">string</span>) {
+  <span class="k">const</span> stream = <span class="k">await</span> <span class="k">navigator</span>.<span class="n">mediaDevices</span>.<span class="f">getUserMedia</span>({
+    video: { width: <span class="n">640</span>, height: <span class="n">480</span>, facingMode: <span class="s">'user'</span> },
+  });
+
+  <span class="k">if</span> (!<span class="f">isBeautySupported</span>()) {
+    <span class="c">// 降级:直接用原流(或走 TRTC 官方 BasicBeauty)</span>
+    <span class="k">return this</span>.trtc.<span class="f">startLocalVideo</span>({
+      view: viewId, publish: <span class="k">true</span>,
+      option: { videoTrack: stream.<span class="f">getVideoTracks</span>()[<span class="n">0</span>] },
+    });
+  }
+
+  <span class="k">const</span> beauty = <span class="f">createBeauty</span>({
+    sdkBaseUrl: <span class="s">'/sdk/effects'</span>,
+    licenseUrl: <span class="s">'/sdk/effects/WebAR.lic'</span>,
+    initialParams: <span class="t">PRESETS</span>.<span class="n">NATURAL</span>,
+    fps: <span class="n">24</span>,
+  });
+  <span class="k">const</span> track = <span class="k">await</span> beauty.<span class="f">process</span>(stream);
+
+  <span class="k">await this</span>.trtc.<span class="f">startLocalVideo</span>({
+    view: viewId, publish: <span class="k">true</span>,
+    option: { videoTrack: track, profile: <span class="s">'480p_1'</span> },
+  });
+}</code></pre>
+
+    <h3>下行(对方)</h3>
+<pre data-lang="ts"><code>trtc.<span class="f">on</span>(<span class="t">TRTC</span>.<span class="n">EVENT</span>.<span class="n">REMOTE_VIDEO_AVAILABLE</span>, <span class="k">async</span> ({ userId }) =&gt; {
+  <span class="k">const</span> remoteTrack = trtc.<span class="f">getVideoTrack</span>({ userId });
+  <span class="k">if</span> (!remoteTrack || !<span class="f">isBeautySupported</span>()) {
+    <span class="c">// 降级:走 SDK 原生渲染</span>
+    <span class="k">return</span> trtc.<span class="f">startRemoteVideo</span>({ userId, view: <span class="s">`remote-${userId}`</span> });
+  }
+  <span class="k">const</span> beauty = <span class="f">createBeauty</span>({ <span class="c">/* same options */</span> });
+  <span class="k">const</span> canvas = <span class="k">await</span> beauty.<span class="f">processRemote</span>({
+    userId, track: remoteTrack, preset: <span class="t">PRESETS</span>.<span class="n">LIGHT</span>,
+  });
+  <span class="c">// 把 canvas 挂到 UI(替代原 &lt;video&gt;)</span>
+  <span class="k">const</span> host = <span class="k">document</span>.<span class="f">getElementById</span>(<span class="s">`remote-${userId}`</span>)!;
+  host.<span class="f">appendChild</span>(canvas);
+});
+
+trtc.<span class="f">on</span>(<span class="t">TRTC</span>.<span class="n">EVENT</span>.<span class="n">REMOTE_USER_EXIT</span>, ({ userId }) =&gt; {
+  <span class="f">createBeauty</span>({<span class="c">/* same */</span>}).<span class="f">stopRemote</span>(userId);
+});</code></pre>
+
+    <h3>面板调节</h3>
+<pre data-lang="ts"><code><span class="c">// 用户拖动"美白"滑块 → 只改本地上行</span>
+beauty.<span class="f">setParams</span>({ whiten: <span class="n">0.7</span> }, <span class="s">'local'</span>);
+
+<span class="c">// 用户切换"对方美颜"预设 → 只改某路 remote</span>
+beauty.<span class="f">setParams</span>(<span class="t">PRESETS</span>.<span class="n">LIGHT</span>, { userId: <span class="s">'male-123'</span> });
+
+<span class="c">// 通话结束</span>
+beauty.<span class="f">dispose</span>();</code></pre>
+
+    <div class="callout warn">
+      <div class="cico">!</div>
+      <div class="body">
+        <strong>接入约束(TUICallEngine):</strong>不能同时用 <code>TUICallEngine.openCamera(viewId)</code> 和 <code>trtc.startLocalVideo({videoTrack})</code> —— 前者会覆盖后者。启用美颜时,<code>accept()</code> 后直接跳过 <code>openCamera</code>,自己调 <code>this.trtc.startLocalVideo(...)</code>。
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Made <span class="heart">◆</span> zhangzheng workspace &nbsp;·&nbsp; 2026-07-01 &nbsp;·&nbsp; <code>@heyhru/web-plugin-sensetime-beauty</code></p>
+  </footer>
+
+</div>
+
+<script>
+  /* ============ 粒子动效 ============ */
+  (function(){
+    const canvas = document.getElementById('particles');
+    const ctx = canvas.getContext('2d');
+    let W, H, particles = [], mouse = {x:-9999, y:-9999};
+    const COLORS = ['rgba(124,58,237,','rgba(236,72,153,','rgba(59,130,246,','rgba(6,182,212,'];
+    function resize(){
+      W = canvas.width = window.innerWidth * devicePixelRatio;
+      H = canvas.height = window.innerHeight * devicePixelRatio;
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+    }
+    function initParticles(){
+      const count = Math.min(70, Math.floor(window.innerWidth / 22));
+      particles = [];
+      for(let i=0;i<count;i++){
+        particles.push({
+          x: Math.random()*W, y: Math.random()*H,
+          vx: (Math.random()-.5)*.3 * devicePixelRatio,
+          vy: (Math.random()-.5)*.3 * devicePixelRatio,
+          r: (Math.random()*2 + 1.2) * devicePixelRatio,
+          c: COLORS[i % COLORS.length],
+          a: Math.random()*.5 + .3,
+        });
+      }
+    }
+    function tick(){
+      ctx.clearRect(0,0,W,H);
+      for(let i=0;i<particles.length;i++){
+        const p = particles[i];
+        for(let j=i+1;j<particles.length;j++){
+          const q = particles[j];
+          const dx = p.x - q.x, dy = p.y - q.y;
+          const d2 = dx*dx + dy*dy;
+          const maxD = 140 * devicePixelRatio;
+          if(d2 < maxD*maxD){
+            const alpha = (1 - Math.sqrt(d2)/maxD) * .22;
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(124,58,237,${alpha})`;
+            ctx.lineWidth = .6 * devicePixelRatio;
+            ctx.moveTo(p.x,p.y); ctx.lineTo(q.x,q.y);
+            ctx.stroke();
+          }
+        }
+      }
+      for(const p of particles){
+        const mx = mouse.x - p.x, my = mouse.y - p.y;
+        const md = Math.sqrt(mx*mx + my*my);
+        const radius = 110 * devicePixelRatio;
+        if(md < radius && md > 0){
+          const force = (1 - md/radius) * .8;
+          p.vx -= (mx/md) * force;
+          p.vy -= (my/md) * force;
+        }
+        p.vx *= .985; p.vy *= .985;
+        const spd = Math.hypot(p.vx, p.vy);
+        if(spd < .05 * devicePixelRatio){
+          p.vx += (Math.random()-.5)*.06 * devicePixelRatio;
+          p.vy += (Math.random()-.5)*.06 * devicePixelRatio;
+        }
+        p.x += p.vx; p.y += p.vy;
+        if(p.x < 0) p.x = W; if(p.x > W) p.x = 0;
+        if(p.y < 0) p.y = H; if(p.y > H) p.y = 0;
+        ctx.beginPath();
+        ctx.fillStyle = p.c + p.a + ')';
+        ctx.shadowColor = p.c + '.6)';
+        ctx.shadowBlur = 8 * devicePixelRatio;
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      requestAnimationFrame(tick);
+    }
+    window.addEventListener('resize', () => { resize(); initParticles(); });
+    window.addEventListener('mousemove', e => { mouse.x = e.clientX*devicePixelRatio; mouse.y = e.clientY*devicePixelRatio; });
+    window.addEventListener('mouseleave', () => { mouse.x = -9999; mouse.y = -9999; });
+    window.addEventListener('touchmove', e => {
+      if(e.touches[0]){ mouse.x = e.touches[0].clientX*devicePixelRatio; mouse.y = e.touches[0].clientY*devicePixelRatio; }
+    }, {passive:true});
+    resize(); initParticles(); tick();
+  })();
+
+  const progress = document.getElementById('scrollProgress');
+  window.addEventListener('scroll', () => {
+    const h = document.documentElement;
+    progress.style.width = (h.scrollTop / (h.scrollHeight - h.clientHeight)*100) + '%';
+  }, {passive:true});
+
+  const sections = document.querySelectorAll('section.block');
+  const tocLinks = document.querySelectorAll('nav.toc li');
+  new IntersectionObserver(entries => {
+    entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('in'); });
+  }, {threshold:.12}).observe && sections.forEach(s => { const io = new IntersectionObserver(entries => entries.forEach(e => e.isIntersecting && e.target.classList.add('in')), {threshold:.12}); io.observe(s); });
+
+  new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if(e.isIntersecting){
+        const id = e.target.id;
+        tocLinks.forEach(li => {
+          const a = li.querySelector('a');
+          if(a && a.getAttribute('href') === '#' + id) li.classList.add('active');
+          else li.classList.remove('active');
+        });
+      }
+    });
+  }, {rootMargin:'-40% 0px -50% 0px'}).observe && sections.forEach(s => {
+    const io2 = new IntersectionObserver(entries => entries.forEach(e => {
+      if(e.isIntersecting){
+        tocLinks.forEach(li => {
+          const a = li.querySelector('a');
+          li.classList.toggle('active', a && a.getAttribute('href') === '#' + e.target.id);
+        });
+      }
+    }), {rootMargin:'-40% 0px -50% 0px'});
+    io2.observe(s);
+  });
+
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    themeVariables: {
+      primaryColor: '#EEF2FF', primaryTextColor: '#1E293B',
+      primaryBorderColor: '#818CF8', lineColor: '#94A3B8',
+      secondaryColor: '#FCE7F3', tertiaryColor: '#DBEAFE',
+      fontFamily: "'Inter','Noto Sans SC',sans-serif", fontSize: '14px',
+    },
+    flowchart: { curve: 'basis', nodeSpacing: 45, rankSpacing: 55, htmlLabels: true, useMaxWidth: true },
+  });
+
+  document.querySelectorAll('nav.toc a').forEach(a => {
+    a.addEventListener('click', e => {
+      const href = a.getAttribute('href');
+      if(href.startsWith('#')){
+        e.preventDefault();
+        const el = document.querySelector(href);
+        if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+      }
+    });
+  });
+</script>
+</body>
+</html>
