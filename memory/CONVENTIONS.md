@@ -51,4 +51,7 @@ tags: 标签1, 标签2
 - `colna add` 默认把新笔记落到 `00-Inbox/`;明确指定分类时放对应目录。
 - 写完笔记自动增量重建索引(`colna add` / `colna sync` 内置)。
 - **归档不是删除**:从 Daily 移出的内容进 `40-Archive/daily-trash/`,永不 `rm`。
-- 不在 `memory/` 之外乱放真源;附件统一进 `_attachments/`。
+- 不在 `memory/` 之外乱放真源。
+- 通用附件(截图、PDF、外来素材、无 md 上下文的资源)统一进 `_attachments/`。
+- 项目自持的可视化 HTML(与同名 md 姐妹,如 `10-Projects/xxx/foo.md` 配 `foo.html`)可就近放项目目录下;
+  chunker 只索引 md,HTML 无论放哪都不会被切段。就近的好处是维护/引用/搬迁一起走。

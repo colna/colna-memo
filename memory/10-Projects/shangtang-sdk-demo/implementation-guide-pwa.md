@@ -9,7 +9,7 @@ tags: [implementation-guide, sensemars, sensetime, pwa, sitin-next, trtc, video-
 **目标分支**:`sitin-next feature/pwa`
 **接入方**:`packages/app-pwa`
 **SDK 封装包**:`@heyhru/web-plugin-sensetime-beauty`(新建 `packages/web-plugin-sensetime-beauty/`)
-**配套可视化**:[shangtang-beauty-implementation-guide.html](../../_attachments/shangtang-beauty-implementation-guide.html)
+**配套可视化**:[implementation-guide-pwa.html](implementation-guide-pwa.html)(light 风格 HTML,含彩色 Mermaid 流程图 + 粒子动效,浏览器直接打开)
 **上位方案**(含选型讨论):[tech-proposal-pwa-integration](tech-proposal-pwa-integration.md)
 
 > 本文是**实现指南**,只写正确方案,不写方案选择。四件事:能力范围 · 本方美颜接入(上行) · 对方美颜接入(下行) · SDK 抽离为 package + PWA 完整接入代码。
