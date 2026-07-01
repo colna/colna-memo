@@ -26,11 +26,13 @@ tags: [sitin4.0, app-pwa, chat, ui, figma]
   - 相机:内置 `<input type=file accept=image/*>`,移动端调起系统拍照/相册
 - [x] dev 预览页 `src/pages/ChatInputBarPreview/` + 路由 `/dev/chat-input-bar`(支持 `?mode=voice`),两态截图已 1:1 还原 Figma
 - [x] 接入真实聊天页 `ChatDetail/index.tsx`:替换 `ChatFooter` → `ChatInputBar`,礼物复用现有 `GiftList` 弹窗(送礼/余额/对象真实生效),`pwa_chat_send_message` 埋点搬到页面层;删除死代码 `ChatFooter.tsx`
+- [x] 语音录制状态机(commit `d69a49a9`):`hooks/useVoiceRecorder.ts`(MediaRecorder+AudioContext 波形+计时)+ `components/ChatVoiceRecorder.tsx`(pointer 手势:按住录制→上滑锁定/取消→松手 send/discard/too-short)+ 7 个 webp 图标;`onSendVoice(blob,durationMs)` 回调占位
 
 ## Follow-up(未做)
 
 - [ ] 相机选图后的 OSS 上传 + 发送图片消息(现为 `onPickImage` 占位 `console.log`+TODO;可复用 `utils/ossUpload.uploadToOss`)
-- [ ] 语音「按住录音 / 发送中」的交互与样式(本次按需求暂缓)
+- [ ] 语音消息的 OSS 上传 + 发送(现为 `onSendVoice` 占位;录制/手势/波形已完成)
+- [ ] 录制态交互 UI 的真机/登录态验证(headless 预览页受 App 未登录重定向阻挡,未能自动截图)
 
 ## 关键设计决策
 
