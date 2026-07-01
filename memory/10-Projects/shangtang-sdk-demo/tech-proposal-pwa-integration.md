@@ -11,6 +11,55 @@ tags: [tech-proposal, sensemars, sensetime, pwa, sitin-next, trtc, video-call, b
 **目标包**:`packages/app-pwa`
 **基础项目**:[shangtang-sdk-demo](README.md)
 
+## 零、核心业务价值验证:对方能看到美颜吗?
+
+**能。这是这个方案的核心业务价值,不是加分项。**
+
+美颜有两种做法,咱们方案是第二种:
+
+| 做法 | 对方看不看得到 | 说明 |
+|---|---|---|
+| ❌ 本地 CSS 滤镜 / 只改 `<video>` 显示 | **看不到** | 上行推流用的还是原始摄像头帧,只是本地渲染多加了一层 filter |
+| ✅ 改上行流本身(咱们方案) | **一定看得到** | 商汤处理后的 canvas → `captureStream()` → `MediaStreamTrack` → TRTC 推流,推的就是美颜后的帧 |
+
+### 端到端数据流
+
+```
+[主播摄像头] → getUserMedia() → [原始 MediaStream]
+                                        │
+                                        ↓ 送进商汤 SDK
+                              [商汤 SDK 处理:美颜/滤镜/贴纸/美妆]
+                                        │
+                                        ↓ 渲染到 canvas
+                                 [美颜后的 canvas]
+                                        │
+                                        ├──→ 本地 <video>          ← 主播自己看到美颜 ✅
+                                        │
+                                        └──→ canvas.captureStream(fps)
+                                                     │
+                                                     ↓
+                                           [美颜后的 MediaStreamTrack]
+                                                     │
+                                                     ↓ trtc.startLocalVideo({ videoTrack })
+                                           [TRTC 上行 → 腾讯服务器 → 对方 TRTC SDK]
+                                                     │
+                                                     ↓
+                                             [对方 <video>]         ← 对方看到美颜 ✅
+```
+
+### 三个附加要点
+
+1. **对方零负担**:美颜全在主播这边算,对方拿到的就是"已经美颜好的视频帧"。不需要对方装任何 SDK、不消耗对方 CPU、带宽也不变(推流分辨率 / 码率与现在一致)
+2. **对方 App 不用改**:只要主播端 PWA 集成一次,对方无论是 PWA / iOS / Android / Web 端,只要能收 TRTC 流就能看到美颜
+3. **主播自拍所见即对方所见**:本地预览和上行流是**同一份 canvas**,主播看到什么效果对方就看到什么效果 —— 避免"我这看着好看,对方看着还是原相机"的落差
+
+### 反过来的边界
+
+- 如果**对方**(男用户)也想给自己加美颜,那对方也得集成一份 SDK。按 heyhru 业务模型,男用户是消费方,通常不需要
+- 美颜**只作用在视频流上,音频不受影响**(音变/降噪是另一条链路,腾讯有 `voice-changer` 插件)
+
+---
+
 ## 一、结论(TL;DR)
 
 **可以接,技术路径是通的**。
