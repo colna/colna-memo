@@ -148,6 +148,7 @@
     <li><a href="#package">Package 设计</a></li>
     <li><a href="#impl">Package 实现</a></li>
     <li><a href="#usage">上层调用示例</a></li>
+    <li><a href="#integration">PWA 接入实现</a></li>
   </ol>
 </nav>
 
@@ -760,6 +761,368 @@ beauty.<span class="f">dispose</span>();</code></pre>
       <div class="cico">!</div>
       <div class="body">
         <strong>接入约束(TUICallEngine):</strong>不能同时用 <code>TUICallEngine.openCamera(viewId)</code> 和 <code>trtc.startLocalVideo({videoTrack})</code> —— 前者会覆盖后者。启用美颜时,<code>accept()</code> 后直接跳过 <code>openCamera</code>,自己调 <code>this.trtc.startLocalVideo(...)</code>。
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 6. PWA 接入实现 ===== -->
+  <section class="block" id="integration">
+    <div class="section-head">
+      <span class="section-num">§ 6 · Integration</span>
+      <h2>PWA 接入:<span class="accent">app-pwa 完整实现</span></h2>
+      <p class="section-lead"><code>packages/app-pwa</code> 侧全部改造点:workspace 依赖 → Vite 配置 → app 端 client 封装 → Zustand 状态 → 上行/下行接入 → 面板 UI → 生命周期清理。7 个改动点,可直接复用为 PR diff。</p>
+    </div>
+
+    <!-- 6.1 依赖 & Vite -->
+    <h3>6.1 依赖 + Vite 配置 + SDK 资源</h3>
+
+    <p><strong>① 加 workspace 依赖</strong>(<code>packages/app-pwa/package.json</code>):</p>
+<pre data-lang="json"><code>{
+  <span class="s">"dependencies"</span>: {
+    <span class="s">"@heyhru/web-plugin-sensetime-beauty"</span>: <span class="s">"workspace:*"</span>
+  }
+}</code></pre>
+
+    <p><strong>② 放置 SDK 静态资源</strong>(<code>packages/app-pwa/public/sdk/effects/</code>):</p>
+    <div class="file-tree">
+<span class="dir">packages/app-pwa/public/sdk/effects/</span>
+├── <span class="file">st-ar-effects.js</span>       <span class="comment"># 商汤 effects SDK 加载器</span>
+├── <span class="file">st-ar-effects.wasm</span>     <span class="comment"># WASM 核心 (~2-3MB)</span>
+├── <span class="file">st-ar-effects.data</span>     <span class="comment"># 模型数据</span>
+└── <span class="file">WebAR.lic</span>              <span class="comment"># License(dev 本地,prod 走 OSS)</span>
+    </div>
+
+    <p><strong>③ Vite + Workbox 配置</strong>:SDK 资源不进 precache,懒加载 + CacheFirst 长期缓存(<code>packages/app-pwa/vite.config.ts</code>):</p>
+<pre data-lang="ts"><code><span class="k">import</span> { defineConfig } <span class="k">from</span> <span class="s">'vite'</span>;
+<span class="k">import</span> { <span class="n">VitePWA</span> } <span class="k">from</span> <span class="s">'vite-plugin-pwa'</span>;
+
+<span class="k">export default</span> <span class="f">defineConfig</span>({
+  plugins: [
+    <span class="f">VitePWA</span>({
+      workbox: {
+        globPatterns: [<span class="s">'**/*.{js,css,html,ico,png,svg}'</span>],
+        globIgnores:  [<span class="s">'**/sdk/**/*.{wasm,data,js}'</span>],  <span class="c">// SDK 不进 precache</span>
+        runtimeCaching: [{
+          urlPattern: /^.*\/sdk\/effects\/.*\.(wasm|data|js)$/,
+          handler: <span class="s">'CacheFirst'</span>,
+          options: {
+            cacheName: <span class="s">'sensetime-effects'</span>,
+            expiration: { maxAgeSeconds: <span class="n">60</span> * <span class="n">60</span> * <span class="n">24</span> * <span class="n">30</span> },
+          },
+        }],
+      },
+    }),
+  ],
+});</code></pre>
+
+    <!-- 6.2 App 侧封装 -->
+    <h3>6.2 App 侧统一入口 · <code>services/beautyClient.ts</code></h3>
+    <p>把 <code>sdkBaseUrl</code> / <code>licenseUrl</code> 收敛到一个文件,避免 UI 组件里到处写 URL。同时暴露 <code>disposeBeauty</code> 给通话生命周期用。</p>
+<pre data-lang="ts"><code><span class="c">// packages/app-pwa/src/services/beautyClient.ts</span>
+<span class="k">import</span> {
+  createBeauty, <span class="t">PRESETS</span>, isBeautySupported,
+  <span class="k">type</span> <span class="t">BeautyInstance</span>,
+} <span class="k">from</span> <span class="s">'@heyhru/web-plugin-sensetime-beauty'</span>;
+
+<span class="k">let</span> instance: <span class="t">BeautyInstance</span> | <span class="k">null</span> = <span class="k">null</span>;
+
+<span class="k">export function</span> <span class="f">getBeauty</span>(): <span class="t">BeautyInstance</span> {
+  <span class="k">if</span> (instance) <span class="k">return</span> instance;
+  instance = <span class="f">createBeauty</span>({
+    sdkBaseUrl: <span class="s">'/sdk/effects'</span>,
+    licenseUrl: <span class="s">'/sdk/effects/WebAR.lic'</span>,
+    initialParams: <span class="t">PRESETS</span>.<span class="n">NATURAL</span>,
+    fps: <span class="n">24</span>,
+  });
+  <span class="k">return</span> instance;
+}
+
+<span class="k">export function</span> <span class="f">disposeBeauty</span>(): <span class="k">void</span> {
+  instance?.<span class="f">dispose</span>();
+  instance = <span class="k">null</span>;
+}
+
+<span class="k">export</span> { <span class="t">PRESETS</span>, isBeautySupported };</code></pre>
+
+    <!-- 6.3 Zustand -->
+    <h3>6.3 状态管理 · <code>store/beautyStore.ts</code></h3>
+    <p>app-pwa 已用 Zustand。美颜参数放 store,面板 UI 订阅、通话链路读取(判断是否启用),两处解耦。</p>
+<pre data-lang="ts"><code><span class="c">// packages/app-pwa/src/store/beautyStore.ts</span>
+<span class="k">import</span> { create } <span class="k">from</span> <span class="s">'zustand'</span>;
+<span class="k">import</span> { <span class="t">PRESETS</span>, <span class="k">type</span> <span class="t">BeautyParams</span> }
+  <span class="k">from</span> <span class="s">'@heyhru/web-plugin-sensetime-beauty'</span>;
+<span class="k">import</span> { getBeauty } <span class="k">from</span> <span class="s">'@/services/beautyClient'</span>;
+
+<span class="k">type</span> <span class="t">PresetKey</span> = <span class="k">keyof typeof</span> <span class="t">PRESETS</span>;
+
+<span class="k">interface</span> <span class="t">BeautyState</span> {
+  enabled: <span class="k">boolean</span>;
+  preset: <span class="t">PresetKey</span> | <span class="s">'CUSTOM'</span>;
+  params: <span class="t">BeautyParams</span>;
+  <span class="f">setEnabled</span>(v: <span class="k">boolean</span>): <span class="k">void</span>;
+  <span class="f">applyPreset</span>(key: <span class="t">PresetKey</span>): <span class="k">void</span>;
+  <span class="f">updateParam</span>(key: <span class="k">keyof</span> <span class="t">BeautyParams</span>, value: <span class="k">number</span>): <span class="k">void</span>;
+}
+
+<span class="k">export const</span> useBeautyStore = create&lt;<span class="t">BeautyState</span>&gt;((set, get) =&gt; ({
+  enabled: <span class="k">true</span>,
+  preset: <span class="s">'NATURAL'</span>,
+  params: <span class="t">PRESETS</span>.<span class="n">NATURAL</span>,
+  <span class="f">setEnabled</span>(v) { <span class="f">set</span>({ enabled: v }); },
+  <span class="f">applyPreset</span>(key) {
+    <span class="k">const</span> params = <span class="t">PRESETS</span>[key];
+    <span class="f">set</span>({ preset: key, params });
+    <span class="f">getBeauty</span>().<span class="f">setParams</span>(params, <span class="s">'local'</span>);
+  },
+  <span class="f">updateParam</span>(key, value) {
+    <span class="k">const</span> params = { ...<span class="f">get</span>().params, [key]: value };
+    <span class="f">set</span>({ preset: <span class="s">'CUSTOM'</span>, params });
+    <span class="f">getBeauty</span>().<span class="f">setParams</span>({ [key]: value }, <span class="s">'local'</span>);
+  },
+}));</code></pre>
+
+    <!-- 6.4 上行 -->
+    <h3>6.4 上行接入 · <code>webCallManager.startLocalVideo</code> 改造</h3>
+    <p>关键改动:<strong>绕开 <code>TUICallEngine.openCamera</code></strong>(它会盖掉自定义 <code>videoTrack</code>),自建 <code>getUserMedia</code> → 美颜 → <code>trtc.startLocalVideo</code>。前后置切换走 <code>updateLocalVideo</code> 热切换。</p>
+
+<pre data-lang="ts"><code><span class="c">// packages/app-pwa/src/services/webCallManager.tsx (改造后)</span>
+<span class="k">import</span> { getBeauty, isBeautySupported } <span class="k">from</span> <span class="s">'@/services/beautyClient'</span>;
+<span class="k">import</span> { useBeautyStore } <span class="k">from</span> <span class="s">'@/store/beautyStore'</span>;
+
+<span class="k">private</span> <span class="f">shouldUseBeauty</span>(): <span class="k">boolean</span> {
+  <span class="k">return</span> <span class="f">isBeautySupported</span>() &amp;&amp; useBeautyStore.<span class="f">getState</span>().enabled;
+}
+
+<span class="k">async</span> <span class="f">startLocalVideo</span>(viewId: <span class="k">string</span>): <span class="n">Promise</span>&lt;<span class="k">void</span>&gt; {
+  <span class="c">// ① 拿原始摄像头流(复用 useCameraStream 单例,避免多次 getUserMedia)</span>
+  <span class="k">const</span> stream = <span class="k">await this</span>.cameraSource.<span class="f">acquire</span>();
+
+  <span class="c">// ② 走 SDK 或裸流(降级)</span>
+  <span class="k">const</span> videoTrack = <span class="k">this</span>.<span class="f">shouldUseBeauty</span>()
+    ? <span class="k">await</span> <span class="f">getBeauty</span>().<span class="f">process</span>(stream)
+    : stream.<span class="f">getVideoTracks</span>()[<span class="n">0</span>];
+
+  <span class="c">// ③ 塞给 TRTC 上行(跳过 TUICallEngine.openCamera)</span>
+  <span class="k">await this</span>.trtc.<span class="f">startLocalVideo</span>({
+    view: viewId,
+    publish: <span class="k">true</span>,
+    option: { videoTrack, profile: <span class="s">'480p_1'</span>, mirror: <span class="k">true</span> },
+  });
+}
+
+<span class="k">async</span> <span class="f">switchCamera</span>(facing: <span class="s">'user'</span> | <span class="s">'environment'</span>): <span class="n">Promise</span>&lt;<span class="k">void</span>&gt; {
+  <span class="k">await this</span>.cameraSource.<span class="f">switch</span>(facing);
+  <span class="k">const</span> stream = <span class="k">await this</span>.cameraSource.<span class="f">acquire</span>();
+  <span class="k">const</span> track  = <span class="k">this</span>.<span class="f">shouldUseBeauty</span>()
+    ? <span class="k">await</span> <span class="f">getBeauty</span>().<span class="f">process</span>(stream)
+    : stream.<span class="f">getVideoTracks</span>()[<span class="n">0</span>];
+  <span class="c">// 热切换,不用 exit/enter room</span>
+  <span class="k">await this</span>.trtc.<span class="f">updateLocalVideo</span>({ option: { videoTrack: track } });
+}
+
+<span class="k">async</span> <span class="f">setBeautyEnabled</span>(on: <span class="k">boolean</span>): <span class="n">Promise</span>&lt;<span class="k">void</span>&gt; {
+  useBeautyStore.<span class="f">getState</span>().<span class="f">setEnabled</span>(on);
+  <span class="c">// 通话中动态切换 → 重新起 track</span>
+  <span class="k">const</span> stream = <span class="k">await this</span>.cameraSource.<span class="f">acquire</span>();
+  <span class="k">const</span> track  = on &amp;&amp; <span class="f">isBeautySupported</span>()
+    ? <span class="k">await</span> <span class="f">getBeauty</span>().<span class="f">process</span>(stream)
+    : stream.<span class="f">getVideoTracks</span>()[<span class="n">0</span>];
+  <span class="k">await this</span>.trtc.<span class="f">updateLocalVideo</span>({ option: { videoTrack: track } });
+}</code></pre>
+
+    <!-- 6.5 下行 -->
+    <h3>6.5 下行接入 · <code>REMOTE_VIDEO_AVAILABLE</code> 事件</h3>
+    <p>接完事件后拿 remote track → 走 <code>processRemote</code> → 拿到 canvas → 通过 eventBus 传给 React 侧挂载。</p>
+
+<pre data-lang="ts"><code><span class="c">// packages/app-pwa/src/services/webCallManager.tsx (下行部分)</span>
+<span class="k">import</span> { <span class="t">PRESETS</span> } <span class="k">from</span> <span class="s">'@/services/beautyClient'</span>;
+<span class="k">import</span> { eventBus } <span class="k">from</span> <span class="s">'@/utils/eventBus'</span>;
+
+<span class="k">private</span> <span class="f">subscribeRemote</span>(): <span class="k">void</span> {
+  <span class="k">this</span>.trtc.<span class="f">on</span>(<span class="t">TRTC</span>.<span class="n">EVENT</span>.<span class="n">REMOTE_VIDEO_AVAILABLE</span>, <span class="k">async</span> ({ userId, streamType }) =&gt; {
+    <span class="k">if</span> (streamType !== <span class="t">TRTC</span>.<span class="n">TYPE</span>.<span class="n">STREAM_TYPE_MAIN</span>) <span class="k">return</span>;
+
+    <span class="k">const</span> remoteTrack = <span class="k">this</span>.trtc.<span class="f">getVideoTrack</span>({ userId, streamType });
+    <span class="k">if</span> (!remoteTrack) <span class="k">return</span>;
+
+    <span class="k">if</span> (!<span class="k">this</span>.<span class="f">shouldUseBeauty</span>()) {
+      <span class="c">// 降级:走 SDK 自动挂 &lt;video&gt;</span>
+      <span class="k">await this</span>.trtc.<span class="f">startRemoteVideo</span>({ userId, view: <span class="s">`remote-${userId}`</span> });
+      <span class="k">return</span>;
+    }
+
+    <span class="k">const</span> canvas = <span class="k">await</span> <span class="f">getBeauty</span>().<span class="f">processRemote</span>({
+      userId,
+      track: remoteTrack,
+      preset: <span class="t">PRESETS</span>.<span class="n">LIGHT</span>,          <span class="c">// 对方档位比本方轻一档</span>
+    });
+    eventBus.<span class="f">emit</span>(<span class="s">'beauty:remoteReady'</span>, { userId, canvas });
+  });
+
+  <span class="k">this</span>.trtc.<span class="f">on</span>(<span class="t">TRTC</span>.<span class="n">EVENT</span>.<span class="n">REMOTE_USER_EXIT</span>, ({ userId }) =&gt; {
+    <span class="f">getBeauty</span>().<span class="f">stopRemote</span>(userId);
+    eventBus.<span class="f">emit</span>(<span class="s">'beauty:remoteRemoved'</span>, { userId });
+  });
+}</code></pre>
+
+    <p>React 组件把 canvas 挂进 DOM(替代原来的 <code>&lt;video&gt;</code> 容器):</p>
+
+<pre data-lang="tsx"><code><span class="c">// packages/app-pwa/src/components/RemoteVideoView.tsx</span>
+<span class="k">import</span> { useEffect, useRef } <span class="k">from</span> <span class="s">'react'</span>;
+<span class="k">import</span> { eventBus } <span class="k">from</span> <span class="s">'@/utils/eventBus'</span>;
+
+<span class="k">interface</span> <span class="t">Props</span> { userId: <span class="k">string</span>; className?: <span class="k">string</span>; }
+
+<span class="k">export function</span> <span class="f">RemoteVideoView</span>({ userId, className }: <span class="t">Props</span>) {
+  <span class="k">const</span> hostRef = <span class="f">useRef</span>&lt;<span class="t">HTMLDivElement</span>&gt;(<span class="k">null</span>);
+
+  <span class="f">useEffect</span>(() =&gt; {
+    <span class="k">const</span> onReady = (p: { userId: <span class="k">string</span>; canvas: <span class="t">HTMLCanvasElement</span> }) =&gt; {
+      <span class="k">if</span> (p.userId !== userId || !hostRef.current) <span class="k">return</span>;
+      <span class="n">Object</span>.<span class="f">assign</span>(p.canvas.style, {
+        width: <span class="s">'100%'</span>, height: <span class="s">'100%'</span>,
+        objectFit: <span class="s">'cover'</span>, display: <span class="s">'block'</span>,
+      });
+      hostRef.current.<span class="f">replaceChildren</span>(p.canvas);
+    };
+    <span class="k">const</span> onRemoved = (p: { userId: <span class="k">string</span> }) =&gt; {
+      <span class="k">if</span> (p.userId !== userId || !hostRef.current) <span class="k">return</span>;
+      hostRef.current.<span class="f">replaceChildren</span>();
+    };
+    eventBus.<span class="f">on</span>(<span class="s">'beauty:remoteReady'</span>,  onReady);
+    eventBus.<span class="f">on</span>(<span class="s">'beauty:remoteRemoved'</span>, onRemoved);
+    <span class="k">return</span> () =&gt; {
+      eventBus.<span class="f">off</span>(<span class="s">'beauty:remoteReady'</span>,  onReady);
+      eventBus.<span class="f">off</span>(<span class="s">'beauty:remoteRemoved'</span>, onRemoved);
+    };
+  }, [userId]);
+
+  <span class="k">return</span> &lt;<span class="t">div</span> ref={hostRef} className={className} /&gt;;
+}</code></pre>
+
+    <!-- 6.6 面板 -->
+    <h3>6.6 美颜面板 · <code>components/BeautyPanel.tsx</code></h3>
+    <p>4 档预设 + 3 项基础美颜(磨皮/美白/红润)+ 3 项微整形(瘦脸/大眼/下巴)滑块。Store 单向数据流,组件只订阅。</p>
+
+<pre data-lang="tsx"><code><span class="c">// packages/app-pwa/src/components/BeautyPanel.tsx</span>
+<span class="k">import</span> { useBeautyStore } <span class="k">from</span> <span class="s">'@/store/beautyStore'</span>;
+<span class="k">import type</span> { <span class="t">BeautyParams</span> } <span class="k">from</span> <span class="s">'@heyhru/web-plugin-sensetime-beauty'</span>;
+
+<span class="k">const</span> <span class="n">PRESETS_UI</span> = [
+  { key: <span class="s">'OFF'</span>,     label: <span class="s">'关闭'</span> },
+  { key: <span class="s">'LIGHT'</span>,   label: <span class="s">'轻'</span> },
+  { key: <span class="s">'NATURAL'</span>, label: <span class="s">'自然'</span> },
+  { key: <span class="s">'STRONG'</span>,  label: <span class="s">'浓'</span> },
+] <span class="k">as const</span>;
+
+<span class="k">const</span> <span class="n">PARAMS_UI</span>: <span class="n">Array</span>&lt;{
+  key: <span class="k">keyof</span> <span class="t">BeautyParams</span>;
+  label: <span class="k">string</span>;
+  group: <span class="s">'skin'</span> | <span class="s">'shape'</span>;
+}&gt; = [
+  { key: <span class="s">'skinSmooth'</span>, label: <span class="s">'磨皮'</span>, group: <span class="s">'skin'</span> },
+  { key: <span class="s">'whiten'</span>,     label: <span class="s">'美白'</span>, group: <span class="s">'skin'</span> },
+  { key: <span class="s">'redden'</span>,     label: <span class="s">'红润'</span>, group: <span class="s">'skin'</span> },
+  { key: <span class="s">'faceSlim'</span>,   label: <span class="s">'瘦脸'</span>, group: <span class="s">'shape'</span> },
+  { key: <span class="s">'eyeEnlarge'</span>, label: <span class="s">'大眼'</span>, group: <span class="s">'shape'</span> },
+  { key: <span class="s">'chin'</span>,       label: <span class="s">'下巴'</span>, group: <span class="s">'shape'</span> },
+];
+
+<span class="k">export function</span> <span class="f">BeautyPanel</span>() {
+  <span class="k">const</span> { enabled, preset, params, setEnabled, applyPreset, updateParam }
+    = <span class="f">useBeautyStore</span>();
+
+  <span class="k">return</span> (
+    &lt;<span class="t">div</span> className=<span class="s">"beauty-panel"</span>&gt;
+      &lt;<span class="t">label</span> className=<span class="s">"beauty-switch"</span>&gt;
+        &lt;<span class="t">input</span> type=<span class="s">"checkbox"</span> checked={enabled}
+               onChange={e =&gt; <span class="f">setEnabled</span>(e.target.checked)} /&gt;
+        美颜
+      &lt;/<span class="t">label</span>&gt;
+
+      &lt;<span class="t">div</span> className=<span class="s">"beauty-presets"</span>&gt;
+        {<span class="n">PRESETS_UI</span>.<span class="f">map</span>(p =&gt; (
+          &lt;<span class="t">button</span> key={p.key} disabled={!enabled}
+                  className={preset === p.key ? <span class="s">'is-active'</span> : <span class="s">''</span>}
+                  onClick={() =&gt; <span class="f">applyPreset</span>(p.key)}&gt;
+            {p.label}
+          &lt;/<span class="t">button</span>&gt;
+        ))}
+      &lt;/<span class="t">div</span>&gt;
+
+      {([<span class="s">'skin'</span>, <span class="s">'shape'</span>] <span class="k">as const</span>).<span class="f">map</span>(g =&gt; (
+        &lt;<span class="t">section</span> key={g} className=<span class="s">"beauty-group"</span>&gt;
+          &lt;<span class="t">h4</span>&gt;{g === <span class="s">'skin'</span> ? <span class="s">'基础美颜'</span> : <span class="s">'微整形'</span>}&lt;/<span class="t">h4</span>&gt;
+          {<span class="n">PARAMS_UI</span>.<span class="f">filter</span>(p =&gt; p.group === g).<span class="f">map</span>(p =&gt; (
+            &lt;<span class="t">label</span> key={p.key} className=<span class="s">"beauty-slider"</span>&gt;
+              &lt;<span class="t">span</span>&gt;{p.label}&lt;/<span class="t">span</span>&gt;
+              &lt;<span class="t">input</span> type=<span class="s">"range"</span> min={<span class="n">0</span>} max={<span class="n">1</span>} step={<span class="n">0.05</span>}
+                     value={params[p.key] ?? <span class="n">0</span>}
+                     disabled={!enabled}
+                     onChange={e =&gt; <span class="f">updateParam</span>(p.key, +e.target.value)} /&gt;
+              &lt;<span class="t">span</span> className=<span class="s">"beauty-value"</span>&gt;
+                {((params[p.key] ?? <span class="n">0</span>) * <span class="n">100</span>).<span class="f">toFixed</span>(<span class="n">0</span>)}
+              &lt;/<span class="t">span</span>&gt;
+            &lt;/<span class="t">label</span>&gt;
+          ))}
+        &lt;/<span class="t">section</span>&gt;
+      ))}
+    &lt;/<span class="t">div</span>&gt;
+  );
+}</code></pre>
+
+    <!-- 6.7 生命周期 -->
+    <h3>6.7 通话生命周期清理</h3>
+    <p>SDK 持有 WebGL context + WASM 内存,通话结束必须 <code>dispose</code>,否则拨新通话会累积泄漏。</p>
+
+<pre data-lang="ts"><code><span class="c">// packages/app-pwa/src/services/webCallManager.tsx (清理部分)</span>
+<span class="k">import</span> { disposeBeauty } <span class="k">from</span> <span class="s">'@/services/beautyClient'</span>;
+
+<span class="k">async</span> <span class="f">hangup</span>(): <span class="n">Promise</span>&lt;<span class="k">void</span>&gt; {
+  <span class="k">await this</span>.trtc.<span class="f">stopLocalVideo</span>();
+  <span class="k">await this</span>.trtc.<span class="f">exitRoom</span>();
+  <span class="k">this</span>.cameraSource.<span class="f">release</span>();
+  <span class="f">disposeBeauty</span>();   <span class="c">// 释放 WebGL + WASM,避免拨新通话时累积泄漏</span>
+}
+
+<span class="k">private</span> <span class="f">handleCallEnd</span>(): <span class="k">void</span> {
+  <span class="c">// 对端挂断 / 网络断开 / 服务器踢人:同样清理</span>
+  <span class="f">disposeBeauty</span>();
+}</code></pre>
+
+    <p>React 通话页面 unmount 兜底:</p>
+
+<pre data-lang="tsx"><code><span class="c">// packages/app-pwa/src/pages/CallPage.tsx</span>
+<span class="k">import</span> { useEffect } <span class="k">from</span> <span class="s">'react'</span>;
+<span class="k">import</span> { disposeBeauty } <span class="k">from</span> <span class="s">'@/services/beautyClient'</span>;
+
+<span class="k">export function</span> <span class="f">CallPage</span>() {
+  <span class="f">useEffect</span>(() =&gt; () =&gt; { <span class="f">disposeBeauty</span>(); }, []);
+  <span class="c">// ...</span>
+}</code></pre>
+
+    <!-- 改动清单 -->
+    <h3>本次接入的改动清单</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>类型</th><th>文件</th><th>动作</th></tr></thead>
+        <tbody>
+          <tr><td>依赖</td><td><code>packages/app-pwa/package.json</code></td><td>+ <code>@heyhru/web-plugin-sensetime-beauty</code></td></tr>
+          <tr><td>资源</td><td><code>packages/app-pwa/public/sdk/effects/*</code></td><td>放置 4 个文件(js / wasm / data / lic)</td></tr>
+          <tr><td>配置</td><td><code>packages/app-pwa/vite.config.ts</code></td><td>Workbox: precache 排除 + runtime CacheFirst</td></tr>
+          <tr><td>新增</td><td><code>src/services/beautyClient.ts</code></td><td>app 侧单例入口</td></tr>
+          <tr><td>新增</td><td><code>src/store/beautyStore.ts</code></td><td>Zustand · 参数状态</td></tr>
+          <tr><td>改造</td><td><code>src/services/webCallManager.tsx</code></td><td><code>startLocalVideo</code> / <code>switchCamera</code> / <code>subscribeRemote</code> / <code>hangup</code></td></tr>
+          <tr><td>新增</td><td><code>src/components/RemoteVideoView.tsx</code></td><td>canvas 挂载容器</td></tr>
+          <tr><td>新增</td><td><code>src/components/BeautyPanel.tsx</code></td><td>预设 + 6 项滑块面板</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout info">
+      <div class="cico">i</div>
+      <div class="body">
+        <strong>sitin-next CLAUDE.md 硬规则提醒:</strong>真正动 <code>sitin-next</code> 代码前,先按 <em>Doc-first</em> 更新相关文档(可以是本方案 md),再按 <em>Modifications</em> 列 diff 拿用户确认。本文的代码块只是设计示意,不是可以直接 commit 的 patch。
       </div>
     </div>
   </section>
