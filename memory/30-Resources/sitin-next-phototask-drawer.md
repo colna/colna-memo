@@ -29,7 +29,7 @@ interface PhotoTaskDrawerProps {
 }
 ```
 
-`onCountdownEnd` 每个 open 周期只触发一次(用 `expiredRef` 保护);抽屉重开会重置。宿主可在此关闭抽屉 / 标记任务过期 / 发提示。
+`onCountdownEnd` 每个 open 周期只触发一次(用 `expiredRef` 保护);抽屉重开会重置。到点时抽屉**先自己 `onClose()` 关闭、再调 `onCountdownEnd()`**,所以宿主在 `onCountdownEnd` 里只需处理"过期"后续(标记任务过期 / 发提示 / 埋点),不用再关抽屉。
 
 ## 状态机(内部自管,无需外部驱动)
 
