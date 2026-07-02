@@ -46,3 +46,12 @@ tags: [sitin-next, social-proxy, online-stats, redis, troubleshooting]
 ## 本地 tsc 注意
 
 - minerva-server 本地 tsc 前需 `prisma generate`(主 `prisma/schema.prisma` + `prisma/monitor/schema.prisma` 两个),否则 `prisma.$queryRaw<T>` 退化成 any、`rows.map((r))` 报 implicit-any。这是仓库既有状态,非新引入。
+
+## prod「当前在线 0 人」但历史图表正常(2026-07-01)
+
+- **现象**:admin-prod「在线数据」页顶部「当前在线 0 / 最长在线 0s」,下方历史图表(总用户 918 等)正常。
+- **根因**:当前在线走 minerva `SCAN proxy:ig_online:*`(Redis),历史走 Postgres → **prod 上 minerva 与 social-proxy 连的不是同一 Redis 实例/db**(SCAN 按 db 隔离,一方写另一方扫不到)。dev 正常 = dev 两边同一 Redis。
+- **定性自测(不需集群权限)**:Action 控制台「设备列表」读 social-proxy **内存 Map**(不碰 Redis)、在线徽标读同一个 `proxy:ig_online:` key。**「列表有设备但 minerva /current=0」即铁证跨服务 Redis 不一致**。
+- **产品级绕开修法**(用户拍板统一成 Action 台那个源):`OnlineStats/index.tsx` 的 `CurrentOnlineCard` 数据源从 `getSpOnlineCurrent`(扫 Redis)换成 `getDevices()`(`GET /api/social-proxy/gateway/devices`,读 social-proxy 内存设备表);当前在线=`count ?? devices.length`,最长在线=遍历取最早 `connectedAt`(epoch ms)。minerva `/current` 保留不删。
+- **取舍**:gateway/devices 读 social-proxy **单实例内存**,失去原 Redis 方案的多副本聚合;当前 prod 单实例无影响,**若 social-proxy 横向扩多副本此数只统计单副本** → 届时要么对齐 Redis env、要么网关侧聚合。
+- **部署映射**:`release/test-admin`→admin-dev、`release/online-admin`→admin-prod。上了 test 只在 dev 生效,**prod 要生效需再并到 `release/online-admin`**。
