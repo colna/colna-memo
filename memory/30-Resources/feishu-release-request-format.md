@@ -16,6 +16,7 @@ tags: [飞书, 上线申请, 规范, lark-cli, sitin-next]
 - **常用群 chat_id**:
   - 「前端」`oc_3aabdcfa9738eec37152a5a65dcca0c5`
   - 「前端小分队」`oc_c46f0c8b2ee2b6db95f07080ee7e010e`
+  - 「SP后端内部群」`oc_713670054e6236e6074902693bec3595`(SP/social-proxy 后端上线申请发这里,@沈硕;沈硕 open_id 需在 `cli_a948f5747e3b9ccc` 应用下重新解析后再补)
   - 发前用 `lark-cli im +chat-search --query 前端 --as user` 确认(同名前缀群很多)。
 
 ## 模板格式(富文本加粗版)
