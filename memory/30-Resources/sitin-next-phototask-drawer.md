@@ -25,8 +25,11 @@ interface PhotoTaskDrawerProps {
   countdownSeconds?: number;        // 倒计时秒数(idle 头部 mm:ss),默认 180
   onVerify: (file: File) => Promise<PhotoVerifyResult>;  // 注入:上传+审核
   onSent?: (cdnUrl: string) => void;                     // 审核通过并"发送"后回调
+  onCountdownEnd?: () => void;                           // 倒计时到 0 触发一次(任务过期)
 }
 ```
+
+`onCountdownEnd` 每个 open 周期只触发一次(用 `expiredRef` 保护);抽屉重开会重置。宿主可在此关闭抽屉 / 标记任务过期 / 发提示。
 
 ## 状态机(内部自管,无需外部驱动)
 
