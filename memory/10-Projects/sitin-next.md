@@ -12,7 +12,7 @@ Sitin 平台主 monorepo,pnpm workspace + Turborepo 管理。
 
 - 仓库:`git@github-colna:presence-io/sitin-next.git`
 - 路径:`/Users/user/Dev2/zhangzheng/sitin-next`
-- 当前分支:`feature/sp`
+- 集成分支:`personal/zz/sitin4`(app-pwa 功能分支从这里切、PR base 也指这里)
 - 环境:Node.js >= 20,pnpm >= 10
 
 ## 技术栈

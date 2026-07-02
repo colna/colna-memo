@@ -14,7 +14,7 @@ tags: [sitin4.0, app-pwa, chat, ui, figma]
 
 - 仓库:`sitin-next` → `packages/app-pwa`
 - 分支:`personal/zz/pwa-chat-bottombar`(从集成分支 `personal/zz/sitin4` 切出)
-- **PR #499**:https://github.com/presence-io/sitin-next/pull/499(base `personal/zz/sitin4`,colna 账号提)
+- **PR #499**(**已合并**):https://github.com/presence-io/sitin-next/pull/499(base `personal/zz/sitin4`,colna 账号提)
 - commit 序列:`3591d6bc`(组件+预览)→`075b8dbe`(接入 ChatDetail、删 ChatFooter)→`d69a49a9`(语音状态机)→`53ce1064`(修 async event currentTarget)→`3d583903`(透明底栏+白圆按钮)→`48629b70`(channel 居中去背景)→`c55dfe76`(blob 日志)→`aa683098`(波形从左往右)→`c6ff580b`(按钮原地放大 scale)→`cc1b1f3f`(语音条阴影)→`c5c4b3ae`(激活按钮阴影)→`f997f963`(修 setPointerCapture 竞态)→`06883042`(修长按弹图片菜单)→`cf9acfdc`(录制零延迟)→`196049c6`(修声纹不动 AudioContext resume)
 
 ## 已完成
@@ -32,9 +32,14 @@ tags: [sitin4.0, app-pwa, chat, ui, figma]
 
 ## Follow-up(未做)
 
-- [ ] 相机选图后的 OSS 上传 + 发送图片消息(现为 `onPickImage` 占位 `console.log`+TODO;可复用 `utils/ossUpload.uploadToOss`)
-- [ ] 语音消息的 OSS 上传 + 发送(现为 `onSendVoice` 占位;录制/手势/波形/blob 获取已完成并真机验证)
+> 相机/语音「发送」的后续演进成了独立的**探真任务**,见 [[pwa-verify-tasks]](PhotoTask/VoiceTask 抽屉,PR #517/#518)。底栏这里的 `onSendImage` / `onSendVoice` 仍是占位,真实上传+发消息随探真接入 ChatDetail 时一起做。
+
+- [ ] 相机选图 / 语音的 OSS 上传 + 发消息(现为占位;探真抽屉里已有 `uploadToOss` 用法样例)
 - [ ] iOS 真机验证(本会话真机测试主要在 Android Chrome;iOS 可能还需 `-webkit-touch-callout:none` 等)
+
+## 后续改动(合并后)
+
+- 发送回调重命名 `onPickImage→onSendImage`、`onGiftClick→onSendGift`;`freeVoiceCount→rewardMultiplier`(奖励金倍数);所有发送加防抖(`useLockFn` + 底栏 500ms 前沿节流)。详见 [2026-07-02 Daily](../50-Daily/2026-07-02.md)。
 
 ## 关键设计决策
 
