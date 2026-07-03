@@ -41,6 +41,26 @@ tags: [sitin4.0, app-pwa, chat, ui, figma]
 
 - 发送回调重命名 `onPickImage→onSendImage`、`onGiftClick→onSendGift`;`freeVoiceCount→rewardMultiplier`(奖励金倍数);所有发送加防抖(`useLockFn` + 底栏 500ms 前沿节流)。详见 [2026-07-02 Daily](../50-Daily/2026-07-02.md)。
 
+## 发送生命周期回调重构(2026-07-02,PR #520)
+
+把粗粒度的 `onSendText/onSendVoice/onSendImage/onSendGift` 换成**每种类型一套发送生命周期**。分支 `personal/zz/pwa-chat-input-lifecycle`(从 sitin4 切),PR #520 → base sitin4。
+
+```ts
+interface SendLifecycle<P> {
+  onStart?; onCancel?;                 // 取消仅 voice/image
+  onSend: (P) => void | Promise<unknown>;  // 注入真实发送,组件 await
+  onSendSuccess?; onSendError?;
+}
+// props: text(无 cancel) / voice({blob,durationMs}) / image(File) / gift({onStart})
+```
+
+- **success/fail 由组件驱动**:ChatInputBar `await onSend`,resolve→success、reject→error,并复位自身 UI(文字乐观清空、失败回填草稿)。发送逻辑仍在页面层(维持「组件纯净」)。
+- **ChatVoiceRecorder** 手势→生命周期:`start()` ok→onStart;上滑取消/locked 垃圾桶/<1s 太短→onCancel;松手/locked send→onSend。
+- **图片取消**用 file input 原生 `cancel` 事件(React 无合成事件),`addEventListener("cancel")`。
+- **礼物**只 `onGiftStart`(打开页面 GiftList),send/success/fail 仍在面板里。
+- ChatDetail 用 `useMemo` 包生命周期对象(稳定 identity,避免每次渲染重挂 cancel 监听)。
+- 坑:commitlint `subject-case` 禁止 subject 首词 PascalCase(`ChatInputBar` 会挂),要小写开头。
+
 ## 关键设计决策
 
 - **组件纯净**:`ChatInputBar` 只暴露回调,不绑业务;`GiftList`、埋点、发送逻辑都留在页面层。接入 = 替换挂载点 + 接线页面已有逻辑,组件零改动。
