@@ -49,6 +49,8 @@ interface PhotoTaskDrawerProps {
 
 对齐 Figma 节点:成功 `4576-2186`、超时 `4577-2187`、抓手 `4139-14442`。
 
+**success/expired 两态与 VoiceTaskDrawer 共用**:抽在 `pages/ChatDetail/taskDrawerStates.tsx`,导出 `TaskSuccessBody({title,earnedText,caption,onDone})` / `TaskExpiredBody({caption,onDone})`,只有文案由调用方传。改终态样式改这一个文件即可。
+
 ## 接真实后端(ChatDetail 用)
 
 `onVerify` 里串 OSS 直传 + 数美审核(注意:审核 proto `archat_api/chat_api` 后端**尚未落地**,须等 `chat_api.proto` + `pnpm proto:gen`):

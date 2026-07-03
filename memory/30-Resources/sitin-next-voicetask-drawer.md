@@ -42,6 +42,7 @@ interface VoiceTaskDrawerProps {
 - **reviewing**:调 `onVerify`;灰化 + 禁用 Send。
 - **通过** → success 居中态(Done);**失败** → failed(TRANSCRIPT 卡 + Re-record)。
 - **expired**:倒计时到 0 进此态(Got it)+ 触发 `onCountdownEnd`。
+- **success/expired 两态与 PhotoTaskDrawer 共用** `pages/ChatDetail/taskDrawerStates.tsx`(`TaskSuccessBody`/`TaskExpiredBody`,只传文案);详见 [[sitin-next-phototask-drawer]]。
 
 ## 弹窗行为(与 PhotoTask 一致)
 
