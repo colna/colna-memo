@@ -39,7 +39,8 @@ interface VoiceTaskDrawerProps {
 - **idle**:SAY THIS 脚本卡 + 倒计时 + Record 按钮。**点击 Record 开始录制,不长按**。
 - **recording**:`useVoiceRecorder.levels` 渲染动态声纹条 + REC 计时 + Stop &amp; review。
 - **recorded**:回放卡(播放键 + 波形 + 时长)+ 绿 chip + Send。**回放有播放头动画**:停录后 Web Audio 解码整段成 44 根峰值,播放时按 `currentTime/durationMs` 从左到右扫过(已播 `#6C4CF0`、未播 `#CDC4F4`)。
-- **reviewing**:调 `onVerify`;灰化 + 禁用 Send。
+- **recorded**:回放卡。**点整个音频条 = 播放/暂停回放**;左侧圆 reload 按钮 = 重新录制(回 idle)。实现:卡片 `relative` + `absolute inset-0` 透明按钮当整条播放热区(定位元素绘制在波形之上,点波形区也命中),reload 按钮 `relative z-10` 顶上层;用兄弟按钮非嵌套。图标 `icon_voicetask_rerecord.webp`。对齐 Figma `4139-14261`。
+- **reviewing**:调 `onVerify`;灰化 + 禁用 Send(播放/重录也 disabled)。
 - **通过** → success 居中态(Done);**失败** → failed(TRANSCRIPT 卡 + Re-record)。
 - **expired**:倒计时到 0 进此态(Got it)+ 触发 `onCountdownEnd`。
 - **success/expired 两态与 PhotoTaskDrawer 共用** `pages/ChatDetail/taskDrawerStates.tsx`(`TaskSuccessBody`/`TaskExpiredBody`,只传文案);详见 [[sitin-next-phototask-drawer]]。
