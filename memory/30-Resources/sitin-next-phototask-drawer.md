@@ -22,6 +22,7 @@ interface PhotoTaskDrawerProps {
   onClose: () => void;
   peerName: string;                 // 标题里的对方名,如 "Jake"
   rewardText?: string;              // 奖励 chip,默认 "Earn +¢1.20"
+  earnedText?: string;              // 成功页 earned 徽章,默认 "Earned +¢1.20"
   countdownSeconds?: number;        // 倒计时秒数(idle 头部 mm:ss),默认 180
   onVerify: (file: File) => Promise<PhotoVerifyResult>;  // 注入:上传+审核
   onSent?: (cdnUrl: string) => void;                     // 审核通过并"发送"后回调
@@ -29,18 +30,24 @@ interface PhotoTaskDrawerProps {
 }
 ```
 
-`onCountdownEnd` 每个 open 周期只触发一次(用 `expiredRef` 保护);抽屉重开会重置。到点时抽屉**先自己 `onClose()` 关闭、再调 `onCountdownEnd()`**,所以宿主在 `onCountdownEnd` 里只需处理"过期"后续(标记任务过期 / 发提示 / 埋点),不用再关抽屉。
+`onCountdownEnd` 每个 open 周期只触发一次(用 `expiredRef` 保护);抽屉重开会重置。到点时抽屉**切到 `expired` 终态展示「Time's up」页并调 `onCountdownEnd()`**(不再自动关);宿主在 `onCountdownEnd` 里处理"过期"后续(标记任务过期 / 发提示 / 埋点),关闭交给用户点 Got it 或下滑。
 
 ## 状态机(内部自管,无需外部驱动)
 
-`idle(待拍照) → ready(待发送) → reviewing(审核中) → failed(不通过)`
+`idle(待拍照) → ready(待发送) → reviewing(审核中) → success(已发送) | failed(不通过);超时 → expired`(6 态,与 VoiceTaskDrawer 对齐)
 
 - **idle**:虚线框 / "Open camera" → 调**前置系统相机**(`<input type="file" accept="image/*" capture="user">`,跳相册)。
 - **ready**:展示刚拍的照片(按原始比例 `object-contain`,`max-h-420`,不裁切)+ 3 个绿色 pre-send chip + "Send photo"。**点照片本身 = 重开相机重拍/重新上传**。
-- **reviewing**:点 Send 后进入,照片叠半透明遮罩 + Loading 胶囊,调用 `onVerify(file)`。
-- **通过** → `onSent(cdnUrl)` + `onClose()`;**失败** → `failed`,红 chip 列 `reasons`,"Re-upload" 重开相机。
+- **reviewing**:点 Send 后进入,照片叠半透明遮罩 + Loading 胶囊,调用 `onVerify(file)`。审核中若超时(`expiredRef`)直接 return,不再改态。
+- **通过** → `success`(绿 ✓ 圆 + `earnedText` 徽章 + "Real photos build trust" + Done),同时 `onSent(cdnUrl)`;**失败** → `failed`,红 chip 列 `reasons`,"Re-upload" 重开相机。
+- **expired**:超时页(灰 ⏱ + "AI resumed · chat on track" 徽章 + Got it)。
 
-设计要点:ready/reviewing **共用同一个 `<img>` DOM 节点**(reviewing 只叠覆盖层),避免切态 remount 导致重新 decode 闪一下 —— 见 [[sitin-next-pwa-figma-webp]] 同批工作的踩坑记录。图标全走 webp。
+设计要点:
+- 顶部所有态有拖拽抓手条(`h-[5px] w-10 rounded-full bg-[#DADCE5]`)。
+- 终态(success/expired)sheet 背景走白色(`border-[#ECECF3] bg-white`,对齐 Figma),流程态保留桃色(`border-[#F7DBCC] bg-[#FFF7F1]`);`dismissible={terminal}` —— 只有终态可下滑/点遮罩关,流程中禁止关闭。
+- ready/reviewing **共用同一个 `<img>` DOM 节点**(reviewing 只叠覆盖层),避免切态 remount 导致重新 decode 闪一下 —— 见 [[sitin-next-pwa-figma-webp]] 同批工作的踩坑记录。图标全走 webp(成功页白 ✓ 复用 voicetask 的 `icon_voicetask_check_white.webp`,超时灰钟复用 `icon_phototask_review.webp`)。
+
+对齐 Figma 节点:成功 `4576-2186`、超时 `4577-2187`、抓手 `4139-14442`。
 
 ## 接真实后端(ChatDetail 用)
 
