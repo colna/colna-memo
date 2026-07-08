@@ -45,7 +45,10 @@ AI 陪聊暂停时,让女方用**真实自拍 / 真实语音**回复对方,通�
 
 **分两期**:
 
-- **P0(前端可独立交付)✅ 已实现**(commit `28df0aab`,分支 `personal/zz/pwa-probe-p0`,未 push):`Chat/index.tsx` 加触发 `useEffect`——`convData.hasProbe` 时按 `probeType` 弹对应抽屉,`handledProbeRef` 按 taskId 去重防重弹;抽屉补传 `rewardText/earnedText`(module helper `probeRewardLabel(probeRewardCents)`,cents/100,≥100 用 $)、`countdownSeconds`(`probeTimeoutSeconds ?? 180`)、`script`(probePrompt,**VoiceTask 的 prompt prop 叫 `script` 不是 promptText**)、`onSent/onCountdownEnd`(P0 仅 markHandled+关抽屉,发消息属 P1)。eslint 干净,tsc net-zero(stash 基线对比,既有 11 error 全是 `UserInfoWithCache` 类型基线)。mock 审核下走 `/dev/photo-task`、`/dev/voice-task` 全流程自测。
+- **P0(前端可独立交付)✅ 已实现 + 提 PR**(**PR #551**,base `feature/sitin4.0`,分支 `personal/zz/pwa-probe-p0`):
+  - 触发/驱动:`convData.hasProbe` 时按 `probeType` 弹对应抽屉,`handledProbeRef` 按 taskId 去重防重弹;抽屉补 `rewardText/earnedText`(`probeRewardLabel(probeRewardCents)`,cents/100,≥100 用 $)、`countdownSeconds`(`probeTimeoutSeconds ?? 180`)、`script`(probePrompt,**VoiceTask 的 prompt prop 叫 `script` 不是 promptText**)、`onSent/onCountdownEnd`(P0 仅 markHandled+关抽屉,发消息属 P1)。commit `28df0aab`。
+  - **抽成 hook `pages/Chat/useProbeTask.ts`**(commit `434baeda`):`useProbeTask(convData, peerName)` 内聚 show state + useProbeTaskVerify(用 `convData.targetUserId`)+ taskId 去重 + props 派生,返回可直接 spread 的 `photoDrawerProps/voiceDrawerProps`。Chat 里探真逻辑从一大段收敛成两行:`const { photoDrawerProps, voiceDrawerProps } = useProbeTask(convData, peerName)` + `<PhotoTaskDrawer {...photoDrawerProps} />`。**下游(P2 工作台调度、dev 预览)可复用同一 hook**;P1 发消息逻辑将来也内聚进 hook 的 `dismiss`。
+  - 验证:eslint 干净;tsc 用 stash 基线对比,useProbeTask.ts 零 error,总数 104(比基线 105 少 1,因删掉一处 `peerUserInfo.userId` 换成 `convData.targetUserId`);既有 error 全是 `UserInfoWithCache` 类型基线。mock 审核走 `/dev/photo-task`、`/dev/voice-task` 自测。
 - **P1(依赖后端)**:proto 落地接真审核;`onSent` 复用 `IMManager.sendImageMessage/sendAudioMessage` 发出,**必带 `cloudCustomData{taskId, isProbeReply:true, isLastSegment:true, earnedCents}`**;与后端敲定**发消息通道**——文档主张经消息中心 `POST /messages/downlink`(女方身份代发+`ForbidAfterSendMsgCallback` 防回环),当前 PWA 是直发 TIM,**需确认**。
 - **P2(随真人接管)**:建 `stores/anomalyStore.ts`(`highestPriority/targetUserId/isProcessing`),跨会话按优先级 `Red>Yellow>Green`(同级 hasProbe 优先)自动 `navigate('/chat',{state:{conversationId,from:'workspace_task'}})` 跳转+弹窗。归真人接管 owner 耿学岩范畴。
 
