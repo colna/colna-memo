@@ -13,6 +13,8 @@ packages/app-pwa/docs/prototypes/
   workbench-normal-state.html    (641 行)  蓝色 / AI 自动驾驶
   workbench-yellow-copilot.html  (926 行)  琥珀 / AI Exposure Alert
   workbench-red-takeover.html   (1106 行)  红色 / Red takeover
+  sitin40-probe-photo.html       (932 行)  探针 · 自拍
+  sitin40-probe-voice.html       (962 行)  探针 · 语音
 ```
 
 ## 核心教训
@@ -51,6 +53,9 @@ packages/app-pwa/docs/prototypes/
 3. **`¢` 是原型的系统性记号错误**。三份都写 `¢113.32` / `+¢0.30`，两位小数配 `¢`，**比真值小 100 倍**。
    真源：`useCash().cash` 是**美元**，`totalEarnedCents` 是**整数美分**。正确约定见 `utils/money.ts`（不足 $1 → `50¢`，否则 `$12.40`）。
 4. **Fraunces 只用于「钱」和「倒计时」**这类展示型数字（`--display` 变量），正文一律 Inter。
+5. **探针语音的审核在 `Stop` 时触发，不是 `Send`**。通过后才出现 Play / Re-record 与 `Send — ¢0.80 earned!`；
+   失败直接 `startRecording()` 重录，不回 idle。真正把媒体塞进 chat 的是**通过态那一下 CTA 点击**（`goStep4`），
+   不是审核回调 —— 两份探针原型都如此。
 
 ## 方法论
 
@@ -59,9 +64,16 @@ packages/app-pwa/docs/prototypes/
   （典型：`#voiceLbl` 录音时被换成计时器，我只读 CSS 就断言「没有计时器」，翻车）。
 - **量尺寸用注入脚本读 computed style**，别靠像素目测。
 - **量「看起来居中」要量墨迹中心**，不是 `getBoundingClientRect` 的盒子中心。
+- **枚举状态要从 JS 取全集**，别凭 UI 想象补：`grep "shBody.textContent ="` / `"ctaBtn.textContent ="` 把所有文案态列出来。
+  （我给探针语音编了一个原型里不存在的「校验前试听」态，被用户当场戳破。）
+- **`nowrap` 的行必须按真机宽度实测**。原型固定 384px 画布会掩盖窄屏溢出：
+  探针自拍的三个通过 pill 在 375px(SE) 溢出 4px、360px 溢出 11px、320px 溢出 31px。
+- **`@media (prefers-reduced-motion:reduce)` 里的 `animation:none` 是无障碍降级**，不代表原型没动效。
+- **原型里的「相机」多半是假的**。探针自拍的全屏取景器无 `getUserMedia`、无 `<video>`，别照着造。
 
 ## 相关
 
 - 落地 PR：#565（顶栏 + 会话头 + 倒计时环）—— **已 merge**，merge commit `e61c6fa9`
+- 探针弹窗落地：PR #568（含行为变更：审核时机、onSent 时机）
 - 输入栏落地：PR #559
 - 详见 [[../../50-Daily/2026-07-08]]
