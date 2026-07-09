@@ -62,6 +62,6 @@ packages/app-pwa/docs/prototypes/
 
 ## 相关
 
-- 落地 PR：#565（顶栏 + 会话头 + 倒计时环）
+- 落地 PR：#565（顶栏 + 会话头 + 倒计时环）—— **已 merge**，merge commit `e61c6fa9`
 - 输入栏落地：PR #559
 - 详见 [[../../50-Daily/2026-07-08]]
