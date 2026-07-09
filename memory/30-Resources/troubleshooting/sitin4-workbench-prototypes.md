@@ -110,6 +110,9 @@ recTarget.style.bottom = (phoneRect.bottom - btnRect.top + 4) + 'px';   // 像�
 ## 相关
 
 - 落地 PR：#565（顶栏 + 会话头 + 倒计时环）—— **已 merge**，merge commit `e61c6fa9`
-- 探针弹窗落地：PR #568（含行为变更：审核时机、onSent 时机）
-- 输入栏落地：PR #559
+- 探针弹窗 + 输入栏按住式/上滑取消：PR #568 —— **已 merge**，merge commit `80616272a`
+  （含行为变更：审核时机、onSent 时机；以及 pointercancel 一律丢弃）
+- 输入栏（点击式，后被 #568 回退为按住式）：PR #559
+- 手势锁的坑：[[uselockfn-swallows-gesture-terminal]]
+- 字体的两个静默坑：[[fraunces-subset-and-tailwind-import]]
 - 详见 [[../../50-Daily/2026-07-08]]
