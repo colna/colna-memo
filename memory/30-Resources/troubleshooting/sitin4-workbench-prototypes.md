@@ -69,9 +69,26 @@ packages/app-pwa/docs/prototypes/
 
 > 规则：**跨原型搬色板前，先 diff 两份的 `:root{--*}`**。别凭「上一份原型的红」写常量。
 
+## 陷阱：`.rec-target` 的 `bottom` 不是相对 `.phone`
+
+```js
+recTarget.style.bottom = (phoneRect.bottom - btnRect.top + 4) + 'px';   // 像「桶底距药丸顶 4px」
+```
+
+祖先链是 `phone > convo > pane`，而 `.pane{position:absolute;inset:0}` → **offsetParent 是 `.pane`**。
+`.picker` 在 pane 内、`.tabs`(64px) 在 pane 外 ⇒ pane 底边 = 输入栏底边。
+
+**真实渲染：桶底 = 药丸顶 − 68px**（`tabs 64 + 4`）。照抄成 4px 会让手指刚离开药丸就触发取消（上滑仅 10px），
+正确值让上滑约 74px。
+
+> **`top`/`bottom` 永远相对 offsetParent。** 看到 `el.style.bottom = <另一个元素的 rect>` 时，
+> 先把祖先链上第一个 `position != static` 的元素找出来，再算。
+
 ## 方法论
 
 - **收到原型第一件事：`cp` 到 scratchpad + 归档进仓库**。飞书临时目录会清文件（被坑 2 次）。
+- **反常的结论先怀疑前提**。我把「一离开药丸就取消」写进笔记当「原型固有行为」，根因只是 offsetParent 认错了。手感明显不对的东西，多半是自己读错了，不是设计如此。
+- **类名要 grep 出来再用**。找底部导航时我 grep `tabbar`，原型里叫 `.tabs`，于是误判「原型没有 tab 栏」，进而算错了整套几何。
 - **注入 class 量 computed style，两个静默失效点**（都会让你读到「上一个状态」的值，误判成规则不生效）：
   1. 原型自带的 demo `<script>` 会清掉注入的 class → 先剥掉所有 `<script>`。
   2. 直接在 `id="x"` 后追加 `class="..."` 会造成**重复 class 属性**，HTML 解析只认第一个 → 必须替换已有的 `class="..."`。
