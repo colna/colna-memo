@@ -52,7 +52,10 @@ packages/app-pwa/docs/prototypes/
    从 12 点顺时针排空。写反（用 `remaining/total`）环会随倒计时**长出来**。
 3. **`¢` 是原型的系统性记号错误**。三份都写 `¢113.32` / `+¢0.30`，两位小数配 `¢`，**比真值小 100 倍**。
    真源：`useCash().cash` 是**美元**，`totalEarnedCents` 是**整数美分**。正确约定见 `utils/money.ts`（不足 $1 → `50¢`，否则 `$12.40`）。
-4. **Fraunces 只用于「钱」和「倒计时」**这类展示型数字（`--display` 变量），正文一律 Inter。
+4. ~~**Fraunces 只用于「钱」和「倒计时」**这类展示型数字~~ **← 已过时**。
+   `--chat-display` 现在也用在**词**上：`Time's up`、探针弹窗标题、`Show him you're real`、RiskSheet 标题。
+   所以字体子集**必须含完整拉丁集**（见 [[fraunces-subset-and-tailwind-import]]）。
+   正文声明的是 Inter，但那个 Google `@import` 被构建丢弃，实际回退 Saans。
 5. **探针语音的审核在 `Stop` 时触发，不是 `Send`**。通过后才出现 Play / Re-record 与 `Send — ¢0.80 earned!`；
    失败直接 `startRecording()` 重录，不回 idle。真正把媒体塞进 chat 的是**通过态那一下 CTA 点击**（`goStep4`），
    不是审核回调 —— 两份探针原型都如此。
