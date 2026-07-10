@@ -15,12 +15,13 @@ packages/app-pwa/docs/prototypes/
   workbench-red-takeover.html   (1106 行)  红色 / Red takeover
   sitin40-probe-photo.html       (932 行)  探针 · 自拍
   sitin40-probe-voice.html       (962 行)  探针 · 语音
+  sitin40-inputbar.html         (1409 行)  输入栏 · 按住录音 / 上滑取消
 ```
 
 ## 核心教训
 
 **同一设计系统的三份原型，同名类的实现各不相同。照着一份抄，一定继承它的 bug。**
-截至 2026-07-09 已因此踩坑 5 次。**动手前先三份逐行 diff。**
+截至 2026-07-09 已因此踩坑 **7 次**（`--red` / `--red-dim` / `.blockbtn` / `.rec-target` offsetParent / `placeHand` 公式 …）。**动手前先逐份 diff。**
 
 ## 差异清单
 
@@ -103,6 +104,33 @@ recTarget.style.bottom = (phoneRect.bottom - btnRect.top + 4) + 'px';   // 像�
 
 > **`top`/`bottom` 永远相对 offsetParent。** 看到 `el.style.bottom = <另一个元素的 rect>` 时，
 > 先把祖先链上第一个 `position != static` 的元素找出来，再算。
+
+## 陷阱：`placeHand()` 的公式与它自己的渲染结果对不上
+
+```js
+hand.style.top = (tb.top - pb.top + tb.height * 0.5) + 'px';   // 说：药丸【中线】
+```
+
+实测目标截图（PIL，按药丸高 44px 归一化）：**手墨迹顶落在药丸【底边】**（+44.5px），整只手挂在药丸下方、压住 tab 栏。
+`.hand` 的祖先链就是 `phone`（offsetParent 正确）、无 transform，那 22px 的下移**无法用排版解释**。
+
+> **有设计图 / 截图时，以像素实测为准，不要照抄原型 JS 的公式。**
+> 这是 `sitin40-inputbar.html` 的第三处自相矛盾（前两处：`--red` 与光晕不同色；`rec-target` 的 offsetParent 是 `.pane`）。
+
+落地：`left = rect.left + rect.width * 0.63`、`top = rect.bottom`，portal 到 body。
+
+**两道墙，只调 z-index 没用**：
+
+1. `TabLayout` 内容区是 `flex-1 overflow-hidden relative` → 越过底栏的 23px **被裁掉**；
+2. TabBar `z-50` > 输入栏 `z-43`，而手在输入栏建立的**层叠上下文内**，给多高的 z 都爬不出去。
+
+→ 唯一出路是 portal 到 body + `fixed`（与 `ChatVoiceRecorder` 的垃圾桶同一手法）。
+
+## PIL 量图：药丸掩码怎么取
+
+- ❌ 每行匹配像素**总数** → 吃进别的浅色带（量出 188px 高）
+- ❌ 每行**最长连续段** → 被 `Voice reply` 文字截断（量出 31px 高）
+- ✅ **取药丸左内侧一列做垂直扫描**，避开文字与图标
 
 ## 方法论
 
