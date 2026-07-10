@@ -138,6 +138,8 @@ recTarget.style.bottom = (phoneRect.bottom - btnRect.top + 4) + 'px';   // 像�
 - 探针弹窗 + 输入栏按住式/上滑取消：PR #568 —— **已 merge**，merge commit `80616272a`
   （含行为变更：审核时机、onSent 时机；以及 pointercancel 一律丢弃）
 - 输入栏（点击式，后被 #568 回退为按住式）：PR #559
+- 加钱弹窗 + 引导手：PR #571 —— **已 merge**，merge commit `aac2f1d0e`
 - 手势锁的坑：[[uselockfn-swallows-gesture-terminal]]
+- review 分诊：[[ai-code-review-triage]]
 - 字体的两个静默坑：[[fraunces-subset-and-tailwind-import]]
 - 详见 [[../../50-Daily/2026-07-08]]
