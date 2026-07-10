@@ -35,8 +35,15 @@ tags: troubleshooting, colna-memo, git
 - **`CLAUDE.md` 描述的机制不存在**:它说本工作区靠 `~/.gitconfig` 的 `includeIf` → `zhangzheng/.gitconfig` 统一身份。
   实际 `~/.gitconfig` 里**只有** `includeIf "gitdir:~/Dev2/buchuan/"` 一条,**没有 zhangzheng**。
   `sitin-next` 之所以正确,是因为身份直接写死在它自己的 `.git/config` 里,与 includeIf 无关。
-- **修法(二选一,待用户定)**:
-  1. 仓库级:`git -C colna-memo config user.name colna && git -C colna-memo config user.email richardzhang1999@163.com`
-  2. 工作区级:给 `~/.gitconfig` 补 `includeIf "gitdir:~/Dev2/zhangzheng/"` → `path = ~/Dev2/zhangzheng/.gitconfig`(该文件已存在),真正实现 CLAUDE.md 描述的机制
+- **已修(2026-07-09)**:给 `~/.gitconfig` 补上 —— 真正实现 CLAUDE.md 描述的机制:
+
+  ```gitconfig
+  [includeIf "gitdir:~/Dev2/zhangzheng/"]
+      path = ~/Dev2/zhangzheng/.gitconfig
+  ```
+
+  生效后 `colna-memo` / `sitin-next2` / `sitin-demo-webapp` 都从 `Dev2/zhangzheng/.gitconfig` 取身份;
+  `sitin-next` 仍走自己的 `.git/config`(仓库级优先级更高,值相同)。`buchuan` 工作区不受影响。
+  另修正 `zhangzheng/.gitconfig` 注释里写错的路径(`/Users/user` → `~`)—— 那正是这次误判的源头。
 - **历史提交的作者不改**(需要 filter-branch / rebase 重写历史,得不偿失)。
 - **教训**:**「约定写在 CLAUDE.md 里」不等于「机制真的生效」。** 涉及身份/凭据的约定,要用 `git config --show-origin` 之类**查生效值**,别信文档。
