@@ -53,7 +53,10 @@ try { return await fn(...args); } finally { lockRef.current = false; }
 | 授权中松手 | 正常，发 1 | 正常，发 1 |
 | **上传未完成就录第二条** | **卡住**，`finish DROPPED`，只发 1 | 正常，发 2 |
 
-20 行仿真就把 bug 钉死了。相关：[[sitin4-workbench-prototypes]]
+20 行仿真就把 bug 钉死了。
+
+相关：[[sitin4-workbench-prototypes]]、
+[[react-effect-timer-callback-dep]]（同源：回调的引用/生命周期与 React 打架，症状同样是「该发生的事永不发生」，且不报错）
 
 ## 遗留
 

@@ -90,6 +90,14 @@ recTarget.style.bottom = (phoneRect.bottom - btnRect.top + 4) + 'px';   // 像�
 ## 方法论
 
 - **收到原型第一件事：`cp` 到 scratchpad + 归档进仓库**。飞书临时目录会清文件（被坑 2 次）。
+- **动手实现原型动效前，先 `grep "@keyframes" src/styles/`**。
+  主线 `ac1684e02` 早把加钱弹窗的 `ep-pop`/`ep-flip`/`ep-glint`/`ep-rise`/`ep-burst` 铺好了，逐帧与原型相同，**零引用**。
+  差点又写一套。同理，顶栏余额滚动 `bal-roll-in/out` 在 PR #565 就已实现 —— **先查再写，两次省掉重复劳动**。
+- **原型的 `prefers-reduced-motion` 块可能漏项**。加钱弹窗的 glint 用 `animation`，而原型只写了 `*{transition:none!important}`，管不到它。
+  一道扫过金币的光对要求减弱动效的用户仍是动效 —— 有意偏离原型，补进降级块。
+- **凡是 `prefers-reduced-motion` 要覆盖的属性，绝不能写进内联 `style`**（内联优先级更高）。
+  动画的起始态靠 0% 关键帧（无 delay）或 `backwards` 填充，不要内联种子值 ——
+  否则降级用户看到的是永远停在 `scale(0.6); opacity:0` 的卡片，即「什么都没有」。
 - **反常的结论先怀疑前提**。我把「一离开药丸就取消」写进笔记当「原型固有行为」，根因只是 offsetParent 认错了。手感明显不对的东西，多半是自己读错了，不是设计如此。
 - **类名要 grep 出来再用**。找底部导航时我 grep `tabbar`，原型里叫 `.tabs`，于是误判「原型没有 tab 栏」，进而算错了整套几何。
 - **注入 class 量 computed style，两个静默失效点**（都会让你读到「上一个状态」的值，误判成规则不生效）：
