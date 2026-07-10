@@ -60,6 +60,23 @@ packages/app-pwa/docs/prototypes/
    失败直接 `startRecording()` 重录，不回 idle。真正把媒体塞进 chat 的是**通过态那一下 CTA 点击**（`goStep4`），
    不是审核回调 —— 两份探针原型都如此。
 
+## `.blockbtn`：同名类跨原型不同值（第 7 次）
+
+| | `workbench-red-takeover.html` | `sitin40-inputbar.html`（**新，以此为准**） |
+|---|---|---|
+| 背景 | `none`（幽灵） | `var(--raised-2)`（填充灰） |
+| 圆角 | `999px`（胶囊） | `6px`（圆角矩形） |
+| 字重 | `500` | `600` |
+| 颜色 | `var(--faint)` | `var(--muted)` |
+| 内边距 | `3px 9px` | `5px 10px` |
+| 字距 | — | `.02em` |
+| **文案** | `Block` | `Blocking` |
+
+> 同一份 `sitin40-inputbar.html` 里 paneA 是 `Blocking`、paneB 是 `Block`——**连它自己都不统一**。
+> 用户指定 `#blockBtn`（paneA）→ `Blocking`。
+>
+> 三个色变量在 app 已有同值 `--chat-*` token（`--chat-raised-2` / `--chat-muted` / `--chat-rule`），直接引 token，别再硬编码 oklch。
+
 ## 色板：同名变量跨原型不同值（第 6 次踩坑的根源）
 
 | | 探针 `sitin40-probe-*.html` | 输入栏 `sitin40-inputbar.html` |
