@@ -47,6 +47,16 @@ tags: [sitin-next, app-pwa, call, refactor, architecture]
 2. 公共域只依赖契约、不知道 web/native。
 3. 平台判断只在入口一处(按 `isApp()` 选适配器),其它地方不再写 `isApp()`。
 
+## ✅ PR #593 已合并(2026-07-13,merge `d9bfa5a3f` → feature/sitin4.0)
+
+含:Step 1(平台拆挂载 CallControllers + entry→startCall options)、Step 2(共享 imListener / useCallSettlement / useCallViolationDeduction 违规扣款)、Step 4 部分(修 handleCallError 死代码 + closeConnect 命名)、远端黑屏(验证+重试+重挂重绑 + UI 头像兜底 + startRemoteVideo 每轮 abort)、响铃背景黑屏(useCameraStream + play() + z-index)、主叫单价(callService.startOutgoingCall + callStore.outgoingCallPrice + useCallUnitPrice,主叫 0.2 / 被叫 releasePrice)、两轮 review 修复。
+
+**仍未做(follow-up)**:
+- Step 4 事件归一化 + Step 5 单域 hook —— 千行级计费事件流重写,需真机专项。
+- video-tips native 限时 —— PWA 无主动挂断 bridge,需原生端加能力。
+- 违规扣款失败丢一分钟(review issue 4)—— 先确认 `pwaEarnDeduction` 后端幂等,再做补扣/重试(否则盲目重试会二次扣款)。
+- 远端视频黑屏根因未定论 —— 已修绑定竞态 + UI 兜底 + STATISTICS 异常日志(frameRate=0 才 warn);真机看那条 warn 的 bitrate 定「没推过来」还是「到了没渲」。
+
 ## 进度(均在 PR #593,base `feature/sitin4.0`,分支 `personal/zz/pwa-call-decouple`)
 
 - **Step 1 ✅**(2026-07-13)CallControllers 按平台拆挂载 + useCall 不再无条件挂三 hook;useWebCall 清 isApp 变纯 web;`entry` 枚举 → `startCall(..., { maxDurationMs })`(常量移 types/call.ts)。+ review 反馈:CallControllers `IS_NATIVE` 模块级固化。
