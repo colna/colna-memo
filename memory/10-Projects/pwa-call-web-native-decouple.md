@@ -50,6 +50,7 @@ tags: [sitin-next, app-pwa, call, refactor, architecture]
 ## 落地路径(小步、每步可验证,不 big-bang)
 
 - **Step 1(最先做,低风险)** 只挂载当前平台的栈。现 `useCall` 无条件挂 web+native+mock;改成组件拆分 `{isApp() ? <NativeCallController/> : <WebCallController/>}`,每个 controller 内部调各自 hook(避开顶层条件调用 hook 的规则问题)。顺手清掉 useWebCall 里残留的 `isApp()` 原生分支。
+  - **同步做:去掉 `entry` 枚举,改成 `startCall` 显式 options。** 现状 `CallEntry = "video_tips" | "debug"` 只用于「video_tips → 1 分钟限时」这一个中心 switch(`startCallLimit`),`"debug"` 无行为;`entry` **未用于埋点**(来源统计走 `session.source`),删枚举安全。改为调用方直接传行为参数,传对象不传裸值:`startCall(..., { maxDurationMs?: number })`,值用共享常量 `maxDurationMs: VIDEO_TIPS_CALL_LIMIT_MS`。放层级仍遵守解耦:**传输适配器签名保持 `startCall(userID, type, orderId)` 不接 options**;options 属于域层「发起意图」,写进归一化 ConnectSession,由共享 `useCallLimit` 消费 —— 顺带补上「native 侧当前无限时」的 gap(同一策略跑两端)。
 - **Step 2(去重收益最大)** 抽公共域 hook:`getCurrentOrderEarned`/`getCallRecordParams`/违规扣款/结算弹窗 → `useCallSettlement`;审核运行时 → `useCallModeration`。两 controller 复用。
 - **Step 3** 抽公共 imListener:CallOrder/AVCall 解析 → `attachCallImListener(getSession)`,两 manager 复用。
 - **Step 4** 归一化事件 + ConnectSession + 命名统一(`cloesConnect`→`closeConnect`、handler 命名对齐、`connectSession` 初值改 `null`)。改动面大、结算时序敏感,单独一轮。
