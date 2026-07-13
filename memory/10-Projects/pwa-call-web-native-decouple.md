@@ -47,10 +47,16 @@ tags: [sitin-next, app-pwa, call, refactor, architecture]
 2. 公共域只依赖契约、不知道 web/native。
 3. 平台判断只在入口一处(按 `isApp()` 选适配器),其它地方不再写 `isApp()`。
 
-## 进度
+## 进度(均在 PR #593,base `feature/sitin4.0`,分支 `personal/zz/pwa-call-decouple`)
 
-- **Step 1 已完成** → PR #593(base `feature/sitin4.0`,分支 `personal/zz/pwa-call-decouple`,2026-07-13)。做了:CallControllers 按平台拆挂载 + useCall 不再无条件挂三 hook;useWebCall 清 isApp 分支变纯 web;`entry` 枚举 → `startCall(..., { maxDurationMs })`,`VIDEO_TIPS_CALL_LIMIT_MS` 移到 types/call.ts。tsc/lint 过,真机未验。
-- Step 2–5 待后续独立 PR。
+- **Step 1 ✅**(2026-07-13)CallControllers 按平台拆挂载 + useCall 不再无条件挂三 hook;useWebCall 清 isApp 变纯 web;`entry` 枚举 → `startCall(..., { maxDurationMs })`(常量移 types/call.ts)。+ review 反馈:CallControllers `IS_NATIVE` 模块级固化。
+- **Step 3 ✅** 抽 `services/callImListener.ts`(`createCallImListener(getSession)`),两 manager 复用,消除逐字节相同的 CallOrder/AVCall 解析。
+- **Step 2 部分 ✅** 抽 `hooks/useCallSettlement.ts`(`getCurrentOrderEarned` + `getCallRecordParams`),web/native 经稳定的模块级 session getter 复用。**违规扣款循环(maybeDeductViolationMinute 等)未抽**(与多 ref/timer/bpTrack 纠缠,风险高),留后续。
+- **Step 4 部分 ✅** 修 `handleCallError` 死代码(closeConnect 置 null 前先读 session);`cloesConnect`→`closeConnect` 统一命名。
+- **关键结论**:Step 1 后已**无重复执行**——SDK/manager 有幂等 init 守卫(`_sdkLoadPromise`/`isEngineInitialized`/`isInitialized`/`isInitializedRef`)且每端只挂一套 hook;Step 2/3 是**代码级去重**(单一真源),不引入新重复。
+- **未做(需真机验、独立 PR)**:Step 4 事件归一化 + ConnectSession 统一 + 初值改 null;Step 5 单域 hook;违规扣款抽取;video-tips 限时下沉到共享策略(补 native 无限时的 gap)。理由:改计费事件流,headless 无法验证,盲改有真金白银风险。
+
+（旧的分步清单见下，勾选状态以上面「进度」为准）
 
 ## 落地路径(小步、每步可验证,不 big-bang)
 
