@@ -102,3 +102,19 @@ function useKeyboardOpen(): boolean {
 - Chromium docs: [Interactive Viewport](https://developer.chrome.com/blog/viewport-resize-behavior)
 - W3C VisualViewport API: <https://drafts.csswg.org/cssom-view/#visualviewport>
 - 移动端布局的 `env(keyboard-inset-height, 0)` 备用方案(仅 `overlays-content` 下有意义)。
+
+## 5. APK WebView 里键盘弹起底栏仍被顶起(web 正常)——两套机制打架
+
+来源:GraceChat-Earn-Android(`p/ljb/sitin4`)+ sitin-next app-pwa(2026-07-14)。web 端 §4 的 baseline-max 修复有效,但 APK WebView 里底部 TabBar 仍跟键盘弹起。
+
+**根因:APK 下有两条键盘链,一失效一帮倒忙**
+1. **navbar 隐藏靠 `visualViewport`(前端)在 APK 失效**:安卓 `PWAWebViewFragment` 用 `enableEdgeToEdge()`,`setOnApplyWindowInsetsListener` **只消费 `systemBars()` 不消费 `ime()`** → 键盘弹起时安卓**不 resize WebView 窗口**,只通过 bridge 通知 → `visualViewport.height` 不变 → `useKeyboardOpen` 恒 false → TabBar 不隐藏。
+2. **安卓 `notifyKeyboardChanged` bridge 把 body 顶上去(只 APK 有)**:安卓 `PWAWebViewFragment.kt` 的 `KeyboardChangedListener`(Android30+ 走 `onKeyboardAnimStart/Progress/End`,<30 走 `onKeyboardHeightChanged1`)`callHandler("notifyKeyboardChanged", {show,height})`;前端 `bridge.ts` handler 收到做 `document.body.style.paddingBottom = height` → 把 `h-full` 流式布局的整个 body(含 flex 底部 TabBar)整体上推一个键盘高度。
+- 叠加 = TabBar 没隐藏 + 被 body padding 顶起 = 底栏跟键盘弹起。
+- **web 正常**:无 notifyKeyboardChanged(不推 body)+ `interactive-widget=resizes-content` 让 visualViewport 真缩 → useKeyboardOpen 生效隐藏 TabBar。
+
+**判据速记**:同一份前端,web 正常、APK 底栏被顶 → 大概率是「APK 有 native 键盘 bridge 主动改布局(body padding / 顶起)」且「visualViewport 在 APK 不 resize 导致纯前端键盘检测失效」两件事叠加。先查 native 有没有 `notifyKeyboardChanged` 之类 bridge + WindowInsets 是否消费了 `ime()`。
+
+**修法**
+- A(前端,推荐):`useKeyboardOpen` 在 APK 改用 `notifyKeyboardChanged` 的 show 状态(暴露成 store 给 TabLayout 订阅),web 仍用 visualViewport。navbar 隐藏后 body padding 只推输入栏。不动安卓。
+- B(安卓):WindowInsets 加消费 `ime()` 让 WebView 真 resize(对齐浏览器),去掉前端 body padding hack;更正统但影响全局布局、回归面大。
