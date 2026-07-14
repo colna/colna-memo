@@ -42,6 +42,13 @@ tags: [troubleshooting, pwa, frontend, mobile, gesture, audio, react]
 - `recorder.stop()` 在 `inactive` 态抛异常 → `onstop` 不触发 → `await stop()` 的 Promise **永挂** → UI 卡死。加 `state==='inactive'` 早退 + try/catch(catch 里也 `resolve(null)`)。
 - `setTimeout`(如 too-short 提示)存 ID、重触发时 clear、卸载 cleanup;`URL.createObjectURL` 用完 revoke(占位日志干脆别建 url)。
 
+## 8. iOS `<video>` 显示 MediaStream 黑屏:paused 不渲染 + 负 z-index 被父层盖死
+来源:sitin4.0 响铃弹窗 ReceiveCallModal 本机预览黑屏(2026-07-12,PR #593)。**盲猜了 5 版**(权限/超时/churn/延迟释放)全错,最后靠诊断日志钉死是两层叠加,教训是「别猜,加日志」。
+- **排查铁律**:`getUserMedia` 成功 ≠ 在渲染。日志要打全:`srcObject` 是否挂上、`onLoadedData` 是否 fire(`videoWidth>0` 说明帧解出了)、**`video.paused`**、以及元素的 `z-index` / 父层背景。缺一个都可能误判方向。
+- **坑 A(paused)**:iOS 对「已挂载 `<video>` 之后再赋 `srcObject`」的 `autoPlay` 常不触发 → 停在 `paused:true`,而 **iOS 不渲染暂停态的 MediaStream** → 黑。修:挂流后主动 `await video.play()`(所有预览统一在 attachStream 里做);`onLoadedData` 里若仍 `paused` 再补一次 `play()` 兜底。`onLoadedData` 触发 ≠ 在播。
+- **坑 B(负 z-index)**:背景视频用 `-z-20`、遮罩 `-z-10`,被父容器**不透明**渐变(`bg-gradient`)盖在下面 → 摄像头这层从来没露过(老 bug,paused 修好后才暴露)。修:视频 `z-0`、遮罩 `z-[1]`、内容 `z-[2]`,层叠 = 父渐变(底)→视频→遮罩→内容。负 z 只有在父层透明时才可见。
+- 与远端视频黑屏(TUICall startRemoteView 时序 / 5000)是两码事,那条见 [[tuicall-remote-video-5000-race]]。
+
 ## 附:UI 布局小坑
 - hover/激活放大按钮用 `transform scale`(配固定尺寸)而非改 width/height —— 改尺寸占布局、挤兄弟;transform 不参与布局,原地放大。
 - overlay 要「相对整行/屏幕居中」时,`relative` 定位基准要设在**整行容器**上,不是被 flex 挤在中间的子项。
