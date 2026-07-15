@@ -6,6 +6,8 @@ tags: [ffmpeg, wasm, vite, pwa, sitin-next, app-pwa, audio, transcode]
 
 # ffmpeg.wasm 在 Vite + PWA 集成的坑
 
+> **注(2026-07-14)**:sitin-next 语音消息**最终未采用** ffmpeg —— 改用现成 `@heyhru/web-util-media` 的 `convertWebMToWav` 转 **WAV**(零依赖,对齐腾讯 IM 官方 Web SDK 发 WAV 的做法)。下面经验保留备查:将来真需要浏览器端 **AAC** 转码(WAV 体积敏感场景)时参考。
+
 场景:`sitin-next / app-pwa` 用 `@ffmpeg/ffmpeg@0.12` 在浏览器把语音 webm/opus → m4a(AAC),兜底老 Android WebView 录不出 AAC 的情况。以下是踩过的坑 + 修法。
 
 ## 1. 依赖与 core 自托管
