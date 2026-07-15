@@ -50,6 +50,7 @@ interface VoiceTaskDrawerProps {
 - **关闭即重置**:`open` 变 false 时清状态 + 释放录音/objectURL;重开干净。
 - **完成前不可关**:`ModalContainer` 的 `dismissible` 设为 `terminal`(仅 success/expired 可点遮罩/下滑/Esc 关);其余态只能重录或等到期。
 - **无关闭 X 按钮(有意去掉,PRD)**:探真任务只有两个出口——完成 或 倒计时耗尽。原型画了 X、抽屉照抄,导致能秒关限时任务,且 dismiss 会误标探针 handled → 即便后端仍报 `hasProbe` 也不再弹。commit `3ab679990`(2026-07-09,cjkun)删掉 X,唯一 onClose 只剩终态(send 成功 / expired 的 Done),终态前遮罩靠 `dismissible={terminal}` inert。→ 有人问「探真弹窗为什么没关闭按钮」= 这个。
+- **2026-07-15 更新:X 又加回来了(PR #623),但语义变了**——点 X = **彻底关闭探真任务**(走 dismiss 标 handled、此 id 不再弹),不是收起(中途做过「收起+banner重开」的方案 A,后按产品改成关闭)。dev 预览页 X 只关预览。真机测试有 temp debug 按钮 `probe: photo`/`probe: voice`(合并前移除)。
 
 ## 接真实后端(ChatDetail 用)
 
