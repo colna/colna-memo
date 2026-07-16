@@ -171,10 +171,49 @@ if (next === "text") {
 
 > ⚠️ 常见误判:以为「同组件内条件渲染切换,React 会复用节点,所以 `autoFocus` 不重跑」。**错的** —— `<ChatVoiceRecorder>` 换成 `<input>` 是不同元素类型,input 是全新挂载,`autoFocus` 照样触发。否决它的真正理由是上表第二行。
 
-**配套**:光弹键盘不够,键盘挡住的内容要让位。见 §8 的 lift,以及配对的 squeeze —— 抬升(`transform`)只平移底栏,**上方 flex-1 滚动区高度不变照样被盖**;要给它加**等高 `margin-bottom`** 把它压矮同样距离(两者共用同一个距离表达式和缓动 → 永不错位),并用 `ResizeObserver` 盯滚动区 clientHeight,一变矮就 `scrollToBottom`(APK 下 visualViewport 不动,vv 那条兜底不触发)。
+**配套**:光弹键盘不够,键盘挡住的内容要让位 —— 见 §8 的 lift 和 §11 的「怎么让位才不掉帧」。
 
 ## 10. 改老文件别顺手全文件 `prettier --write`
 
 同源。给 `Chat/index.tsx` 加完改动顺手跑 `prettier --write`,**一下 211 行 diff**(实际改动 ~20 行)—— 该文件本来就没按 prettier 格式化过,全文件重排把真实改动淹了。`git checkout --` 回退重做、手工对齐缩进后 diff 只有 37 行。
 
 **判据**:仓库有 formatter ≠ 每个存量文件都被格式化过。动老文件前先 `prettier --check <file>`,不通过就**只手工对齐自己那几行**,别全文件重排(除非单独开一个 `style:` commit)。
+
+## 11. 键盘让位别用「压矮」:布局属性逐帧重排 → 底栏丝滑、内容掉帧
+
+来源:sitin-next app-pwa,PR [#633](https://github.com/presence-io/sitin-next/pull/633)(2026-07-16)。§8 的 lift 把**底栏**平移上去了,但上方 flex-1 滚动区高度不变、照样被盖。直觉修法是给滚动区加**等高 `margin-bottom`** 压矮 —— **这是错的**。
+
+**根因:一个动作被拆成两条渲染路径。** 底栏 `transform` 走**合成层**;聊天区 `margin-bottom` 是**布局属性**,过渡期间**逐帧重排**(主线程)。体感就是「底栏丝滑、内容掉帧」。再配一个 `ResizeObserver`(每帧读 `clientHeight` / 写 `scrollTop` 重新贴底)= 典型 layout thrashing,雪上加霜。
+
+**实测**(harness 复刻结构 + 120 条消息,键盘弹起 600ms 内):
+
+| 方案 | Layout 次数 | Layout 耗时 | 主线程占用 |
+|---|---|---|---|
+| margin 压矮 + RO | 11 | 4.8ms | 24.7ms |
+| margin 压矮,无 RO | 12 | 2.7ms | 15.3ms |
+| **transform 整块上移** | **0** | **0.0ms** | **7.7ms** |
+
+**正确修法:聊天区和底栏共用同一个 lift style 一起整块上移**(纯合成层、零重排,且天然同步 —— 比"两个 style 靠共用常量对齐"更不容易漂)。
+
+**两个硬前提,缺一个就翻车(都实测过)**:
+1. 外层要有**静止的 `overflow-hidden` 裁剪窗口** —— 否则上移后顶部溢出、盖住 header。
+2. **内容必须贴底** —— 否则短列表内容贴顶,整块上移把它推出窗口切掉(实测首条 `top=-178`、被切 226px)。
+   - 用 **`mt-auto` 撑杆**(第一个子元素 `margin-top:auto`),**别用 `justify-content:flex-end`** —— 后者在滚动容器上会让顶部溢出内容**滚不到**(经典 flex 坑)。
+   - 代价:不满一屏时内容从贴顶变贴底。各家 IM 都这样,但属于**视觉变化,要让用户确认**。
+
+**白赚**:去掉 RO 后,用户翻历史消息时键盘一弹**不再被强制拽回底部**(那是 `RO + scrollToBottom` 的副作用),整块平移天然保持阅读位置。
+
+**几何直觉(为什么"压矮"和"平移"不能互换)**:「顶边不动、底边上移」= **尺寸变化 = 必然布局**。想用纯 transform,就只能整块平移,而平移对齐的是**底边**,所以内容必须锚在底边 —— 这不是实现细节,是几何约束。
+
+### 方法论:测机制,别测体感
+
+第一次想验掉帧,用 headless Chrome 数 rAF 帧间隔 → **36 帧/600ms 满帧、0 卡顿,完全没复现**(headless 的 rAF 不反映真实合成,不可信)。换 **CDP `Performance.getMetrics` 数 `LayoutCount`** → 一眼看到 **11 vs 0**,直接命中机制。
+
+```js
+const c = await page.target().createCDPSession();
+await c.send("Performance.enable");
+const grab = async () => Object.fromEntries((await c.send("Performance.getMetrics")).metrics.map(m => [m.name, m.value]));
+// before → 触发动画 → after,比 LayoutCount / LayoutDuration / TaskDuration
+```
+
+> **通用判据**:凡是过渡 `margin` / `height` / `padding` / `top` 等布局属性,都会逐帧重排。动画只碰 `transform` / `opacity` 这条老规矩,**在"看起来只是让个位置"的布局需求里最容易被忘掉**。
