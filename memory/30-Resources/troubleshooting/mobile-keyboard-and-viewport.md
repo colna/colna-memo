@@ -145,3 +145,36 @@ function useKeyboardOpen(): boolean {
 - **模块化**:全部逻辑在 `utils/keyboardLift.ts`(对外仅 `handleNativeKeyboardChanged(data)` + `KEYBOARD_LIFT_STYLE`),`bridge.ts` 只做端能力挂载(handler 一行转发)。
 
 **方法论**:APK WebView 无 devtools、on-device vConsole 也不便 → 在 `bridge`/键盘模块里挂一个 `position:fixed` 的**页面日志浮层**(绿字、`pointer-events:none`、只记变化事件),真机截图回传即可看清 native 逐帧时序。定位完再单独 commit 删除。这套是本次一切根因定位的关键工具。
+
+## 9. 用代码「呼起」系统键盘:条件渲染的输入框必须 `flushSync` + 同步 focus
+
+来源:sitin-next app-pwa,Chat 页点底栏键盘图标(2026-07-16,`components/ChatInputBar.tsx`)。
+
+**铁律**:**iOS Safari 只在用户手势(tap/click)的同步调用栈内 `focus()` 才弹软键盘。** 脱离手势栈 → 只定位光标、不弹键盘。
+
+**难点**:语音优先的底栏里,文字输入框是**条件渲染**的(语音态下不在 DOM)。点图标 → `setMode("text")` → 输入框要**下一次渲染**才挂载 → 那时再 focus 已经出了手势栈。
+
+```tsx
+if (next === "text") {
+  flushSync(() => setMode(next)); // 逼 React 同步挂载 input
+  textInputRef.current?.focus();  // 仍在本次 click 的同步栈内 → iOS 认
+}
+```
+
+**三个方案的取舍(别再重推一遍)**:
+
+| 方案 | 能否弹键盘 | 否决理由 |
+|---|---|---|
+| `useEffect` 里 focus | iOS ❌ | paint 后才跑,已出手势栈 |
+| 原生 `autoFocus` | ✅ 会触发 | **不区分挂载来源** —— 记忆态是 TEXT 时,进页面没人点就自动弹键盘 |
+| `flushSync` + focus | ✅ | 精确锁定「用户主动点」这一条路径 |
+
+> ⚠️ 常见误判:以为「同组件内条件渲染切换,React 会复用节点,所以 `autoFocus` 不重跑」。**错的** —— `<ChatVoiceRecorder>` 换成 `<input>` 是不同元素类型,input 是全新挂载,`autoFocus` 照样触发。否决它的真正理由是上表第二行。
+
+**配套**:光弹键盘不够,键盘挡住的内容要让位。见 §8 的 lift,以及配对的 squeeze —— 抬升(`transform`)只平移底栏,**上方 flex-1 滚动区高度不变照样被盖**;要给它加**等高 `margin-bottom`** 把它压矮同样距离(两者共用同一个距离表达式和缓动 → 永不错位),并用 `ResizeObserver` 盯滚动区 clientHeight,一变矮就 `scrollToBottom`(APK 下 visualViewport 不动,vv 那条兜底不触发)。
+
+## 10. 改老文件别顺手全文件 `prettier --write`
+
+同源。给 `Chat/index.tsx` 加完改动顺手跑 `prettier --write`,**一下 211 行 diff**(实际改动 ~20 行)—— 该文件本来就没按 prettier 格式化过,全文件重排把真实改动淹了。`git checkout --` 回退重做、手工对齐缩进后 diff 只有 37 行。
+
+**判据**:仓库有 formatter ≠ 每个存量文件都被格式化过。动老文件前先 `prettier --check <file>`,不通过就**只手工对齐自己那几行**,别全文件重排(除非单独开一个 `style:` commit)。
