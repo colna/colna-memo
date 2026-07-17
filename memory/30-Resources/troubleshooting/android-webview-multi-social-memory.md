@@ -67,4 +67,8 @@ HOT/待命(WebView 活着等后续命令) ⇄ ACTIVE(执行中)
 
 ## 相关
 
+- **[[ce-ins-exchange-flow]] —— 落地前必读**。它记录了 CE 交换 INS 的**代码真实流程**,其中两条直接影响本方案:
+  1. **APK 1.34 已是分界线**:`≥1.34` 传 `EMPTY_ROBOT_MSG`(全零)让 APK 自己从 SP 拉任务 → **「命令驱动」已完成一半**;`<1.34` 仍由 PWA 下发关注列表。两条路径在 PWA 里并存。
+  2. **PWA 现在是 SP WebView 的生命周期发起方**(`useInsTaskInit.ts:693` 直接 `startSocialProxyRobotWebView`,`platform` 还硬编码 `"instagram"`)—— 与本方案「生命周期归调度器」**直接冲突,两个主人**。
+- ⚠️ **本笔记 §「结论」写的「FCM 只当门铃,命令从 server 拉」需要修正**:现有架构 **sp-server 是 WebSocket 长连推 `EXECUTE_SCRIPT`**(`SocialProxyWSClient`),**且 sp-server 完全没有 FCM**(`grep -rni "fcm|firebase" src/` 零命中)。更贴合现状的接法是:**FCM 只负责在进程被冻结/WS 断开时叫醒 → 起 FGS → 重连 WS → server 把积压命令推下来**,不需要新建拉取 API,改动比原方案小得多。
 - [[sitin-next-pwa-chat-tim]]、[[mobile-keyboard-and-viewport]](同为 APK WebView 环境踩坑)
