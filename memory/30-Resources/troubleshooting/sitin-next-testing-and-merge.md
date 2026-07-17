@@ -23,3 +23,55 @@ tags: [troubleshooting, sitin-next, testing, jest, vitest, git, merge]
 
 ## 反复冒出来的 submodule 噪声
 - `packages/business-pwa-proto/proto` 子模块指针经常显示 modified(非本人改动),挡 rebase/checkout。复位:`git checkout -- <submodule> && git submodule update <submodule>` 再操作。
+
+## `business-pwa-proto` 的 dist 过期 → app-pwa 报一堆 proto 类型 `unknown`(2026-07-16 两次误判)
+
+**现象**:`app-pwa` 跑 `tsc --noEmit` 突然几十个错,形如 `Cannot find module '@heyhru/business-pwa-proto/gen/archat_api/msgcenter_api'`,或 proto 类型全变 `unknown`(`Property 'code' does not exist on type 'unknown'`)。
+
+**根因**:`app-pwa` import 的 `@heyhru/business-pwa-proto/gen/...` 指向 **dist**,不是 src。**dist 没构建/过期**就全线解析失败。触发场景:base 合入了用新 proto 的代码(如 `chatApi.ts` 用 msgcenter)、或 `git stash` / 分支切换让 dist 失效。
+
+**修法(一条)**:
+
+```bash
+cd packages/business-pwa-proto && pnpm build     # 只重建 dist
+```
+
+**判据**:app-pwa 大量 proto 类型报错 = **先 rebuild dist,再怀疑自己的代码**。顺手拉基线对照(`git stash` 后跑 base)能立刻证明与改动无关。
+
+### ⚠️ 别手贱跑 `pnpm proto:gen`
+
+`src/gen` 是**入库的**(路径是 `src/gen`,不是 `gen`)。重新生成会因 protoc 版本差异 **churn 20+ 个受版本影响的入库文件**,把真实 diff 淹掉。回退:`git checkout -- packages/business-pwa-proto/src/gen`。
+
+只有 proto submodule 指针真的变了才需要 `proto:gen`;日常缺 dist 只用 `pnpm build`。
+
+> **踩坑教训**:我当时用 `git ls-files packages/business-pwa-proto/gen` 查返回空,就断定「gen 不入库」——**路径查错了**。`git ls-files <path>` 返回空只能说明**这个路径**没文件,不能推出「这类文件不入库」。先 `ls` 或 `git ls-files | grep` 确认路径。
+
+> `protoc` 若报 not found,先看 `/opt/homebrew/bin/protoc`(装了但不在非交互 shell 的 PATH 里),别急着 `brew install`。
+
+## 分支内部有「后一个 commit 推翻前一个」时 → 先 squash 再落,别直接 rebase
+
+2026-07-16 PR #633:3 个 commit 里第 1 个引入 `margin-bottom` 压矮、第 2 个又删掉它。base 前进后直接 rebase,**要为那个死中间态解两遍冲突**,且该状态从未被验证过。
+
+**改用只对最终状态解一次冲突**:
+
+```bash
+git checkout -b tmp origin/<base>
+git merge --squash <branch>     # 冲突只解一次(最终状态)
+# 解冲突 → commit
+git branch -f <branch> tmp && git checkout <branch> && git branch -D tmp
+git push --force-with-lease --no-verify
+```
+
+净 diff 不变,评审也不用看已被推翻的方案。**判据:分支内自我推翻 → rebase 的工作量和出错面翻倍,先 squash。**
+
+## 验 gitignore 用 `check-ignore`,别用 `git status`(通用 git 技巧)
+
+删文件 + 加 ignore 后想验证规则是否生效,`git status --porcelain --ignored <path>` **会被暂存的 `D` 记录盖住**,看不出结果。直接问规则:
+
+```bash
+$ git check-ignore -v .serena/project.yml .serena/cache/x
+.gitignore:38:.serena/	.serena/project.yml
+.gitignore:38:.serena/	.serena/cache/x
+```
+
+输出 `<规则文件>:<行号>:<规则> → <路径>`,一目了然;无输出 = 未命中。

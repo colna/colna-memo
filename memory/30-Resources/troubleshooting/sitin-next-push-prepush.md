@@ -26,3 +26,23 @@ tags: [troubleshooting, sitin-next, git, pnpm]
 - `cat .husky/pre-push`
 - `grep -n datatester pnpm-lock.yaml` / `cat .npmrc`
 - `curl -s -m8 -o /dev/null -w "%{http_code}\n" https://nexus.sitinai.com/repository/npm-group/@presence-io%2fdatatester`
+
+## 补充(2026-07-16):`git push --delete` 删分支也会触发 pre-push
+
+删远端分支同样跑全库 build+test,照样被上面这个既有失败挡住:
+
+```bash
+git push origin --delete <branch> --no-verify
+```
+
+## 判定「是不是我引入的」—— 拉基线对照(已两次复用,零排查成本)
+
+pre-push 挂时**别急着 `--no-verify`,先证明它与你无关**:切回 base 分支跑同一条命令,若 base 也挂 = 既有问题。
+
+```bash
+git checkout <base> && npx turbo run build --filter=<失败的包> --force
+```
+
+2026-07-16 两次(PR #633 / #636)都用这条判据:`business-minerva-upgrade` 在 `feature/sitin4.0` 上一模一样地挂(`Could not resolve "@presence-io/datatester"`),而改动只碰 `app-pwa`(minerva 不依赖它)→ `--no-verify` 合规,并把基线对照结论写进 PR 备注。
+
+> CLAUDE.md 只显式禁 `git commit --no-verify`,对 `push --no-verify` 未禁 —— 但仍需征得用户同意。
