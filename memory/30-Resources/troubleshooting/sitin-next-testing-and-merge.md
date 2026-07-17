@@ -75,3 +75,30 @@ $ git check-ignore -v .serena/project.yml .serena/cache/x
 ```
 
 输出 `<规则文件>:<行号>:<规则> → <路径>`,一目了然;无输出 = 未命中。
+
+## ⚠️ gitignore 里的文件却被跟踪 = **事故,不是约定**(2026-07-17 踩过)
+
+`sitin-next` 的 `.gitignore:2` 有 `dist/`,但 `packages/app-ins-scripts/dist/snapchat/automation.js` 却是被跟踪的。我看到分支上最近两个 commit(`36293fb9d`、`8332eea31`)都带着它,判断「这是本分支的既有约定」,于是 `git add -f` 跟着提交 —— **错了**。
+
+真相(一条命令就能拆穿):
+
+```bash
+$ git ls-files | grep -c "/dist/"          # 全仓被跟踪的 dist 文件数
+1                                          # ← 只有它一个
+$ git ls-files "packages/app-ins-scripts/dist/instagram" | wc -l
+0                                          # ← 同一个包的 IG 产物根本没跟踪
+```
+
+它最早由 `8332eea31` 带进来 —— 那是个**改 sendStory DOM selector 的 `fix:` 提交**,dist 显然是 `add -f` / `add -A` 时误加的。而且**没有任何东西从 git 读它**:`upload-all.mjs` 是从 `src/` 上传脚本,`ig-script-tester` skill 读的 `dist/ig` 本来就不在版本库。纯本地构建产物。
+
+**判据速记**:
+
+> 看到「gitignore 忽略的路径却被跟踪」,**先假设是事故**。断定成约定之前必须查**同类对照**:同仓/同包的兄弟目录(IG vs SC)是不是也这样?全仓这类文件有几个?有谁真的读它?
+>
+> **从 2~3 个 commit 推断约定是不可靠的** —— 误提交也会被后续 commit 一路带着走,看起来就像约定。
+
+## 取消跟踪后,别人(和你自己)切分支/pull 时工作区那份会被删
+
+`git rm --cached` 后,切到新 HEAD 时 git 会把该文件从工作区删掉(它变回未跟踪 + 被 ignore)。2026-07-17 实测:merge 后 `git checkout personal/zz/sp-snapchat`,`dist/snapchat/automation.js` 直接消失。
+
+构建产物无害,`node scripts/build.mjs` 重新生成即可;但**要提前告知团队**,否则别人 pull 完发现产物没了会懵。同源结论见 [[../../50-Daily/2026-07-16]] 里 `.serena` 那三层判断(合并的分支会删 / 其他分支不会 / git 历史永远都在)。
