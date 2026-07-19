@@ -95,6 +95,22 @@ web 的 `beginCallLifecycle` 在**被叫和主叫两个入口都复位** `isEnde
 
 修法：`handleOutgoingStart` 拿到 targetUserId 后补 `isEnded.current = false`。教训：**web/native 两套入口，对称的状态复位 web 抽成一处、native 是两处手写 → 天然容易只改一处，改 native 生命周期时逐一核对被叫/主叫两入口。**
 
+## 外呼健壮性（P2/P3，2026-07-18 修）
+
+- **双击建单守卫**：`handleOutgoingStart`（web+native）里权限检查+建单都是 `await`，两次快速点击会在第一次没建完单时重复建单 = **真金白银的重复单**。修：`outgoingInFlightRef` 把整段串行化，进行中直接丢弃后到的触发，`finally` 复位。凡「await 中建单/建资源」的入口都要防重入。
+- **外呼失败要发终止信号，别静默 return**：外呼在权限拒/建单失败时若静默 `return`，上游按事件复位的状态机（`useVideoTipsCall.activeRef`）收不到信号 → **状态泄漏**，把下一通无关通话误当 videoTips 处理（误挂断+误发奖）。修：失败路径 `emit CALL_OUTGOING_ENDED{reason:'aborted'}`，业务 hook `onAbort` 复位；`handleOutgoingEnded` 对 `aborted` 静默不弹 toast（权限反馈由 `permissions.ts` 自己给）。**fire-and-forget 的 emit 架构，失败路径也必须发信号。**
+- **平台无关 hook 里的平台能力差异用 `isApp()` 分流**：`useVideoTipsCall` 是平台无关编排，但「能不能挂断」是平台差异（web 有 `WebCallManager.hangup` / native 挂断归 APK）。native 上 arm 到点调 no-op hangup 的 60s timer 只会误导 → `if (isApp()) return` 仅 web arm。native 限时挂断仍是缺口（见上「native 缺口」），需 GraceChat-Earn 支持。
+
+## 「都修」类请求的复核纪律
+
+review 列的 finding 到动手时**逐条对当前代码复核**，别照单全改：
+
+- 有的已被后续 PR 缓解（如 native stale session 被 #646 的 `startCall` 归零残留解决 → 不成立）。
+- 有的是**有意取舍**（#647 注释白纸黑字「订单悬空远好过错发钱」，`handleCallError` 不缩窄悬空窗口是故意的）。
+- 有的**盲改会资损或越权**（reward.cents 量纲 / price 语义 / finishCallOrder 幂等 = 动钱口径，需后端确认；缩窄悬空窗口需区分瞬时 5100/5000 vs 致命错误码，判错就错发钱）。
+
+专业做法：**前端能安全正确修的全落地，需后端/native 或有意取舍的明确分类回报**，不为了显得干活去改真金白银逻辑。
+
 ## 相关
 
 - 现有主动外呼实现见 [[tuicallkit-web-ui]]、[[../../50-Daily/2026-07-07]]（PR #540）、[[../../50-Daily/2026-07-12]]（orderId 走 userData）。
