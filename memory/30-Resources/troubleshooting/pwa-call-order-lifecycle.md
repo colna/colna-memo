@@ -74,6 +74,27 @@ sitin4.0 视频通话计费的真相。跨 sitin-next(PWA) + Kira-Android(男) +
 - `callCancelFromNative` payload 只有 callType，分不出「我方取消」和「对方拒接」。
 - native 无 `handleCallError` 对等回调 → 通话出错关不了单。
 
+## ⭐ 挂载层决定生命周期：限时/发奖编排必须挂常驻层，不能挂 chat 页
+
+`CallControllers.tsx:40` 按 `IS_NATIVE` 二选一挂 `WebCallController`/`NativeCallController`，还常驻挂 `MockCallController`。**它是 `<AppRouter/>` 的 sibling，不随路由变** → 挂在这里的 hook 通话全程不卸载。
+
+反例（我 refactor #650 踩的坑）：把 videoTips 的限时/发奖编排 `useVideoTipsCall` 挂进 chat 页（`ActiveChat` 内）。**接通后 `useWebCall` 会 `navigate("/video-call")`，而 `/video-call` 是 `/chat` 的对等 Route，会卸载整个 `/chat` 子树** → hook 随之卸载：
+
+- 60s 限时 timer 在接通瞬间被 effect cleanup 清 → **web 仍不在 1min 自动挂**；
+- 结束时 onEnd 已不在 → **奖励丢**。
+
+**修法**：hook 改自包含、无 chat 依赖、无参数，随 `CallControllers` 常驻在 App 根（新增 `VideoTipsCallController`，和 `MockCallController` 同级）。自记接通时长判发奖、金额取发起时 `centsPerMinute`、金币动画走全局 `modalStore`（不经 chat 的 mountedRef gate）。
+
+> 规律：**凡「跨接通、跨导航要活着」的编排（限时、发奖、订单收尾），必须挂常驻层，不能挂随路由卸载的页面。** 底层通话（callService/CallManager/useWebCall）只管生命周期+建单+发 TIM+按传入 price 结钱，不认「videoTips/限时」。
+
+## ⭐ native 结束守卫 isEnded 两个入口都要复位（P1，2026-07-18 修）
+
+web 的 `beginCallLifecycle` 在**被叫和主叫两个入口都复位** `isEnded`/`isUserHangup`；native 的 `useNativeCall` 原本只在**被叫入口**（`handleNativeCallInvited`）复位，**主叫入口**（`handleOutgoingStart`）漏了。
+
+后果：第 2 通及以后的 native 主叫，上一通结束置的 `isEnded=true` 残留 → `handleNativeCallEnd` 被 `if(isEnded.current) return` 直接吞 → **订单结钱了但结算/发奖/导航回退全丢**。
+
+修法：`handleOutgoingStart` 拿到 targetUserId 后补 `isEnded.current = false`。教训：**web/native 两套入口，对称的状态复位 web 抽成一处、native 是两处手写 → 天然容易只改一处，改 native 生命周期时逐一核对被叫/主叫两入口。**
+
 ## 相关
 
 - 现有主动外呼实现见 [[tuicallkit-web-ui]]、[[../../50-Daily/2026-07-07]]（PR #540）、[[../../50-Daily/2026-07-12]]（orderId 走 userData）。
