@@ -62,6 +62,44 @@ tags: [troubleshooting, sitin-next, app-pwa, tim, chat]
 - `chatModerationApi` 的 `chat_api` proto **已生成**(`src/gen/`、`dist/gen/`),旧注释"尚未生成"过时。
 - mock 桩 `useMsgCheck`(恒 `passed:true`)已删。
 
+
+## ⭐ IndexedDB 存 TIM 消息:一条不可克隆 = 整个会话缓存永久写不进(2026-07-18 实测)
+
+- **现象**:进会话写缓存 45 条,刷新回来 L2 只读到 37;**每次刷新都稳定 37**;缺的那段要等 revalidate 从服务端重拉。
+- **根因**:`chatCacheDB` 的 `put` 抛 `DataCloneError` ——
+  `Failed to execute 'put': function(e2){ this.instanceID=..., this.sizeType=.., this.size=.. } could not be cloned`。
+  **IndexedDB 走结构化克隆、不接受函数**,而 TIM **图片/文件类**消息的 `payload` 上挂着 SDK 的类/方法。
+- **致命点**:`put` 失败会让**整个事务**失败 —— 会话里只要有一条这种消息,整批就永远写不进去,盘上卡死在最后一次成功的版本;而 `flush()` 的 catch **完全静默**且自动回滚重试 → 永远失败、永远无声。
+- **修法**:存盘前对每条 `raw` 做 JSON 往返只留可序列化数据(`formatMessage` 读的都是纯字段,不依赖原型/方法);**个别消息序列化失败就跳过它,不连累整批**。
+- **配套**:`writeBatch` 要补 `tx.onabort` —— 配额超限走 abort 不走 error,只听 `onerror` 会让 Promise 永远悬着。`os.put` 对不可克隆值是**同步抛错**、不走 `tx.onerror`。
+- **⭐⭐ 方法论**:我先后按「防抖没落盘」改了两版(加卸载兜底 flush、防抖改节流)都无效 —— 改的都是「**什么时候写**」,而真相是「**根本写不进去**」。**转折点是给静默的 catch 加日志**。一个吞异常的 catch 能让人朝错方向修无数遍;排查时先把「静默失败」暴露出来,再谈修法。
+
+## 消息校准(reclaim)会误删「刚到、服务端还没索引」的消息
+
+- `chatMessageSource.reclaim` 的判据是「在拉取前快照里 + 在窗口内 + 服务端页没有 = 已删」。但 TIM 实时推送往往**快过服务端落库/漫游索引**,这段窗口里拉历史根本拿不到它 —— 典型翻车:videoTips 卡由前端调 `/msgcenterApi/injectMessage` **现注入**,推送秒到、卡已渲染,紧接着一次 revalidate 就把它差集清掉(还连缓存一起写回),表现为「卡闪一下就消失,刷新后过一会儿又出现」。
+- **修法**:`reclaim` 加豁免 —— 时间戳距今不足 60s 的一律保留,不交给服务端裁决。符合该函数既有的「宁可漏删不可误删」约束。
+- **通用判据**:凡是「客户端能先于服务端看到」的消息(实时推送、现注入、乐观发送),都不能用「服务端拉不到 = 已删」来裁决。
+
+## videoTips 卡的下发链路与「删不掉」
+
+- **链路**:① 后端 `getConversationState` 返回含 `TASK_TYPE_VIDEO_TIPS` 的 task → ② **前端**调 `InjectMessage`(url `/msgcenterApi/injectMessage`)让后端注入 TIM 消息 → ③ 渲染成卡。
+- **关键**:注入参数是 `fromUserId=peerUserId, toUserId=selfUserId`,即**以对方身份**注入 —— 女方端 `IMManager.deleteMessage` 删的是「别人发的消息」,`ok:true` 只代表 SDK 调用成功,**删不掉服务端漫游副本**。下次 `revalidate` 拉历史会把卡**合并回来**(实测:删卡后无任何新推送,却凭空多出同一个 message id)。
+- **修法**:本地「已消费」黑名单(`videoTipsConsumed`,localStorage)+ 在 `filterMessages` 统一过滤(L1/L2/network 三条读路径都经它)。治本仍在服务端(收到 `phone_call_message.taskId` 后删掉那条注入消息 / 不再下发)。
+
+## 会话锁(lockRef)会锁死切换,且绿灯时静默无提示
+
+- 锁的条件只看**有没有 pendingTask**、不看颜色:`if (!pendingTask?.id) return; lockRef.current = { locked: true, status: convStatus }`。
+- `handleSelectConversation` 被锁拦截时,**只有 Red/Yellow 弹 toast,Green 直接静默 `return`** —— 表现就是「点了完全没反应」。自动切换(`taskQueue` effect)同样 `if (lockRef.current.locked) return`。
+- **解锁只在 ActiveChat 卸载时**(或 pendingTask 消失)→ 切不走就不卸载 → 不解锁 → 自我维持。
+- **所以「PENDING 任务一直没被完成」会直接锁死会话切换。** 而前端完成 task 走的是发消息时 `buildCloudData` 的 `taskIds`(`event_type: "anomaly_task_complete"`),**和 `phone_call_message` 是两条独立的路** —— 「打完电话完成 PENDING 任务」必须**后端消费 `phone_call_message.taskId`** 才成立,前端单方面改不出来。
+- **兜底选会话的 effect 也走 `handleSelectConversation`**,同样会被锁拦 —— 当前会话不在列表时本该自愈却被拦住,是既有隐患。
+
+## 排查这块问题的姿势
+
+- 全链路统一 tag 打点(`vtLog` → `[VideoTipsFlow]`),vConsole 搜一个词看完时间线:发卡 → TIM 到达 → 写缓存 → reclaim → 渲染 → 点击 → 通话 → phone_call_message → 删卡 → 清缓存。
+- L2 读写**对账**日志是定位缓存问题的关键:写侧 `queued/truncated/droppedUnserializable`,读侧 `onDisk/afterTtl/afterFilter` + cutoff + 最老最新时间戳。`onDisk < 上次 queued` = 落盘丢失;`afterTtl < onDisk` = 被 TTL 砍;`afterFilter < afterTtl` = 被 filterMessages 砍。**一眼定责,不用猜。**
+- 一键清缓存:`sitin4.clearChatCache()`(或 Debug 页「清除聊天缓存」)—— 一次清 L1 内存 + L2 IndexedDB(先 flush 再 clear)+ 5 个 localStorage key。注意已有的「清除 LocalStorage」**清不掉 IndexedDB 和内存**。
+
 ## 相关
 
 - push / pre-push 卡无关包见 [sitin-next-push-prepush](./sitin-next-push-prepush.md)
