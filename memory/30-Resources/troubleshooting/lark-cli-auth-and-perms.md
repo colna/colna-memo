@@ -65,6 +65,25 @@ lark-cli docs +update ... --content @./file.xml
 ```
 shell cwd 会自动回到原目录,不影响后续命令。
 
+## 4.1 `docs +fetch` 读不出内嵌 sheet / 整篇是 sheet 的文档（2026-07-20）
+
+**现象**：文档里的表格章节 fetch 回来只有一个空标签，拿不到单元格内容：
+
+```
+<sheet token="I2m9sfnIShfKY8twVgGczSUfnre" sheet-id="ao1JQm"></sheet>
+```
+
+若整篇文档本身是电子表格，直接报错：
+
+```
+Unsupported document type 'sheet'. Only docx is supported.
+```
+
+**影响**：审需求文档时会**静默漏掉整块内容**而不自知 —— 我 review sitin4.0 时「Go Live 页 / Mock 视频改造 / 任务拆解」三节就是这么漏的。
+
+**修法**：从 `<sheet>` 标签取 `token` + `sheet-id`，切到 `lark-sheets` 技能单独读。
+**纪律**：fetch 回正文后先 `grep '<sheet\|<bitable'`，有就说明还有下钻内容没读到，别当作已读全。
+
 ## 5. docs `+update` 成功但 `result: failed`(没编辑权限)
 
 **现象**:`ok: true`,但响应里:
