@@ -22,10 +22,17 @@ tags: project, tauri, rust, android, instagram, snapchat, automation
 
 - 仓库:`git@github-colna:presence-io/social-proxy-scripts-container-app.git`
 - 当前分支:`main`,版本 `0.1.0`
-- **本地状态**:`/Users/max/Dev2/zhangzheng/social-proxy-scripts-container-app` **只是个空目录,从未 clone**。需要时:
-  ```bash
-  git clone git@github-colna:presence-io/social-proxy-scripts-container-app.git
-  ```
+- **本地状态**:2026-07-21 已 clone 到 `/Users/max/Dev2/zhangzheng/social-proxy-scripts-container-app`。
+
+> ## ⚠️ `scripts/*/automation.js` 是**产物**,不是真源(2026-07-21 确认)
+>
+> 真源在 **`sitin-next/packages/app-ins-scripts/src/{instagram,snapchat}/{actions,methods}/`**,
+> 由该包的 `scripts/build.mjs`(esbuild)打成 `dist/{platform}/automation.js`,再拷进本仓库 `scripts/`。
+>
+> **要改脚本行为,改 sitin-next 那边,不要动这里的 bundle。** 本仓库只是注入宿主。
+>
+> 判断依据:bundle 顶部有 `// src/snapchat/actions/utils.js` 之类的路径注释;
+> 本仓库 `package.json` 没有任何生成 `scripts/` 的构建步骤。
 
 ## 项目结构
 
