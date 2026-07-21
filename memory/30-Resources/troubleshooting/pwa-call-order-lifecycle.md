@@ -39,6 +39,23 @@ sitin4.0 视频通话计费的真相。跨 sitin-next(PWA) + Kira-Android(男) +
 - `ConnectSession.price` / `FinishCallOrderRequest.price` 是**美元**。铁证：mock 的 price 直进 `CallRecordModal.tsx:141` 的 `earned.toFixed(2)`。
 - → `VideoTipsMsgBubble` 传 `centsPerMinute / 100`。
 
+### ⭐ `0` 不是 nullish —— 金额兜底必须用 `||`，不能用 `??`（2026-07-18 CR 查出的资损 P1）
+
+`??` 只在 `null`/`undefined` 时兜底，**`0` 会被当成有效值原样传下去** —— 而 `0` 恰恰是金额字段最该兜底的值。
+
+真实事故：发卡处 `getRewardCentsByType(videoTipsTask.reward, "video")` 缺外层兜底，函数内部又用 `??`。
+VIDEO 项存在但 `cents=0` 时不回落 TEXT，`OUTGOING_CALL_PRICE_PER_MIN` 的 `?? 默认值`也救不了 →
+`finishCallOrder(orderId, 60, 0)`，**女方打满 60s 拿 $0**。
+
+修法两条一起上：
+
+1. 取值用 `||` 让 0 也能回落：`getRewardCentsByType(A) || getRewardCentsByType(B)`
+2. **兜底后仍为 0 就不发卡**，且不落幂等标记（等后端配好 reward 后该 task 仍能正常发卡）
+
+> 更普适的一条：**「兜底值落在哪一层」决定它是否真的生效。** 同一个默认值在展示层兜了、在数据源头没兜，
+> 就会分裂成两套口径 —— 界面显示 `$0.2/min`、结单按 `0` 结，而且**界面看起来是对的**，最难查。
+> 默认值要落在**唯一真源**上（如 `session.price` 赋值处），不要在每个消费点各兜一次。
+
 ## PWA 侧实现要点
 
 - **web/native 不能收口到一个 manager**：结束事件不相交（`CALL_ENDED` vs `NATIVE_CALL_END`），`CallControllers.tsx` 二选一挂载。但**结钱口径必须一致** → 抽 `utils/callerPayout.ts` 共用（web `webCallManager` + native `nativeCallManager` 都调）。
