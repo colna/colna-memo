@@ -92,6 +92,10 @@ tags: [troubleshooting, sitin-next, app-pwa, tim, chat]
 - `handleSelectConversation` 被锁拦截时,**只有 Red/Yellow 弹 toast,Green 直接静默 `return`** —— 表现就是「点了完全没反应」。自动切换(`taskQueue` effect)同样 `if (lockRef.current.locked) return`。
 - **解锁只在 ActiveChat 卸载时**(或 pendingTask 消失)→ 切不走就不卸载 → 不解锁 → 自我维持。
 - **所以「PENDING 任务一直没被完成」会直接锁死会话切换。** 而前端完成 task 走的是发消息时 `buildCloudData` 的 `taskIds`(`event_type: "anomaly_task_complete"`),**和 `phone_call_message` 是两条独立的路** —— 「打完电话完成 PENDING 任务」必须**后端消费 `phone_call_message.taskId`** 才成立,前端单方面改不出来。
+
+> ✅ **2026-07-21 更新:后端已实现该消费。** 这条链路现已闭环 —— 前端在 `sendCallEndedToPeer` 里带 `taskId`(见下),后端据此销 PENDING 任务、会话锁随之解开。此前「打完电话切不动会话」的根因至此消除。
+>
+> 前端侧口径(`services/outgoingCallOrder.ts`):`taskId` 由 videoTips service 发起时 `setPendingVideoTipsTaskId` 登记、结束时 `takePendingVideoTipsTaskId` **一次性取走**(校验对端匹配 + 未过期,否则丢弃残留),只有 videoTips 通话才带;**所有真的拨出去过的主叫结束都带**(接通/拒接/忙线/未接/取消都算任务完成),没拨出去的(权限拒/建单失败)走不到那里。发送成功后才 emit `VIDEO_TIPS_CALL_RECORDED` 删卡,发失败不删卡、可重来。
 - **兜底选会话的 effect 也走 `handleSelectConversation`**,同样会被锁拦 —— 当前会话不在列表时本该自愈却被拦住,是既有隐患。
 
 ## 排查这块问题的姿势
