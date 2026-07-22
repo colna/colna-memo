@@ -258,3 +258,42 @@ override fun onStart(
 **踩坑**:stub 的 `requestAnimationFrame` 若**同步**执行回调,会假失败 —— 模块用 `kbRaf` 做每帧合并,`kbRaf = requestAnimationFrame(cb)` 的**赋值发生在 cb 返回之后**,把 cb 里的 `kbRaf = 0` 覆盖掉,之后 `if (kbRaf) return` 永久短路。必须存下 cb、手动 flush(这也更接近真实 rAF 语义)。
 
 **残留**:Android 侧**零编译验证** —— 本机无 JDK(`/usr/bin/java` 是 stub)。真机待验:弹起一步到位、收起不回弹、二次弹出跟手。
+
+
+## 13. 新协议落地后真机打脸的两个坑(接 §12)
+
+§12 的「native 首帧给出目标高度」方案上真机后连续暴露两个问题,**都是我把 legacy 的保护机制当冗余删掉造成的**。教训比方案本身值钱。
+
+### 坑一:`bounds.upperBound` 一样会少报 IME 工具栏
+
+§12 里我判断「upperBound 是系统权威值,不需要历史最大值兜底」——**错的**。真机同一台设备、同一个键盘,`phase=end` 时报 351,换一次弹起就报 320,**差 31px 正好是一行 IME 工具栏**(与 §8 记的 351/320 完全一致)。少报那次输入条被压进键盘 46px。
+
+排查时两张截图的对照是决定性的:`缓存全高=351` 一直在,但新协议路径**根本不读它**。
+
+**修法**:两条路径**共享** `lastKbFullHeight`,按 `max(本次上报, 历史最大值)` 抬升。
+
+> **将来删 `handleLegacy` 时,这套 localStorage 缓存要留着** —— 它防的是 native 上报本身不可靠,与协议版本无关。
+
+### 坑二:回前台不归位 —— 「丢弃 progress」丢过头了
+
+切后台再切回,输入条被键盘挡住。
+
+§8 记过「回前台会重发逐帧高度」,并写了「handler 自己能覆盖、不需要 visibilitychange 兜底」。**那条结论只在 legacy 下成立**,因为 legacy 处理每一帧。新协议把 `progress` 全丢了,而**回前台不是一次新的键盘动画、不一定伴随 `start`** → `--kb-height` 停在切后台前的值。
+
+**修法**:用 `phaseAnimating` 标志(start 置位 / end 清除)区分 `progress` 的两种来源 —— 动画期间的逐帧值照旧丢弃(否则退化成追逐帧),**动画之外的 progress 当作状态同步**。
+
+**连带的坑**:状态同步必须**无条件写入**,不能复用 `end` 那条「与 phaseTarget 差值 <24 就跳过」的路径 —— `phaseTarget` 记的是**逻辑目标**,而切后台期间 `--kb-height` 可能已被归零,**两者一致并不代表画面是对的**。
+
+### ⭐ 方法论:调试指标本身也会说谎
+
+第一版排查浮层用 `vh - --kb-height` 当键盘顶算 gap。但输入条**正是被 `--kb-height` 抬上去的**,所以只要 lift 正确应用,**gap 恒等于 0** —— 它测的是「我的公式自洽吗」,不是「有没有被挡」。真机拿回 `gap=-0` 时差点当成「无遮挡」的证据。
+
+改用 native 原始高度后仍不对:少报时键盘**物理位置没变**、只有上报值缩了,于是两张视觉差异极大的截图 gap 都显示 `-15`。最终要用 `max(本次上报, 历史最大值)` 才算得出真实的 46px。
+
+> **判据**:设计调试指标时先问一句「**这个数会不会因为我要测的 bug 而一起失真?**」。用被测量本身推导出的量做指标,等于自证自洽。
+
+### 环境提醒
+
+`app-pwa` **没有测试框架**(全仓其他包有 vitest)。这轮 20 条状态机断言是用 `npx esbuild` 把模块转成 esm、在 node 里 stub 掉 `document`/`localStorage`/`requestAnimationFrame` 跑的,脚本放 scratchpad 不进仓库。
+
+**stub `requestAnimationFrame` 必须异步**:模块用 `kbRaf` 做每帧合并,回调若同步跑,`kbRaf = requestAnimationFrame(cb)` 的赋值会覆盖回调里的复位,之后 `if (kbRaf) return` 永久短路 —— 会造成 10 条假失败。
