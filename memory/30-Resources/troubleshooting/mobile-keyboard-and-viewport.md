@@ -136,7 +136,7 @@ function useKeyboardOpen(): boolean {
 - **完整高度靠逐帧累积** → 首次弹出 target 逐帧变大、CSS transition 追不上 → **上升慢、非一步到位**。
 - **缓存只增、不分场景** → 横屏键盘高度 / 表情面板高度 / 异常大值把 `lastKbFullHeight` 永久污染。
 
-**最终方案(纯 CSS 驱动,不逐帧追 native)**
+**当时的方案(纯 CSS 驱动,不逐帧追 native)** —— ⚠️ **已被 §12 取代,新 APK 上不再走这套反推**;下面这段仅对旧 APK(无 `phase` 字段)仍然生效
 - **一次写目标**:`show` → 目标 = `lastKbFullHeight - GAP`;`!show`/收起 → 0。CSS transform `transition 0.2s cubic-bezier(0.2,0,0,1)` 负责上升下降的缓动,一步到位。
 - **完整高度 = 历史最大 + 持久化 localStorage**:冷启动首次即读缓存一步到位(否则逐帧累积被 CSS 拖慢)。
 - **收起锁存(latch)**:高度从「近满峰值」回落 > `KB_RETRACT_DELTA(45)` 即 latch `closing`→target 0,**保持到 `show=false`**;末段抖动不再翻转(修「落到底又弹回」)。高度回到近满(重新打开/回前台)才解锁。
@@ -217,3 +217,44 @@ const grab = async () => Object.fromEntries((await c.send("Performance.getMetric
 ```
 
 > **通用判据**:凡是过渡 `margin` / `height` / `padding` / `top` 等布局属性,都会逐帧重排。动画只碰 `transform` / `opacity` 这条老规矩,**在"看起来只是让个位置"的布局需求里最容易被忘掉**。
+
+
+## 12. 别在前端反推 native 早就知道的数字:动画首帧就能拿到键盘目标高度
+
+来源:sitin-next `personal/zz/pwa-kb-simplify` + GraceChat-Earn-Android `p/colna/kb-phase-target-height`(2026-07-21)。§8 那套「历史最大值 + localStorage 缓存 + 回落锁存 + sanity 区间」全部是在做**一件本不该做的事**。
+
+**根本判断**:`keyboardLift.ts` 154 行里,真正做「让位」的只有一个 CSS transform;其余全在从一条混合的逐帧流里**反推「哪一帧才是终值」**。而这个数字系统从动画**第一帧**就精确知道:
+
+```kotlin
+override fun onStart(
+    animation: WindowInsetsAnimationCompat, bounds: WindowInsetsAnimationCompat.BoundsCompat
+): WindowInsetsAnimationCompat.BoundsCompat {
+    // bounds.upperBound.bottom = 本次动画要去到(show)/离开(hide)的 ime 高度
+    imeChangeListener?.notifyKeyboardAnimStart(imeShow, bounds.upperBound.bottom)
+    return bounds
+}
+```
+
+原代码 `onStart(animation, bounds)` **拿到了 `bounds` 却只用来 `return`**,把已知量丢掉,再让前端花 100 行猜回来。
+
+**修法**:payload 加 `phase: start|progress|end|legacy`,四路回调收敛成一个 `notifyKeyboardChanged(phase, show, height)`。前端 `start` 一次写死目标交给 CSS 缓动、**`progress` 全丢**、`end` 仅在与 start 差 ≥24px 时修正(两者取值来源不同 —— start 来自动画 bounds、end 来自 provider 的 `getKeyboardHeight()`,无条件采信会在收尾再跳一下)。§8 记的五种翻车(逐帧追不跟手 / 骤降判收起永不触发 / 方向判收起被末段抖动翻转 / 完整高度靠累积上升慢 / 缓存被污染)**在新协议下全部消失**,因为它们都是反推的产物。
+
+### ⭐ 兼容性:前端在线更新、APK 靠发版 → 必然出现「新前端 + 旧 APK」
+
+我最初判断「前端可以删 ~100 行」是**错的**。PWA 前端随时可发,APK 要等用户升级,所以旧的反推路径**必须整段留着**,新逻辑只能是一条按 `phase` 分流的快路径(两条路径状态完全隔离,同一台设备只走一条)。净效果 **+62 行而非 −100 行**;等 APK 全量后才谈得上删。
+
+> **通用教训**:双端协议升级时,「改完就能删旧代码」的前提是两端同步发布。凡是一端在线更新、另一端靠发版的组合,新旧协议共存期就是**无限期**的,降级路径要按长期代码来写(而不是标个 TODO 就当它快没了)。
+
+### 顺带:`.px` 这个扩展名字是反的
+
+`common/utils/UtilsExtensions.kt` 里 `inline val Int.px: Float get() = this / density` —— 叫 `px`,做的却是 **物理像素 → dp**。于是 Android<30 那条路径判显隐的 `height > 400` 比的是**转换前的物理像素**:density=3 的屏上 400px 才 133dp、density=2 上是 200dp,**阈值随屏幕密度漂移**。已改成先转 dp 再比 150dp。
+
+> 遇到 px/dp/sp 互转的扩展,**先读实现再用**,别信名字。
+
+### 验证:app-pwa 没有测试框架,用一次性 harness 顶上
+
+全仓其他包都有 vitest,`app-pwa` 没有。给它从零搭一套超出改动范围,于是用 `npx esbuild` 把 `keyboardLift.ts` 转成 esm、在 node 里 stub 掉 `document`/`localStorage`/`requestAnimationFrame` 后直接跑真实模块,断言 `--kb-height` 的写入序列(14 条:新协议 start/progress/end + 收起末段抖动 + 二次弹出 + 旧协议不被污染)。脚本放 scratchpad,不进仓库。
+
+**踩坑**:stub 的 `requestAnimationFrame` 若**同步**执行回调,会假失败 —— 模块用 `kbRaf` 做每帧合并,`kbRaf = requestAnimationFrame(cb)` 的**赋值发生在 cb 返回之后**,把 cb 里的 `kbRaf = 0` 覆盖掉,之后 `if (kbRaf) return` 永久短路。必须存下 cb、手动 flush(这也更接近真实 rAF 语义)。
+
+**残留**:Android 侧**零编译验证** —— 本机无 JDK(`/usr/bin/java` 是 stub)。真机待验:弹起一步到位、收起不回弹、二次弹出跟手。
