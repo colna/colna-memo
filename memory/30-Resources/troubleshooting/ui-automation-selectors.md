@@ -180,3 +180,51 @@ SPA 常给布局容器挂 `tabindex`，点击时它真的拿到焦点。于是�
 没有真实环境可验证时，**交付「可自检的东西」而不是「声称能用的东西」**——比如 dryRun 模式：只定位不点击，并如实标出哪几步因为前置条件不满足而根本没检查过。
 
 相关：[[snapchat-web-scripts]] · [[chrome-extension-e2e-automation]] · [[verification-discipline]]
+
+---
+
+## 自绘编辑器（Lexical / Draft.js / Snapchat 输入框）的录制与回放
+
+2026-07-22 在 browser-replay 上踩到，两个坑都会导致**「每一步都成功、结果却是空的」**。
+
+### 坑 1：录不到输入 —— `beforeinput` 被 preventDefault 后，浏览器不再派发 `input`
+
+自绘编辑器的标准做法是在 `beforeinput` 里 `preventDefault()`，然后自己把内容写进内部 model 再渲染 DOM。默认插入被取消，**`input` 事件就不会产生**。只监听 `input` 的录制器完全瞎掉，导出的脚本里一条输入步骤都没有。
+
+**修法**
+- 监听 `beforeinput`：无论页面是否 preventDefault 都会派发，是唯一还能被外部观测到的输入信号。
+- **值要延迟到结算时才读**：`beforeinput` 触发时内容还没落进 DOM，当场读只能读到旧值。
+- 再加一层失焦兜底：值 ≠ 聚焦时的基线就补一条（覆盖表情面板、粘贴按钮这类纯 JS 塞值，连 `beforeinput` 都没有）。
+- 用 WeakMap 记「已录入的值」做去重，顺带避免「点进点出、值没变也记一步」。
+
+### 坑 2：回放写不进去 —— `execCommand('insertText')` 也不派发 `beforeinput`
+
+编辑器的内容真源是内部 model，DOM 只是渲染结果。直接 `el.textContent = value` 它收不到，发送时读的还是空 model。
+
+`document.execCommand('insertText', ...)` 看着更"原生"，**实测同样没用**：
+
+```
+execCommand('insertText') → ret:true, text:"hi", fired:null   // beforeinput 没派发
+```
+
+返回 true、DOM 也变了，但编辑器的监听器一次都没触发 —— 效果等同直写 textContent。
+
+**修法：合成 `beforeinput` 喂给它**（编辑器就在那儿接管输入）
+
+```js
+const taken = !el.dispatchEvent(new InputEvent('beforeinput', {
+  bubbles: true, cancelable: true, composed: true,
+  inputType: 'insertText', data: value
+}));
+if (taken) { await nextFrame(); return; }   // 被吃掉 = 编辑器接管，绝不能再碰 DOM
+el.textContent = value;                      // 普通 contenteditable 才走这条
+el.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, data: value }));
+```
+
+`dispatchEvent` 返回 false 表示被 `preventDefault` → 编辑器已接管。此时**再去写 DOM 只会让两边状态打架**。
+
+### ⭐ 方法论：断言要落在业务结果上
+
+这次的失败形态是**回放日志全绿、消息一条没发出去**。步骤执行状态只能证明「选择器找得到元素」，证明不了「操作真的生效了」。测试必须断言业务结果（消息发出去了吗、表单值对不对），否则这类静默失败永远发现不了。
+
+配套地，fixture 要**复刻编辑器的架构**而不只是加个 `contenteditable`：内部 model + 渲染 DOM + 发送时读 model。只写 `<div contenteditable>` 的 fixture 两个坑一个都复现不出来。
