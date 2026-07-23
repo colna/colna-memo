@@ -10,7 +10,7 @@ tags: [project, chrome-extension, mv3, automation, colna]
 
 - 仓库：`git@github-colna:colna/browser-replay.git`（**个人仓库**，非 presence-io）
 - 本地：`/Users/max/Dev2/zhangzheng/browser-replay`
-- 起点：2026-07-21 从空仓库建起，当天推了 3 个 commit
+- 起点：2026-07-21 从空仓库建起，当天推了 3 个 commit；7-22 又推 3 个（祖先快照、自绘编辑器修复、祖先属性全收）
 
 ## 硬约束：选择器不含 class
 
@@ -34,10 +34,10 @@ test/                  selector 单测 + 端到端
 
 ## 测试
 
-`npm test` —— 需要本机 Chrome，**零 npm 依赖**。
+`npm test` —— 需要本机 Chrome，**零 npm 依赖**。当前 **46 项**。
 
-- `test/selector-test.html`（11 项）：真实 DOM 上验证无 class、动态 id 不采用、结构路径从地标起算、候选唯一命中、shadow DOM 穿透、结构失效后靠文本兜底
-- `test/e2e.mjs`（24 项）：headless Chrome + CDP `Input` 发**真实 isTrusted** 鼠标键盘事件录制 → 回放 → 断言表单数据完全一致
+- `test/selector-test.html`（15 项）：真实 DOM 上验证无 class、动态 id 不采用、结构路径从地标起算、候选唯一命中、shadow DOM 穿透、结构失效后靠文本兜底、祖先链快照与属性
+- `test/e2e.mjs`（31 项）：headless Chrome + CDP `Input` 发**真实 isTrusted** 鼠标键盘事件录制 → 回放 → 断言表单数据完全一致；另有一组自绘编辑器场景（与 Snapchat 同构的 fixture），**断言落在业务结果**（消息是否真的发出）而非步骤执行状态
 
 > E2E **没有加载扩展本体**：Chrome 136+ 已禁用命令行 `--load-extension`。改用 chrome API 桩把未经改动的 `content.js` 装进普通页面跑。详见 [[../30-Resources/troubleshooting/chrome-extension-e2e-automation]]。
 
@@ -47,6 +47,15 @@ test/                  selector 单测 + 端到端
 - 拖拽、原生 `<select>` 下拉层内的点击未覆盖
 - 回放只在单个标签页内进行，不跟随新开的标签页
 
+## 导出的 JSON
+
+每步除选择器外还带**往外最多 10 层的祖先结构快照**（`depth` 从 1 起算 = 直接父）。记的是每层祖先「自己」是什么（tag / nth-of-type / childCount / 直接文本 / 属性），**不是 outerHTML** —— 第 10 层的 outerHTML 往往就是大半个页面，没法读也没法 diff。
+
+属性**除 class / style 外全收**（含 `aria-expanded`、`aria-selected`、`tabindex`、站点自定义 `data-*`）：白名单永远追不上各家站点，而这些状态位正是判断「当前是展开还是选中」的唯一依据。id 仍按稳定性判定后才记。
+
 ## 待办
 
 - [ ] `background.js` 的存储与跨页面调度**未被自动化覆盖**（同上，扩展装不进测试环境）。需手动装载扩展验一次：录一段**带页面跳转**的流程 → 回放看游标能否续跑
+- [ ] **祖先快照占导出体积的大头**（7-22 实测一份 15 步的 SC 录制里占 58%，11 条祖先链去重后只剩 4 条）。改成全量取属性后还会涨，未实测。可做的：按步去重 / 引用化
+- [ ] 真实站点上点按钮内的 `svg` 时**没上溯到 button**（停在 11 层结构路径）。`describeClickTarget` 的判据是 `altScore > directScore`，两者同为 structural=40 时不换。**fixture 里没能复现**，差异未查清，故未动逻辑
+- [ ] 录制会把原地不动的 `scroll`（`0,0`）也记进去，纯噪声

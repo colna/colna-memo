@@ -23,6 +23,7 @@ tags: [troubleshooting, sitin-next, testing, jest, vitest, git, merge]
 
 ## 反复冒出来的 submodule 噪声
 - `packages/business-pwa-proto/proto` 子模块指针经常显示 modified(非本人改动),挡 rebase/checkout。复位:`git checkout -- <submodule> && git submodule update <submodule>` 再操作。
+- ⚠️ **复位前必须先进 submodule 目录 `git status` 确认里面没有未提交改动** —— `git submodule update` 会直接把它们冲掉。外层只显示一行指针变化,看着像「没改什么」,但这个复位动作本身是有破坏性的。确认为空再执行(2026-07-22 撤回 `1d23c882` ← `74557430` 时按此做过)。
 
 ## `business-pwa-proto` 的 dist 过期 → app-pwa 报一堆 proto 类型 `unknown`(2026-07-16 两次误判)
 
