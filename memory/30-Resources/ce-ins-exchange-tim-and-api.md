@@ -25,22 +25,51 @@ tags: [reference, sitin-next, app-pwa, contact-exchange-service, ce, instagram, 
 
 传输形式统一为 `TIMCustomElem`:`payload.description` = CustomDescription,`payload.data` = JSON 字符串。
 
-### 1.1 CustomDescription 枚举
+### 1.1 CustomDescription 是什么
 
-`app-pwa/src/types/chatMessage.ts:67-72`
+TIM 原生只有 `TIMTextElem` / `TIMImageElem` / `TIMSoundElem` 等几种元素,**没有「交换卡片」这类业务消息**。所有业务卡片都塞进万能的 `TIMCustomElem`,靠 `payload.description` 这个字符串标签区分是哪种业务:
 
-| CustomDescription | 解析类 | 方向 | 说明 |
+```
+TIM 消息
+├─ type: "TIMCustomElem"                       ← SDK 层:这是一条自定义消息
+└─ payload
+   ├─ description: "freeExchangeRequest"       ← 业务层类型标签(即 CustomDescription)
+   └─ data: "{\"orderId\":123,\"accountID\":\"xxx\"}"   ← 业务数据,JSON 字符串
+```
+
+`CustomDescription` 枚举(`app-pwa/src/types/chatMessage.ts:41-73`)把这些魔法字符串收敛成常量,收发两端共用。整个 PWA 里这类标签 30 多个(`Gift`、`CallOrder`、`VideoTips`…),交换相关占 6 个。
+
+**一个标签决定三件事**:
+1. **用哪个类解析** —— `formatMessage()` 工厂(`:687-748`)按 `description` switch
+2. **渲染成什么气泡** —— class 的 `type` 决定走哪个 bubble;`belongsToChatMsg = false` 的不进聊天列表
+3. **离线推送文案** —— `IMManager.sendCustomMessage`(`:596`)查 `descriptionMessageTypeMap` 自动生成
+
+### 1.2 6 个标签 = 3 种角色 × 2 代命名
+
+`chatMessage.ts:67-72`
+
+| CustomDescription | 解析类 | 实际发送方 | 说明 |
 |---|---|---|---|
-| `insExchangeRequest` | `ExchangeRequestMessage` | 男→女 | 老版付费交换请求 |
-| `freeExchangeRequest` | `ExchangeRequestMessage` | 女→男 / 男→女 | 新版(Blurred Card V2)交换请求 |
-| `insExchangeSend` | `ExchangeSendMessage` | 接受方回执 | 老版 |
-| `freeExchangeSend` | `ExchangeSendMessage` | 接受方回执 | 新版,给出自己的 IG 号 |
-| `insExchangeSystem` | `ExchangeSystemMessage` | 系统 | 过期退款等通知 |
-| `freeExchangeSystem` | `ExchangeSystemMessage` | 系统 | 拒绝通知 |
+| `insExchangeRequest` | `ExchangeRequestMessage` | 男端 App / dora;CE 反欺诈退款 + DH 请求也复用 | 老版付费交换请求 |
+| `freeExchangeRequest` | `ExchangeRequestMessage` | **PWA 自己发**(`useInsTaskInit.ts:329`) | 新版(Blurred Card V2)交换请求 |
+| `insExchangeSend` | `ExchangeSendMessage` | 老版男端,新版 PWA 已不发 | 接受方回执 |
+| `freeExchangeSend` | `ExchangeSendMessage` | **PWA 自己发**(`useInsTaskInit.ts:517`) | 接受方回执,给出自己的 IG 号 |
+| `insExchangeSystem` | `ExchangeSystemMessage` | CE 后端 `notifyExpiredRefund` | 过期退款通知 |
+| `freeExchangeSystem` | `ExchangeSystemMessage` | **PWA 自己发**(`InsExchangeBubble.tsx:77`) | 拒绝通知 |
 
-Ins / Free 两套 desc **共用同一个解析类、渲染一致**,只是历史遗留的两代命名。
+**3 种角色**(真正的区别):
 
-### 1.2 交换请求 `ExchangeRequestPayload`
+| 角色 | 谁发 | 干什么 |
+|---|---|---|
+| `*Request` | 发起方 | 「我想跟你换 IG」邀请卡,收方看到 Accept / Reject + 倒计时 |
+| `*Send` | 接受方 | 「我同意了,这是我的 IG 号」回执卡,收方看到 Follow 按钮 |
+| `*System` | 系统 / 拒绝方 | 纯通知(拒绝、过期退款),无按钮、`belongsToChatMsg=false` 不进列表 |
+
+**2 代命名**(历史包袱):`ins*` = 第一代**男方付金币**买交换;`free*` = 第二代 Blurred Card V2**女方免费主动**发起。但 PWA 代码里两代 **`case` 落到同一个类、渲染完全一致**,真正区分付费/免费的是订单状态和 `orderStatus` 字段。**实质只有 3 种消息,每种两个历史别名。**
+
+> ⚠️ **标签写错不报错**:`formatMessage` 的 `default` 返回 `UnknownMessage`,不抛错不告警 → 表现为「消息发出去了、SDK 也收到了、界面上什么都没有」。新增自定义消息必须同步改三处(枚举常量 / `formatMessage` case / bubble 组件),漏一处就静默失效。详见 [[troubleshooting/sitin-next-pwa-chat-tim]]。
+
+### 1.3 交换请求 `ExchangeRequestPayload`
 
 `chatMessage.ts:416-429`
 
@@ -60,7 +89,7 @@ Ins / Free 两套 desc **共用同一个解析类、渲染一致**,只是历史�
 | `giftId` | string | **仅 CE 服务端 DH 场景**带,固定 `"rose"` |
 | `localPwaStatus` | enum | **PWA 本地写回**的处理态:`countdown / agreed / refused / expired` |
 
-### 1.3 接受回执 `ExchangeSendPayload`
+### 1.4 接受回执 `ExchangeSendPayload`
 
 `chatMessage.ts:469-480`
 
@@ -75,7 +104,7 @@ Ins / Free 两套 desc **共用同一个解析类、渲染一致**,只是历史�
 | `pwafollowReward` | number | 奖励金额 |
 | `localPwaStatus` | enum | `unfollowed / followed` |
 
-### 1.4 系统消息 `ExchangeSystemPayload`
+### 1.5 系统消息 `ExchangeSystemPayload`
 
 `chatMessage.ts:512-518`
 
@@ -89,7 +118,7 @@ Ins / Free 两套 desc **共用同一个解析类、渲染一致**,只是历史�
 
 `belongsToChatMsg = false`,不进聊天列表渲染。
 
-### 1.5 `localPwaStatus` 的写回机制(易踩坑)
+### 1.6 `localPwaStatus` 的写回机制(易踩坑)
 
 `useInsTaskInit.ts:112-149` 的 `updateMessageStatus()`:
 
@@ -103,7 +132,7 @@ await IMManager.modifyMessage(rawMessage);
 
 作用:**跨端同步 + 防重复处理**。状态取值:请求侧 `countdown → agreed | refused | expired`;回执侧 `unfollowed → followed`。
 
-### 1.6 CE 服务端主动发的 3 条 TIM
+### 1.7 CE 服务端主动发的 3 条 TIM
 
 `contact-exchange-api/.../push/TimPushService.kt` + `push/CeNotificationService.kt`
 
@@ -187,7 +216,7 @@ PWA 侧统一走 HTTP + protobuf(`http/httpClient.ts` → `requestPost2`),按 pr
 
 ### 3.1 男端发来的 TIM 有什么字段
 
-见 §1.2。要点:新老字段并存(`accountID`/`insAccount`、`avatarUrl`/`insAvatar`、`expireAt`/`expireTimestamp`),`pwafollowReward` 小写 f,`localPwaStatus` 是 PWA 自己写回去的不是男端给的。
+见 §1.3。要点:新老字段并存(`accountID`/`insAccount`、`avatarUrl`/`insAvatar`、`expireAt`/`expireTimestamp`),`pwafollowReward` 小写 f,`localPwaStatus` 是 PWA 自己写回去的不是男端给的。
 
 ### 3.2 自动处理 → 上报后端接口 & TIM
 
@@ -235,7 +264,7 @@ PWA 侧统一走 HTTP + protobuf(`http/httpClient.ts` → `requestPost2`),按 pr
 
 ### 3.4 男端接收也会发 TIM
 
-女方接受后 PWA 发 `freeExchangeSend`(字段见 §1.3)。对端收到 `ExchangeSendMessage` 且 `isInsLoggedIn === true` 时(`:197-201`)走 `handlePeerAccepted()`(`:543-580`):
+女方接受后 PWA 发 `freeExchangeSend`(字段见 §1.4)。对端收到 `ExchangeSendMessage` 且 `isInsLoggedIn === true` 时(`:197-201`)走 `handlePeerAccepted()`(`:543-580`):
 
 ```
 finishAndFollowInsExchangeOrder(orderId, peerUserId)
@@ -246,7 +275,7 @@ finishAndFollowInsExchangeOrder(orderId, peerUserId)
 
 > ⚠️ 若此时 `isInsLoggedIn === false`,**该消息被直接丢弃且无补偿**,只能靠 `listUserInsExchangeOrder` 的 `isFollowOrder` 分支救回。
 
-另外 CE 服务端会发 §1.6 的 3 条系统 TIM。
+另外 CE 服务端会发 §1.7 的 3 条系统 TIM。
 
 ### 3.5 PWA 批量接受接口
 

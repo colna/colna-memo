@@ -98,6 +98,35 @@ tags: [troubleshooting, sitin-next, app-pwa, tim, chat]
 > 前端侧口径(`services/outgoingCallOrder.ts`):`taskId` 由 videoTips service 发起时 `setPendingVideoTipsTaskId` 登记、结束时 `takePendingVideoTipsTaskId` **一次性取走**(校验对端匹配 + 未过期,否则丢弃残留),只有 videoTips 通话才带;**所有真的拨出去过的主叫结束都带**(接通/拒接/忙线/未接/取消都算任务完成),没拨出去的(权限拒/建单失败)走不到那里。发送成功后才 emit `VIDEO_TIPS_CALL_RECORDED` 删卡,发失败不删卡、可重来。
 - **兜底选会话的 effect 也走 `handleSelectConversation`**,同样会被锁拦 —— 当前会话不在列表时本该自愈却被拦住,是既有隐患。
 
+## ⭐ 自定义消息类型:`description` 标签写错不报错,消息静默消失(2026-07-24)
+
+TIM 原生只有 `TIMTextElem` / `TIMImageElem` / `TIMSoundElem` 等几种元素,**所有业务卡片(礼物、通话、交换、videoTips…30+ 种)都塞进万能的 `TIMCustomElem`**,靠 `payload.description` 这个字符串标签区分。`CustomDescription` 枚举(`types/chatMessage.ts:41-73`)就是把这些魔法字符串收敛成常量,收发两端共用。
+
+```
+TIMCustomElem
+└─ payload
+   ├─ description: "freeExchangeRequest"   ← 业务类型标签
+   └─ data: "{\"orderId\":123,...}"        ← 业务数据,JSON 字符串
+```
+
+**一个标签决定三件事**:
+1. **用哪个类解析** —— `formatMessage()` 工厂(`:687-748`)按 `description` switch 出对应 class
+2. **渲染成什么气泡** —— class 的 `type` 决定走哪个 bubble 组件;`belongsToChatMsg = false` 的(如 `ExchangeSystemMessage`)根本不进聊天列表
+3. **离线推送文案** —— `IMManager.sendCustomMessage`(`:596`)拿 `description` 查 `descriptionMessageTypeMap` 自动生成 offlinePushInfo
+
+**坑**:`formatMessage` 的 `default` 分支返回 `UnknownMessage`,**不抛错、不告警**。所以标签拼错 / 漏加 case 的表现是「消息发出去了、对端 SDK 也收到了、但界面上什么都没有」,极难从现象反推。
+
+**修法 —— 新增一种自定义消息,三处必须同步加,漏一处就静默失效**:
+| # | 位置 | 漏了会怎样 |
+|---|---|---|
+| 1 | `CustomDescription` 枚举常量 | 发送端只能写裸字符串,易拼错 |
+| 2 | `formatMessage()` 的 `case` | 收到后变 `UnknownMessage`,**不渲染** |
+| 3 | `bubbles/` 对应组件 + `MessageType` | 解析出来了但没有 UI |
+
+**排查姿势**:界面没消息时,先在 `formatMessage` 的 `default` 分支打点看 `desc` 实际值,而不是去查网络/缓存。
+
+**历史别名要认得**:同一种消息常有两代 desc 并存(如 `insExchangeRequest` / `freeExchangeRequest`),`formatMessage` 里两个 `case` 落到同一个类,**渲染完全一致**。别被命名骗了以为是两种消息 —— 交换那 6 个标签实际只有 3 种角色(Request 邀请卡 / Send 回执卡 / System 通知),每种两个别名。详见 [ce-ins-exchange-tim-and-api](../ce-ins-exchange-tim-and-api.md)。
+
 ## 排查这块问题的姿势
 
 - 全链路统一 tag 打点(`vtLog` → `[VideoTipsFlow]`),vConsole 搜一个词看完时间线:发卡 → TIM 到达 → 写缓存 → reclaim → 渲染 → 点击 → 通话 → phone_call_message → 删卡 → 清缓存。
