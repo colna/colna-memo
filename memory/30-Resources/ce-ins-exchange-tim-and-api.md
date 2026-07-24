@@ -12,6 +12,9 @@ tags: [reference, sitin-next, app-pwa, contact-exchange-service, ce, instagram, 
 > - Proto:`sitin-next/packages/business-pwa-proto/proto/archat_api/{user_api,contact_exchange_api}.proto`
 >
 > 相关:[[ce-ins-exchange-flow]](流程图 + 与需求文档的冲突清单)
+>
+> **飞书版(可分享给同事)**:[PWA CE 梳理](https://presence.feishu.cn/wiki/VZWFwof1ei54CNkOaoCc8JYdn4f)
+> 内容与本文同源;差别是 §5 的流程在飞书里是 3 张 mermaid 画板。**改动请以本文为准,改完再同步过去**(转换要点见 [[troubleshooting/lark-cli-auth-and-perms]] §6)。
 
 ---
 
