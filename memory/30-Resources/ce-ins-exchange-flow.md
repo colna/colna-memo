@@ -200,7 +200,45 @@ for (const u of response.followedUserinfo) { await startRobot({...}, isFirstTime
 | `components/InsExchangeModal.tsx` | 批量 Accept 弹窗 |
 | `utils/insExchangeQueue.ts` | 串行队列 |
 
-## 7. 方法论
+## 7. CE 后端（`contact-exchange-service`，2026-07-24 补）
+
+仓库 `git@github.com:presence-io/contact-exchange-service.git`（Kotlin + Spring Boot + R2DBC + gRPC:9096），定位是**把 dora 单体里的 CE 逻辑拆出来复刻**，源码里到处写「复刻 dora XXX」。
+
+### 7.1 服务端只发 3 条 TIM（`push/TimPushService` + `push/CeNotificationService`）
+
+走 TIM REST `POST /v4/openim/sendmsg`，admin 账号 `administrator_unread_enabled`，`SyncOtherMachine=2` / `OnlineOnlyFlag=0`，`TIMCustomElem` 的 `Desc` 即 CustomDescription、`Data` 是 JSON 串。
+
+| 场景 | Desc | content 字段 |
+|---|---|---|
+| 反欺诈退款 `notifyFraudRefund` | `insExchangeRequest` | `orderId` / `coins` / `content` |
+| 过期退款 `notifyExpiredRefund` | `insExchangeSystem` | `orderId` / `coins` / `content` + OfflinePush `Exchange failed😢.Received %s coins refund.` |
+| DH 交换请求 `notifyDhExchangeRequest` | `insExchangeRequest` | `giftId:"rose"` / `insAvatar` / `insAccount` / `orderId` / `expireTimestamp` / `pwafollowReward` / `orderStatus:"unpaid"` |
+
+**男方真人下单那条 `insExchangeRequest` 不在本仓库**——CE 只在「DH / 退款」两类系统场景发 TIM，正常男方下单的卡片由男端 App / dora 侧发出。
+
+### 7.2 ⚠️ Blurred Card V2 三接口不在 CE 仓库
+
+`CheckBlurredCardCondition`(21016/17) / `SendBlurredCardGift`(21018/19) / `CreateBlurredCardOrder`(21020/21) 在 CE 仓库 grep **零命中**，仍在 dora/user-service。CE 目前只复刻了 ins exchange order 那一套（20+ RPC）。判断「女主动」逻辑改哪里时别找错仓库。
+
+### 7.3 阈值与默认值（`CeProperties`，可被 yaml 覆盖）
+
+`notInsPwaChatRound=200` · `insPwaMinCoin=500` · `pwaSendChatRound=5` · `notInsPwaOrDhChatRound=20` · `defaultExpireSeconds=86400` · 礼物 `firstOrder=id_watch/150`、`default=roses/450` · 官方号 `iranoble49` · 过期扫描 cron `0 * * * * *`（每分钟）。
+
+### 7.4 订单状态机与 checkCondition
+
+`INIT`（素人占位，100 年过期）→ `PAID`（男方付款，24h）→ `FINISH`（`followed` 区分是否已关注）；旁支 `REJECT`（退款）/ `REFUNDED`（Scheduler 过期退款）。
+`checkInsExchangeCondition` 先查历史订单（FINISH→COMPLETED；INIT/PAID 未过期→PROCESSING），再按 isInsPwa 走 chemistry 金币消费 / 聊天轮次阈值。`getInsExchangeConditionInfo` 是 PWA 专用详情版（`leftChatRound` / `leftTriggerCount`），带 Byteplus `ins_test_switch` 门控 + meetup 捷径 —— **但 PWA 侧已是死代码**，实际走 Blurred Card。
+
+### 7.5 定时任务只有一个
+
+`InsExchangeScheduler.processExpiredOrders`，每分钟扫 `findExpiredOrders` → `refundOrder`，PAID 单退款后发过期 TIM。**没有任何「定期问女方要不要交换」的服务端轮询** —— 女主动完全由 PWA 端按聊天轮次驱动。
+
+### 7.6 完成交换后的下游
+
+`finishOrder` 事务提交后 fire-and-forget 发 Kafka `ce.exchanged`：
+`{creatorId(女), userId(男), platform:"ig", userIgHandle, creatorIgHandle, exchangedAt}` → social-proxy 消费触发 FOLLOW_BACK。这与 §4.3「谁去 follow」的矛盾仍然成立：PWA 侧同时还自己 `startRobot()`。
+
+## 8. 方法论
 
 - **画板是需求文档里信息密度最高的部分**，`docs +fetch` 只会返回 `<whiteboard token="...">` 标签。必须 `docs +media-download --token <t> --type whiteboard --output <相对路径>` 导出成图再读（画板**只能**走这个，不能用 `+media-preview`）。
 - 流程图渲染：`npx @mermaid-js/mermaid-cli`，配 `-p puppeteer.json` 指系统 Chrome、`themeVariables.fontFamily` 指 `PingFang SC` 免中文方框。**一张 16 层深的图会渲成 1:3.2 的瘦长条，在飞书里等于没法看** —— 按语义拆图（本文拆点选在 `Promise.all`，即「拿钱/干活」分水岭）。
