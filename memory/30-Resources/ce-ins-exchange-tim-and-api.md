@@ -397,48 +397,74 @@ handleAcceptAll()
 
 ## 5. 完整流程
 
-```
-【入口 A】男方 App 内付费下单(PWA 不可见)
-  └→ CE createAndPayInsExchangeOrder
-       事务: lockUserCoin → existOrderProcessing → INSERT(PAID, +24h) → deductCoin
-       事务后: logCoinChange / delCoinConsume / resetChatRound / handleMeetupCooldownBlacklist
-  └→ TIM insExchangeRequest ────────────────┐
-                                            │
-【入口 B】女方 PWA 聊天满一轮(对方发→我回)  │
-  └→ getPeerUserInfo(必须 UserType.User)    │
-  └→ checkBlurredCardCondition → eligible    │
-  └→ createBlurredCardOrder → orderId        │
-  └→ TIM freeExchangeRequest ───────────────┤
-  └→ 礼物 x N + sendBlurredCardGift          │
-                                            │
-                          女端收到,只当信号 ▼
-                     checkPendingOrders()
-                       └→ listUserInsExchangeOrder()   ← 权威
-                       └→ isInsLoggedIn ?
-                            false → 存 modal / 等待小崽启动
-                            true  → dispatchInsExchangeOrders()
-                                     ├ isFollowOrder → handlePeerAccepted()
-                                     └ 其他          → handleAcceptExchange()
-                                            │
-        ┌───────────────────────────────────┴───────────────────────────────┐
-     Accept                                                              Reject
-  finishAndFollowInsExchangeOrder                                rejectInsExchangeOrder
-   ├ checkFraud(chat_meetup 已确认约会 + 真 INS PWA → 强制退款+BLOCKED)      ├ PAID → REJECT
-   ├ 事务: lockBalance → finishAndFollow → addBalance → recordBalanceChange  └ 同步 refundOrder
-   ├ 事务后: removeBlackUser(MUTED) / 发 Kafka ce.exchanged                  └ TIM freeExchangeSystem
-   └ 返回 earnedAmount / maxEarnedAmount        💰 不可逆
-        │
-        ├→ TIM freeExchangeSend(带女方 IG 号)
-        ├→ updateMessageStatus("agreed")
-        └→ startRobot() → APK SocialProxyWebView → instagram.com + app-ins-scripts
-                                                    真实 follow + 发招呼
-                                            │
-                            男端收到 freeExchangeSend
-                              └→ handlePeerAccepted → finishAndFollow + startRobot
-                              └→ updateMessageStatus("followed")
+### 5.1 请求下发 —— 双入口
 
-【超时】CE Scheduler 每分钟 findExpiredOrders → refundOrder → REFUNDED
-        PAID 单退款后发 TIM insExchangeSystem + 离线推送
+```mermaid
+flowchart TB
+    A["男方 App 内付费下单"] --> A1["CE createAndPayInsExchangeOrder"]
+    A1 --> A2["事务 lockUserCoin / INSERT PAID 24h / deductCoin"]
+    A2 --> A3["事务后 logCoinChange / resetChatRound / meetup 黑名单"]
+    A3 --> T1["TIM insExchangeRequest"]
+
+    B["女方 PWA 聊天满一轮 对方发我回"] --> B1{"目标是真人 UserType.User"}
+    B1 -- 否 --> BX["跳过 不触发"]
+    B1 -- 是 --> B2{"checkBlurredCardCondition eligible"}
+    B2 -- 否 --> BR["移出 exchangedUsers 下一轮重试"]
+    B2 -- 是 --> B3["createBlurredCardOrder 得 orderId"]
+    B3 --> T2["TIM freeExchangeRequest PWA 自己发"]
+    T2 --> B4["非关键路径 埋点 连发礼物 sendBlurredCardGift"]
+
+    T1 --> C["女端收到 只当 invalidate 信号"]
+    T2 --> C
+    C --> C1["checkPendingOrders"]
+    C1 --> C2["listUserInsExchangeOrder 权威数据源"]
+```
+
+### 5.2 女端接单 → 发钱 → 回执闭环
+
+```mermaid
+flowchart TB
+    C2["listUserInsExchangeOrder 权威列表"] --> D{"isInsLoggedIn"}
+    D -- false --> D1["InsExchangeModal 弹窗 等小崽启动"]
+    D -- true --> D2["dispatchInsExchangeOrders"]
+    D1 -. 用户点 Accept .-> D2
+    D2 --> E{"createUserId 是我"}
+    E -- 是 isFollowOrder --> F["handlePeerAccepted"]
+    E -- 否 --> G["handleAcceptExchange"]
+    G -. 用户点 Reject .-> R["rejectInsExchangeOrder"]
+
+    F --> H["finishAndFollowInsExchangeOrder"]
+    G --> H
+    H --> H1{"checkFraud 已确认约会且真 INS PWA"}
+    H1 -- 是 --> HX["强制退款 BLOCKED 发反欺诈 TIM"]
+    H1 -- 否 --> H2["事务 lockBalance finishAndFollow addBalance"]
+    H2 --> H3["事务后 解除 MUTED 发 Kafka ce.exchanged"]
+    H3 --> H4["返回 earnedAmount 钱已发不可逆"]
+
+    H4 --> I1["TIM freeExchangeSend 带女方 IG 号"]
+    H4 --> I2["updateMessageStatus agreed"]
+    H4 --> I3["startRobot 起 APK 小崽真实 follow"]
+
+    R --> R1["PAID 转 REJECT 同步退男方金币"]
+    R1 --> R2["TIM freeExchangeSystem reason decline"]
+
+    I1 --> J{"对端 isInsLoggedIn"}
+    J -- false --> JX["消息被丢弃 无补偿"]
+    J -- true --> J1["handlePeerAccepted 完成订单并 follow"]
+    J1 --> J2["updateMessageStatus followed"]
+```
+
+### 5.3 异常支线 —— 过期退款
+
+```mermaid
+flowchart TB
+    S["CE InsExchangeScheduler 每分钟"] --> S1["findExpiredOrders"]
+    S1 --> S2{"有过期单"}
+    S2 -- 无 --> S0["本轮结束"]
+    S2 -- 有 --> S3["refundOrder 退男方金币 状态转 REFUNDED"]
+    S3 --> S4{"原状态是 PAID"}
+    S4 -- 是 --> S5["TIM insExchangeSystem 加离线推送退款文案"]
+    S4 -- 否 --> S6["仅退款 不发 TIM"]
 ```
 
 ---
