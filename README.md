@@ -16,7 +16,7 @@
 ```
 
 - **Git 为唯一真源**:所有内容是 `memory/` 下的 Markdown,走 git 跨设备同步。
-- **zvec 为派生索引**:每台设备本地用 [zvec](https://github.com/alibaba/zvec) 建语义向量索引,
+- **zvec 为派生索引**:每台设备本地用 [zvec](https://github.com/zvec-ai/zvec-rust) 建语义向量索引,
   索引文件 `.colna/` **不入 git**,可随时由 `colna index` 重建。
 - 这样绕开了嵌入式向量库"单进程写"的限制,不存在多设备写同一 DB 的冲突。
 
