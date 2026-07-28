@@ -29,6 +29,17 @@ tags: [爬虫, 京东, 反爬, playwright, 报价]
 
 **结论**:裸环境(无登录 + 可能被标记 IP)连商品页都进不去。**这个项目真实成本是「风控对抗」不是写代码。**
 
+## 关键更新(2026-07-28 晚):带真实登录 cookie 仍被风控拦
+
+用户提供了真实 H5 登录 cookie(含 thor/pin=jd_5cd6de89bb77a/_pst + 设备指纹 3AB9D23F7A4B3C9B/shshshfpb)。
+
+- curl 带 cookie 调 `productPageComments`:从「系统繁忙」→ 返回 `{}`(**登录态生效但缺 h5st 签名**,拿不到数据)。
+- **Playwright(有头 + stealth + 注入 cookie)打开 `item.m.jd.com/product/SKU.html` 仍落地 `risk_handler` 风控页。**
+
+**根因(重要)**:京东风控 = 登录态 + **设备指纹(3AB9D23F/shshshfpb)** + IP + 自动化检测(`is_headless_browser`)四重绑定。cookie 绑原始设备,拿到异环境(不同 IP/浏览器指纹/自动化 Chrome)复用直接被识别拦截。**cookie 救不了异环境。**
+
+**结论:独立服务器爬虫方案不成立。** 正确产品形态 = **在用户自己已登录、未被风控的真实浏览器里跑**(油猴脚本 / 浏览器扩展 / Console hook fetch+XHR 抓 mp4),等于用户本人操作,绕开全部风控。报价与交付物应按"浏览器扩展/脚本"重定义,而非服务器 API。
+
 ## 突破方向(按有效性)
 
 1. **登录态 cookie(最有效)**:账号扫码登录一次,持久化 context 复用,登录用户风控宽松。
