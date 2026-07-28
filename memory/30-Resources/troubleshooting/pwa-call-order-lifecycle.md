@@ -132,3 +132,9 @@ review 列的 finding 到动手时**逐条对当前代码复核**，别照单全
 
 - 现有主动外呼实现见 [[tuicallkit-web-ui]]、[[../../50-Daily/2026-07-07]]（PR #540）、[[../../50-Daily/2026-07-12]]（orderId 走 userData）。
 - 女方钱包/计费口径 [[../pwa-female-wallet-billing]]、reasonType 由男方 App 上报 [[../grafana-loki-query-manual]] §6。
+
+## 2026-07-27 常驻 WebView 生命周期 / videoTips 删卡 / 弹窗接口不发
+
+- **native 通话页是原生的,`useNativeCall` 挂常驻主 WebView、通话结束不卸载** → 通话期定时器/循环别只靠 unmount cleanup 停,必须用**权威的 store `callState`**(CallManager 结束时可靠置 Idle)做**自愈守卫**(非 Connected 即自停)。已知同类循环:useVoiceModeration(静音违规)、useVideoScreenshotViolation(截图判罚)。isEnded 守卫/END 事件都可能漏,不可靠。(修:#734)
+- **videoTips 删卡靠模块级 `recorded` 标志**(不是 taskId);原先只由 `VIDEO_TIPS_CALL_RECORDED` 置,而它串在「关单响应 → 发 phone_call_message」之后 → 卡片置灰 ~3s 才删。**在 `onStop` 提前置 `recorded=true`** 即可与 phone_call_message 解耦、接通类通话结束重挂即删。(修:#743)
+- **排查「某接口没调用」**:优先看**调用处守卫早退**(ids 是否为空)+ 传参源头是否**写死 null**。实测亲密度弹窗 `selfUserInfo={null}` 写死 → 弹窗自身 checkFreeExchangeCondition 与 Record→getIntimacyHistory 都因缺 selfUserId 不发。注意弹窗类组件在 `ChatModals`(memo)里,不在 ActiveChat。(修:#741)

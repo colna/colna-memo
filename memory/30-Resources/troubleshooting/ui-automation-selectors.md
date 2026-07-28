@@ -339,3 +339,13 @@ contentVersion  录制时的脚本版本      ← 排查先看它
 - 找错了 → **执行了另一个动作**,而且每步都显示成功
 
 给任何兜底加「宁可命中点什么」的退路前,先问:命中错的会发生什么?
+
+## 2026-07-27 IG toProfessionalAccount 踩坑(app-ins-scripts)
+
+- **`utils.simulateClick` 会一次触发 2~3 次点击**(合成事件链 + 原生 `el.click()` + 直接调 React `onClick`)。IG/React「点一次进一步」的向导按钮用它会**一次跳过好几步**(真机现象:脚本冲到成功页跳过类别,手动却一步步)。→ 向导「下一步/完成/继续」用**单次 `el.click()`**(`clickOnce`);radio 选择保持 simulateClick(选中幂等无害)。
+- **判「到没到某页」不能看子元素数**:IG 类别选项**懒加载**,radiogroup 先挂空壳再填。判到页看**容器存在**,再轮询等选项渲染。
+- **向导主按钮点前必查 `disabled`**:选够条件才解禁,盲点无效。
+- **radio 的 `aria-label`/`value` 常是数字 id**(类别 2201=产品/服务),可见文案在同行 span → 匹配要**兼顾文案与 id**。
+- **新增 method 两步**:①`src/instagram/methods/<name>.js` 挂 `window.SocialProxy.<name>` ②`scripts/build.mjs` GROUPS.automation 加 `m:<name>`。dispatch 是 `SP[action]` 泛化,无白名单。
+- **文案进共享 `utils.LABELS`(中/英/西)**,用 `matchLabelLoose`,别在 method 内硬编码数组。
+- **判断容器跑没跑最新代码看日志格式/新字段**:改完 dist 型产物必须 `node scripts/build.mjs` 重建 + **重新注入** bundle;光看行为易误判成逻辑 bug,其实是 dist 没更新。
