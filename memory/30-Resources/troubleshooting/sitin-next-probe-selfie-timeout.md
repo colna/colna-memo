@@ -32,7 +32,9 @@ onClose();       // → dismissPhoto = dismiss(report=true) → task_abandoned +
 
 ## 修法
 
-### 前端(已改 `feature/sitin4.0.1`,4 文件,未 commit)
+> 状态:前端修复已 **merge**(PR #758,merge commit `3c40e362`)进 `feature/sitin4.0.1`;后端 follow-up 未做。
+
+### 前端(PR #758 已 merge,4 文件)
 - `PhotoTaskDrawer.done` / `VoiceTaskDrawer.send`:`const ok = await onSent?.(...); if (ok !== false) onClose();`(`useLockFn` 防连点)。发送成功才关、失败保持打开可重试。
 - `ProbeTaskDrawers.tsx`:加模块级 `const sentProbes = new Set<number>()`;`handlePhotoSent/handleVoiceSent` 改 async、`await onSendImage/Voice`、成功 `sentProbes.add(id)` 并 `return ok`,**不再自己 dismiss**;`dismiss` 的 report 块加守卫 `report && !(id && sentProbes.has(id))` —— 已发送的那次 onClose 静默关(不 `task_abandoned`、不 `onDismiss/reportTimeout`)。
 - `index.tsx` `onSendImage/onSendVoice`:补 `return ok`(`sendImage/sendVoice` 本就返回 `Promise<boolean>`)。
