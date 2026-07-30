@@ -297,3 +297,34 @@ override fun onStart(
 `app-pwa` **没有测试框架**(全仓其他包有 vitest)。这轮 20 条状态机断言是用 `npx esbuild` 把模块转成 esm、在 node 里 stub 掉 `document`/`localStorage`/`requestAnimationFrame` 跑的,脚本放 scratchpad 不进仓库。
 
 **stub `requestAnimationFrame` 必须异步**:模块用 `kbRaf` 做每帧合并,回调若同步跑,`kbRaf = requestAnimationFrame(cb)` 的赋值会覆盖回调里的复位,之后 `if (kbRaf) return` 永久短路 —— 会造成 10 条假失败。
+
+
+## 14. 「输入条偶高偶低」二刷:又删了 max 兜底(重踩 §13 坑一)+ 最终改用「过抬 + 白裙边」
+
+来源:sitin-next app-pwa,PR [#775](https://github.com/presence-io/sitin-next/pull/775)(2026-07-29,`utils/keyboardLift.ts` + `components/ChatInputBar.tsx`)。用户报「输入条偶尔被键盘盖、偶尔留缝,尤其切后台回来变矮」。
+
+### ⭐⭐ 元教训:动 keyboardLift 前先读本笔记 §12/§13
+
+我这轮的**主要弯路是重踩了 §13 坑一**:判断「历史最大值兜底是遮羞布、原生上报可信」→ 提 PR 删掉 `max(本次, lastKbFullHeight)`(#773)→ resume 立刻变矮。而 §13 坑一(07-21 写的)白纸黑字:**「两条路径共享 `lastKbFullHeight`,别删,它防的是 native 上报本身不可靠」**。CLAUDE.md 的「先查再写」就是为这个 —— **改 keyboardLift 前 `colna search 键盘` 读到 §12/§13,能省掉整轮返工**。
+
+### 新结论:resume 的欠报是「inset 落定卡死」,补报非动画期变化(Android)救不了
+
+真机 `[kbLift]` 日志(见下)证:切后台回来后 `phase=start/end` **稳定报 320**(比首开 351 少 31px=一行工具栏),且 **`ime()` inset 落定后再不变化**。
+
+- 因此「在 `onApplyWindowInsets` 里补报非动画期 ime 变化」这类 Android 改法(我提过 GraceChat #91)**对 resume 无效** —— 没有「变化」可报,inset 就卡在 320。已关闭。
+- resume 时用户看到被盖 = 键盘物理还是 351、原生却报 320 = **纯欠报**。**只有前端 max 兜底(记住 351)能救**,这正是 §13 坑一的结论。
+
+### 最终方案:不追像素精度,改「过抬偏置 + 白色裙边」(稳健兜底)
+
+原生上报不可靠(§8/§13)、APK overlay 下 `visualViewport` 不动(§5),**追键盘高度像素精度这条路本质走不通**。改用工程兜底:
+
+- **过抬偏置**:`keyboardLift.ts` 的 `KEYBOARD_TOP_GAP` 用 `- KEYBOARD_TOP_GAP` 参与计算,**负值=多抬**(宁可高、不被盖)。终值取 `0`(不过抬)~ 负数按机型调。
+- **白色裙边**:`ChatInputBar` 根节点(`relative bg-white`)内加 `absolute inset-x-0 top-full bg-white`、**高度 = `var(--kb-height, 0px)`** 的白块。键盘收起 `--kb-height=0` → 高度 0、不遮 TabBar;弹起铺满输入条下方,把过抬/欠报造成的缝用白色盖住,不露底下聊天内容。
+- **白带宽度 = 过抬量 + 输入条自带 `pb-2`(8px)**。`KEYBOARD_TOP_GAP` 每 -1 → 白带/余量各 +1px。**8px 是不压进键盘的物理下限**(过抬 0、余量 0);终采用 `0`(8px 白带),真机若偶发被盖再往负调。
+- **布局校验**:底栏容器(`Chat/index.tsx` 那个 `relative shrink-0` + `KEYBOARD_LIFT_STYLE`)是聊天区 `overflow-hidden` 窗口的**兄弟、不在其内**,裙边可见段(屏幕中部的缝)不会被裁;被键盘盖/被裁的部分本就不可见。
+
+> **通用套路**:原生/系统给的量不可靠又没法在前端独立测准(overlay 键盘、visualViewport 不动)时,**别死磕精度 —— 偏一个安全方向 + 用同色元素把偏出来的缝填掉**,比追准值稳得多。
+
+### 诊断:`[kbLift]` 日志(接 §8 的浮层方法论)
+
+这轮定位靠给 `keyboardLift.ts` 临时加 `console.log("[kbLift] recv", data)` / `set --kb-height` / progress skip(vConsole 抓),真机复现「进入→输入→切后台→回前台」把行发回。**关键读法**:看 `recv` 的 `height` 在 resume 后是否掉档(351→320)、`set --kb-height` 是否跟着掉。诊断分支用完即弃、不进 PR。
