@@ -28,6 +28,17 @@ tags: troubleshooting, colna-memo, git
 - **修法**:pull 后再次运行 Git 中间态与 unmerged 检查;发现 autostash 恢复未完成就停止 reindex / push。回归测试同时覆盖二次 sync 守卫和 `rebase --abort` 后恢复本地 Memo / dirty source。
 - **教训**:Git 命令退出码 0 只证明 pull 主操作成功,不证明 autostash 已无冲突恢复。
 
+## 同一 Daily 跨环境内容分叉,rebase 撞真实冲突(2026-07-31)
+
+- **现象**:两台环境(如本机 sitin 工作区 与 metabot-workspace/colna WORK)同日各自往 `50-Daily/YYYY-MM-DD.md` 追加**不同的工作日志条目**,`git pull --rebase` 把本地那条 commit 往远端上 replay 时,同一文件出现 `<<<<<<< HEAD` 内容冲突(不是 autostash 冲突,是提交内容本身分叉)。远端还可能顺带更新了几个项目/troubleshooting 笔记,本地是旧版。
+- **安全合并手法(保留双方,不回退别人)**:
+  1. `git rebase --abort` 回到干净态(会 `Applied autostash` 恢复本地 dirty 源码)。
+  2. `git fetch origin main`。
+  3. `git reset --soft origin/main` —— HEAD 移到远端;此时本地那条 commit 的**全部**改动变 staged,会暴露出你**没打算改**的文件(远端更新过、你本地是旧版的项目笔记),**别直接提交否则回退别人**。
+  4. `git restore --staged .` 全部 unstage;`git checkout origin/main -- memory/` 把 memory/ 工作树整体对齐远端(丢弃本地对非目标文件的旧版),`src/*.rs` 等非 memory 的他人 dirty 源码不受影响。
+  5. 只把你自己的 delta(本次要追加的 Daily 条目)用 Edit 重新加回文件末尾 → `git add 该 Daily` → commit → push。
+- **教训**:跨环境写同一 Daily 必然分叉。**不要靠 rebase/autostash 自动合内容**;以远端为底 + 只重放自己的增量条目最稳。软重置后务必检查 staged 里有没有「你没改却被带上」的文件,那些是别人在远端的更新,要 checkout 远端版盖回,不能提交本地旧版。
+
 ## 全量索引内存膨胀与假完成(2026-07-31)
 
 - **根因**:`fastembed 4.9.1` 默认 batch 256,对 batches 使用 Rayon 并发;每个 ONNX Session 又启用全部 CPU 线程。1355 chunks 会同时跑多批推理,曾达到约 29.5 GB footprint / 28.6 GB swap。旧代码还会一次向 zvec 写 1355 docs,超过其 1024 单批边界。
