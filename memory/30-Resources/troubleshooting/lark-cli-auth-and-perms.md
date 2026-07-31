@@ -50,6 +50,18 @@ lark-cli auth login --device-code "<device_code>"
 
 **坑**:不能在同一轮发完 URL 立刻阻塞执行 `--device-code`(harness 在阻塞期间不会把消息发给用户)。每次重启 `auth login` 会作废上一轮的 device code。
 
+### 网页报 20001,但 CLI 实际已授权成功(2026-07-31)
+
+**现象**:用户点击授权后,浏览器最终页显示「请求不合法,错误码 20001」;但后台轮询日志已经出现 `device-flow: token response received` 和 `OK: 授权成功`。
+
+**判断方法**:不要只看浏览器最终页。先执行 `lark-cli auth list`,再用 `lark-cli auth status --verify` 服务端校验;只要 `tokenStatus: valid`、`verified: true` 且用户名正确,授权就已完成,无需重新扫码。
+
+**本次结果**:本机 profile `cli_a929bdd9c578dcba` 已登录张峥;IM 基础 scopes 有效。`im:message.send_as_user` 仍缺失,上线申请前需单独确认应用后台权限并做增量授权。
+
+### 同一 app 的 user token 不是多账号并存(2026-07-30)
+
+同一 app 下本地只保留一个 user token;给另一账号执行 `auth login` 会覆盖原账号,不是新增一套并存凭据。因此读写仅授权给张峥的文档前,必须先用 `lark-cli auth list` 核对当前账号;不对就重新走张峥的 device flow。不同 app / profile 还要分别核对,因为 user token 和 `open_id` 都具有 app 作用域。
+
 ## 4. docs `+update --content @file` 必须是 cwd 相对路径
 
 **现象**:

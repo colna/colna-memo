@@ -6,6 +6,12 @@ tags: troubleshooting, colna-memo, git
 
 # colna sync 排错
 
+## 当前 Git / SSH 约定(2026-07-31)
+
+- 工作区仓库使用**本机 SSH 配置与密钥**,遵循仓库现有 remote(通常为 `git@github.com:<owner>/<repo>.git`)。
+- 不强制改写为 `github-colna` alias,也不再依赖工作区专用 `includeIf`;提交前按仓库实际生效配置核对 `git config user.name` / `git config user.email`。
+- 下文 `includeIf` / `github-colna` 相关内容是旧机器上的历史排错记录,不代表当前执行约定。
+
 ## pull 被拒:cannot pull with rebase: You have unstaged changes
 
 - **现象**:`colna sync` 输出 `(跳过 pull:... cannot pull with rebase: You have unstaged changes)`,远端未真正拉取对齐。
@@ -15,6 +21,19 @@ tags: troubleshooting, colna-memo, git
   2. pull 加 **`--autostash`**(`git pull --rebase --autostash`),兜底任何残留的非 memory 未提交改动(如源码改动),rebase 后自动恢复。
   3. reindex 由两次合并为一次,放在 commit + pull 之后(真源状态稳定再建索引)。
 - **教训**:`git pull --rebase` 对脏工作区零容忍;封装同步命令时「先提交本地、再拉远端」是更安全的顺序,`--autostash` 是廉价兜底。
+
+## autostash 恢复冲突仍返回成功(2026-07-31)
+
+- **现象**:`git pull --rebase --autostash` 已拉取成功,但恢复本地未提交源码时产生 `UU`;Git 仍可能返回 0。旧流程会继续 reindex / push 并打印同步成功。
+- **修法**:pull 后再次运行 Git 中间态与 unmerged 检查;发现 autostash 恢复未完成就停止 reindex / push。回归测试同时覆盖二次 sync 守卫和 `rebase --abort` 后恢复本地 Memo / dirty source。
+- **教训**:Git 命令退出码 0 只证明 pull 主操作成功,不证明 autostash 已无冲突恢复。
+
+## 全量索引内存膨胀与假完成(2026-07-31)
+
+- **根因**:`fastembed 4.9.1` 默认 batch 256,对 batches 使用 Rayon 并发;每个 ONNX Session 又启用全部 CPU 线程。1355 chunks 会同时跑多批推理,曾达到约 29.5 GB footprint / 28.6 GB swap。旧代码还会一次向 zvec 写 1355 docs,超过其 1024 单批边界。
+- **修法**:应用层按 16 chunks 串行执行 embedding + zvec 写入,并显式给 fastembed `Some(batch.len())`;真实全库 108 files / 1355 chunks 实测 107.35 秒、最大 RSS 2.04 GB、swap 0。
+- **完整性**:state v2 记录格式版本、文件 hash、每文件 chunk IDs 和总数;写完 `flush → optimize → flush`,再验证 write counts、doc_count、schema 中 `text` / `embedding` 索引存在性和 vector completeness。zvec v0.5.0 的 `CollectionStats.indexes` 只列向量索引,不能用它判断 FTS 是否存在;FTS 需用 `Collection::schema().has_index("text")` 单独校验。state 缺失 / 损坏 / 旧版、索引打不开或数量 / 必需索引不符一律全量恢复,中断时不落 state。
+- **删除坑**:zvec v0.5.0 `delete_by_filter` 在当前 HNSW + FTS schema 的优化后 collection 上会成功返回但 doc_count 不变;改为按 state 中的 chunk 主键删除,`NotFound` 视为幂等成功。
 
 ## 提交前冲突标记守卫(2026-06-26 新增)
 

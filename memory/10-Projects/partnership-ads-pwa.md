@@ -44,3 +44,10 @@ tags: [sitin-next, app-pwa, partnership-ads, 任务, 技术方案]
 - lark-cli 飞书身份被「步川」顶掉(同 app 只存一个 user token),写文档报 `4030004 缺编辑权`;重新 `auth login` 用张峥扫码切回。判断真因:`docs +update` 返回 `ok:true` 但 `data.result:failed` + warnings 才是真实结果,不能只看 ok。
 - 飞书 wiki 文档写入需张峥有**可编辑**(仅可阅读能 fetch 但写入 4030004)。
 - mermaid 图用 `<whiteboard type="mermaid">…</whiteboard>` 主 Agent 直插;整篇重写用 `overwrite`(含 `<title>` 保留标题)。
+
+## 2026-07-30 实现更新
+
+- 卡片已独立为首页「Become partner」区块,位于 Win Free Cash 上方;核心闭环由 `usePartnershipAds` 持有。
+- 查询并发由 30s 时间节流改为 `useLockFn` 在途锁:上一轮结束即可再查;回前台、挂载补查、手动 Received 均可触发 `finishTask(2000)`。
+- `getCommonFinishedTasks` 的后端语义已扩展为返回带 `status` 的用户任务,不能再把返回的每条记录都视为完成。当前 `useTask.ts` 未过滤 `status`,会把 `PENDING` 的 2000 标成 finished 并隐藏卡片;前端过滤还是后端恢复只返 FINISHED 尚待定口径。
+- 若卡片未来改成复用通用任务卡,仍须保留 `usePartnershipAds` hook,否则回前台验证闭环会丢失。

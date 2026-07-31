@@ -34,6 +34,10 @@ tags: project, tauri, rust, android, instagram, snapchat, automation
 > 判断依据:bundle 顶部有 `// src/snapchat/actions/utils.js` 之类的路径注释;
 > 本仓库 `package.json` 没有任何生成 `scripts/` 的构建步骤。
 
+### app-ins-scripts 上传白名单(2026-07-30)
+
+`packages/app-ins-scripts/scripts/upload-all.mjs` 的 `SCRIPT_GROUP_MAP` 是上传白名单,不是单纯的排序表。新脚本即使已被 `build.mjs` 打进 `dist`,未登记映射仍会被静默跳过。新增脚本必须同时配置 group / order;组内 `executeAction` 保持最大 order、最后加载。`toProfessionalAccount` 已补为 automation/order 28,`executeAction` 顺延为 29。
+
 ## 项目结构
 
 ```
