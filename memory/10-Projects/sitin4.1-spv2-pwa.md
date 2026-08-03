@@ -25,8 +25,10 @@ tags: sitin4.1, spv2, ce, snapchat, app-pwa, 进度
 | | FE-1.2 登录弹窗按社媒 | ✅ 完成 | showInsModal 严格对齐 Figma 2956/3045,IG/SC 真素材 |
 | | FE-1.3 授权抽屉多社媒三态 | ✅ 完成(金额占位) | 断连触发已接(handleOpenSocialLogin/checkInsAbnormal);金额仍占位待取数 |
 | | FE-1.4 单登录态授权另一社媒卡 | ✅ 完成 | PausedCard authorizeOther,已接真实渲染链(scAuthed 判据) |
-| **2 任务系统** | FE-2.1 一次性任务 Authorize snapchat + Social Connect | ⛔ 卡后端 | 需后端 Snapchat 绑定任务 id + Social Connect 金额取数 |
-| | FE-2.2 双登录态强制 CE 交换任务 | ⬜ 未做(前端可做) | 数据源=listUserInsExchangeOrder(cardType)+platform_online;需新增阻塞卡进渲染链 |
+| **2 任务系统** | FE-2.1 一次性任务 Authorize snapchat(id 137) | ✅ 前端完成(待后端确认) | 08-03:enum/registry/标题/点击(showInsModal snapchat)+ finishTask(137)+$0.5 奖励弹窗。**待后端确认返回任务 137 及奖励金额**;Social Connect 金额取数另计 |
+| | FE-2.2 双登录态强制 CE 交换任务 | ⬜ 未做(前端可做) | 数据源=listUserInsExchangeOrder(cardType)+platform_online;需新增阻塞卡进渲染链。**当前最大前端缺口** |
+| | (增)登录弹窗授权后按平台收回+完成 | ✅ 完成 | 08-03 fix:showInsModal 用 justAuthed(存续期 false→true)驱动成功→完成→关闭;按平台选任务;IG 保留 insState 重置、SC 不重置 |
+| | (增)Chat 空状态放行 | ✅ 完成 | 08-03:授权任一社媒(igUsable‖scAuthed)即进聊天,IG 原口径不回归 |
 | **3 CE 链路+接口** | FE-3.1 女主动发卡 cardType 动态决策 | ✅ 完成 | 优先服务端 card_type,兜底 selectPrimaryPlatform(IG>SP) |
 | | FE-3.2 InsExchangeBubble 按 cardType 渲染 | ✅ 完成 | 平台名 Instagram/Snapchat 按 payload.cardType |
 | | FE-3.3 CE 接口补 cardType | ✅ 完成 | createBlurredCardOrder 传 cardType;**proto 已 regen 解除阻塞** |
@@ -44,6 +46,9 @@ tags: sitin4.1, spv2, ce, snapchat, app-pwa, 进度
 3. **Snapchat 真实授权闭环** 依赖 social-proxy-server 官网 SC 登录 + APK 回调传 platform(PWA 侧已就绪;Android p/ljb/snpachat 三端能力已支持 platform)。
 4. **InsRobotUserInfo.insId/insAvatar 未改名**(语义已泛化,彻底改名留 follow-up)。
 5. Snapchat 弹窗 SC 素材已从 Figma 导入(ic_logo_snapchat.svg / bg_snapchat_login.png);其余 SC 图后续按需补。
+6. **埋点事件名仍是 IG 名**(showInsModal 里 pwa_ins_login_button_click / pwa_earning_ins_task_page_one|two_click / pwa_perm_ig_authorization 等)——08-03 只补了 `platform` 字段区分,**彻底重命名待与数据侧对齐**;⚠️ 影响 INS 成本漏斗口径(全局记忆按内容名取数)。
+7. **登录弹窗成功页 showcase 图仍 IG**(bgInsAuth),缺 SC 素材。
+8. **taskId 137 完成依赖后端**:前端已 finishTask(137),但需后端返回该任务+奖励金额,否则奖励取 0、不弹窗。
 
 ## 关键约定 / 踩坑(本项目)
 
@@ -52,3 +57,11 @@ tags: sitin4.1, spv2, ce, snapchat, app-pwa, 进度
 - **在 sitin-next2 干活**(主树 sitin-next 有脏 proto submodule + 并行 agent worktree,避开);同一 origin。
 - rebase 换了底层 bridge.ts 后**必须重跑 tsc/lint 再 push**(曾漏跑)。
 - Figma download_figma_images 的 image dir 是**工作区根**,素材要 mv 进 sitin-next2。
+- **合 main 遇 proto submodule 冲突**(08-03):用 `git merge-base --is-ancestor A B` 判断祖先关系,谁包含对方取谁(本次 ours 19259794 ⊇ main dad3cb70);`src/gen` 是生成代码不信 auto-merge,`git checkout HEAD -- src/gen` 取超集侧再 `pnpm --filter business-pwa-proto build` 重建 dist。详见 troubleshooting/colna 无关,记在 daily 08-03。
+
+## 08-03 推送记录(PR #824)
+
+- `5bf52bcb4` feat: add snapchat authorize one-time task (id 137)
+- `293ad1e98` fix: close & complete social login modal per platform
+- `8507a8f22` feat: allow chat access when any social authorized
+- `b9674ae22` Merge origin/main(落后 72,唯一冲突 proto submodule)
