@@ -77,3 +77,11 @@ tags: troubleshooting, colna-memo, git
   另修正 `zhangzheng/.gitconfig` 注释里写错的路径(`/Users/user` → `~`)—— 那正是这次误判的源头。
 - **历史提交的作者不改**(需要 filter-branch / rebase 重写历史,得不偿失)。
 - **教训**:**「约定写在 CLAUDE.md 里」不等于「机制真的生效」。** 涉及身份/凭据的约定,要用 `git config --show-origin` 之类**查生效值**,别信文档。
+
+## 坑:sync 报「dimension mismatch, expected 768 but got 384」(2026-08-03)
+
+- **现象**:`./colna sync` 重新嵌入时报 `zvec error InvalidArgument: field[embedding] dimension mismatch, expected 768 but got 384`,索引无法写入。
+- **根因**:`./colna` 包装脚本默认 `COLNA_PROFILE=debug`,而 `target/debug/colna` 是**升级 e5-base 之前**的旧编译(e5-small,384 维);zvec 索引已由 release 二进制重建成 768 维(e5-base)。旧 debug 二进制产出 384 维向量 → 与 768 维索引字段冲突。
+- **修法**:`COLNA_PROFILE=release ./colna sync`(release 二进制是 768 维,与索引一致)。
+- **一次性彻底修**:`cargo build`(重编 debug 到 e5-base 768),或把包装脚本默认 profile 改成 release。
+- **教训**:embedder.rs 改了模型/维度后,**debug 与 release 两个二进制都要重编**,否则用哪个过期就哪个爆维度不一致。
