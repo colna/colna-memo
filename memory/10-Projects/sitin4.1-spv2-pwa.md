@@ -23,7 +23,7 @@ tags: sitin4.1, spv2, ce, snapchat, app-pwa, 进度
 | | FE-0.4 授权回调多社媒写回 | ✅ 完成 | finishPWAInsTask 补 platform;handleOpenSocialLogin 补 snapchat |
 | **1 授权登录 UI** | FE-1.1 授权卡按社媒 | ✅ 完成 | AuthorizeSocialCard(platform),已接 needsInsAuth 链 |
 | | FE-1.2 登录弹窗按社媒 | ✅ 完成 | showInsModal 严格对齐 Figma 2956/3045,IG/SC 真素材 |
-| | FE-1.3 授权抽屉多社媒三态 | 🟡 UI 完成/未接生产 | showSocialAuthDrawer,含奖励标注(Claimable/Rewards)。**生产没触发点**、金额写死 |
+| | FE-1.3 授权抽屉多社媒三态 | ✅ 完成(金额占位) | 断连触发已接(handleOpenSocialLogin/checkInsAbnormal);金额仍占位待取数 |
 | | FE-1.4 单登录态授权另一社媒卡 | ✅ 完成 | PausedCard authorizeOther,已接真实渲染链(scAuthed 判据) |
 | **2 任务系统** | FE-2.1 一次性任务 Authorize snapchat + Social Connect | ⛔ 卡后端 | 需后端 Snapchat 绑定任务 id + Social Connect 金额取数 |
 | | FE-2.2 双登录态强制 CE 交换任务 | ⬜ 未做(前端可做) | 数据源=listUserInsExchangeOrder(cardType)+platform_online;需新增阻塞卡进渲染链 |
@@ -39,7 +39,7 @@ tags: sitin4.1, spv2, ce, snapchat, app-pwa, 进度
 
 ## 未接线 / 占位(follow-up)
 
-1. **授权抽屉(FE-1.3)生产触发点缺失** —— 组件 + `showSocialAuthDrawerFromStore()` 已建,但没有代码在「授权过期/丢失」时弹它(现仅 /dev/spv2 按钮)。需接异常判定链。
+1. ~~授权抽屉生产触发~~ **已接**:断连(handleOpenSocialLogin/checkInsAbnormal)时弹,仅 expired 才弹。剩:金额取数(见 2)。
 2. **奖励金额写死** —— Claimable $X / Rewards $X / 单登录卡金额都是占位;需 `listUserInsExchangeOrder` 带 cardType 分组求和(后端已可返回 cardType,前端未接)。
 3. **Snapchat 真实授权闭环** 依赖 social-proxy-server 官网 SC 登录 + APK 回调传 platform(PWA 侧已就绪;Android p/ljb/snpachat 三端能力已支持 platform)。
 4. **InsRobotUserInfo.insId/insAvatar 未改名**(语义已泛化,彻底改名留 follow-up)。
