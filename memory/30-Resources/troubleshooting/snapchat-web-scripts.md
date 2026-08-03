@@ -123,4 +123,18 @@ sitin-next/packages/app-ins-scripts/
 - **配套铁律**:`bridge.js` 结尾**不要**再写 `window.JSBridge = window.SocialProxyBridge`(+ `.response = _onResponse`)。那句会把端的原生 JSBridge 覆盖成 JS 包装层 SocialProxyBridge(无 notifyPageAbnormal)。GraceChat ca9fe3f9 已把它注释掉,sitin-next 同步注释。
 - ⚠️ GraceChat/旧版 `checkLoginStatusIIFE.js` 头注释「notifyPageAbnormal 只挂在 AndroidBridge 上」是**过时残留**,与其自身代码矛盾,别照信。
 
-相关：[[ui-automation-selectors]] · [[social-proxy-scripts-container-app]] · [[sitin4-endchat-backend-gap]] · [[android-webview-multi-social-memory]]
+## 首次登录态检测必失败、再查才好(2026-08-03)
+
+**现象**:GraceChat 首次检查 SC 登录态一定 `type:1`(上报 notifyPageAbnormal 关会话),再查一次就正常。
+
+**根因**(`checkLoginStatusIIFE.js` + `checkLoginStatus.js`):
+1. 检测窗口太短:IIFE 原本 `INITIAL_DELAY=1000 / MAX_TRIES=3 / POLL_INTERVAL=1000`,总窗口 ~3s。`/v2/welcome` 是 Snapchat Next.js SPA,登录卡片渲染晚于 3s(日志会有 `Abort fetching component for route "/v2/welcome"` = 页面还在重载路由),3 次轮询全落空。
+2. 判定缺陷:`checkLoginStatus` 只有登录态正向信号,找不到就一律 `type=1`,**「页面没渲染好」= 「未登录」不可区分**。
+
+**端超时(重要数字)**:`PWAWebViewFragment.doCheckSocialProxyAbnormalWebview` 的 `SocialProxyPageCheckRequest.DEFAULT_TIMEOUT_MS = 30_000L`。检测 WebView 存活 30s;JS 若不在 30s 内上报,端 postDelayed 兜底以 `type:-1 error:timeout` **照样 finish 关会话**。→「不上报」不安全,但有 ~27s 空间可用。
+
+**修法**:窗口拉到 25s(< 30s)、间隔 500ms、`type=0` 命中即返回;新增正向登出信号 `isLoggedOut`(密码框/用户名输入/登录表单),且需**连续稳定 3s** 才判 `type=1`——规避已登录用户 `/v2/login→/v2/welcome` 跳转途中短暂闪现登录表单被误判。窗口耗尽才报 1。
+
+> 检测 WebView **只注入 JSBridge、无 AndroidBridge**,故 `bridge.eventTrack/log` 无效(`AndroidBridge.event 未注入`),`sp_check_login_status` 埋点在该 WebView 丢失。
+
+相关：[[ui-automation-selectors]] · [[social-proxy-scripts-container-app]] · [[sitin4-endchat-backend-gap]] · [[android-webview-multi-social-memory]] · [[pwa-video-call-native-bridge]]
