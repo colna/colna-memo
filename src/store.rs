@@ -101,28 +101,40 @@ fn build_docs(chunks: &[Chunk], embeddings: &[Vec<f32>]) -> Result<Vec<Doc>> {
     Ok(docs)
 }
 
+/// zvec 单次写入上限为 1024 条;分批写入时留余量,避免全量重建时一次 insert 超限失败。
+const MAX_WRITE_BATCH: usize = 512;
+
 /// 批量写入(全量重建用 insert):chunks 与 embeddings 一一对应。
+/// 按 MAX_WRITE_BATCH 分批,规避 zvec「超过 1024 条」硬上限(全量重建 1000+ 块必踩)。
 pub fn insert_chunks(
     collection: &Collection,
     chunks: &[Chunk],
     embeddings: &[Vec<f32>],
 ) -> Result<usize> {
     let docs = build_docs(chunks, embeddings)?;
-    let refs: Vec<&Doc> = docs.iter().collect();
-    let res = collection.insert(&refs)?;
-    Ok(res.success_count as usize)
+    let mut total = 0usize;
+    for batch in docs.chunks(MAX_WRITE_BATCH) {
+        let refs: Vec<&Doc> = batch.iter().collect();
+        let res = collection.insert(&refs)?;
+        total += res.success_count as usize;
+    }
+    Ok(total)
 }
 
-/// 批量 upsert(增量更新用):按主键 id 覆盖或新增。
+/// 批量 upsert(增量更新用):按主键 id 覆盖或新增。同样分批,防单次变更文件过多超限。
 pub fn upsert_chunks(
     collection: &Collection,
     chunks: &[Chunk],
     embeddings: &[Vec<f32>],
 ) -> Result<usize> {
     let docs = build_docs(chunks, embeddings)?;
-    let refs: Vec<&Doc> = docs.iter().collect();
-    let res = collection.upsert(&refs)?;
-    Ok(res.success_count as usize)
+    let mut total = 0usize;
+    for batch in docs.chunks(MAX_WRITE_BATCH) {
+        let refs: Vec<&Doc> = batch.iter().collect();
+        let res = collection.upsert(&refs)?;
+        total += res.success_count as usize;
+    }
+    Ok(total)
 }
 
 const OUTPUT_FIELDS: &[&str] = &["id", "source_path", "title", "heading", "tags", "date", "text"];
