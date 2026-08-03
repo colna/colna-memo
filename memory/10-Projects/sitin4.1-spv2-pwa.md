@@ -25,12 +25,12 @@ tags: sitin4.1, spv2, ce, snapchat, app-pwa, 进度
 | | FE-1.2 登录弹窗按社媒 | ✅ 完成 | showInsModal 严格对齐 Figma 2956/3045,IG/SC 真素材 |
 | | FE-1.3 授权抽屉多社媒三态 | 🟡 UI 完成/未接生产 | showSocialAuthDrawer,含奖励标注(Claimable/Rewards)。**生产没触发点**、金额写死 |
 | | FE-1.4 单登录态授权另一社媒卡 | ✅ 完成 | PausedCard authorizeOther,已接真实渲染链(scAuthed 判据) |
-| **2 任务系统** | FE-2.1 一次性任务 Authorize snapchat + Social Connect | ⬜ 未开始 | taskRegistry 加条目 |
-| | FE-2.2 双登录态强制 CE 交换任务 | ⬜ 未开始(**已解阻塞**) | platform_online 现可用;授权+在线+订单社媒判定 |
+| **2 任务系统** | FE-2.1 一次性任务 Authorize snapchat + Social Connect | ⛔ 卡后端 | 需后端 Snapchat 绑定任务 id + Social Connect 金额取数 |
+| | FE-2.2 双登录态强制 CE 交换任务 | ⬜ 未做(前端可做) | 数据源=listUserInsExchangeOrder(cardType)+platform_online;需新增阻塞卡进渲染链 |
 | **3 CE 链路+接口** | FE-3.1 女主动发卡 cardType 动态决策 | ✅ 完成 | 优先服务端 card_type,兜底 selectPrimaryPlatform(IG>SP) |
 | | FE-3.2 InsExchangeBubble 按 cardType 渲染 | ✅ 完成 | 平台名 Instagram/Snapchat 按 payload.cardType |
 | | FE-3.3 CE 接口补 cardType | ✅ 完成 | createBlurredCardOrder 传 cardType;**proto 已 regen 解除阻塞** |
-| | FE-3.4 CE 机器人调度按社媒分支 | ⬜ 未开始 | useInsTaskInit startRobot 透传 platform |
+| | FE-3.4 CE 机器人调度按社媒分支 | ✅ 完成 | startRobot 按订单 cardType 拉对应平台小崽 |
 
 ## 已完成的「实质逻辑」vs「仅 UI」区分
 
