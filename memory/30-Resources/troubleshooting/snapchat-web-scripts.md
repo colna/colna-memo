@@ -114,4 +114,13 @@ sitin-next/packages/app-ins-scripts/
 - **pre-push** = 全量 `pnpm test`，会被 `business-minerva-upgrade` 挡住（`@presence-io/datatester` 所在私有 registry `nexus.sitinai.com` 需内网）。**turbo 会把被中断的其它任务一并标记 ELIFECYCLE** —— 逐包 `--filter` 单跑才能分清「真失败」与「被连坐」
 - `git cherry-pick` **不触发 pre-commit hook**，lint / circular / build 要手动补跑
 
-相关：[[ui-automation-selectors]] · [[social-proxy-scripts-container-app]] · [[sitin4-endchat-backend-gap]]
+## notifyPageAbnormal 上报走 `window.JSBridge`,不是 `AndroidBridge`(2026-08-03 核对端源)
+
+登录态异常上报(`checkLoginStatusIIFE.js` 的 `notifyAPK`)**必须走 `window.JSBridge.notifyPageAbnormal`**,不能用 `window.AndroidBridge.notifyPageAbnormal`。核对 `GraceChat-Earn-Android` 端源结论:
+
+- `notifyPageAbnormal` 原生实现 + 注入在 **`PWAWebViewFragment.kt`**:端为「social-proxy 异常检测 WebView」`addJavascriptInterface(object{@JavascriptInterface notifyPageAbnormal(payload)}, "JSBridge")`。**checkLoginStatusIIFE.js 就跑在这个检测 WebView**,所以 `window.JSBridge.notifyPageAbnormal` 是真·原生能力(端收到后据 `type≠0` 定向关平台会话)。
+- 抓取用的 SocialProxy WebView(`WebViewManager.kt`)**只注入 `"AndroidBridge"`**;`AndroidBridge.kt` 的 @JavascriptInterface **没有 notifyPageAbnormal**(只有 onResult/scriptEvent/log/request/event/finish/changeStepText/requestHttp/getLastMessageId/uploadMessages/isFullSyncDone/setFullSyncDone)。→ 用 AndroidBridge 上报永远走 `else` 打 warn、异常态漏报。
+- **配套铁律**:`bridge.js` 结尾**不要**再写 `window.JSBridge = window.SocialProxyBridge`(+ `.response = _onResponse`)。那句会把端的原生 JSBridge 覆盖成 JS 包装层 SocialProxyBridge(无 notifyPageAbnormal)。GraceChat ca9fe3f9 已把它注释掉,sitin-next 同步注释。
+- ⚠️ GraceChat/旧版 `checkLoginStatusIIFE.js` 头注释「notifyPageAbnormal 只挂在 AndroidBridge 上」是**过时残留**,与其自身代码矛盾,别照信。
+
+相关：[[ui-automation-selectors]] · [[social-proxy-scripts-container-app]] · [[sitin4-endchat-backend-gap]] · [[android-webview-multi-social-memory]]
