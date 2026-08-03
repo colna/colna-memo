@@ -185,7 +185,8 @@ fn full_rebuild(
     if !chunks.is_empty() {
         println!("加载 embedding 模型(首次会下载)...");
         let mut emb = embedder::Embedder::new()?;
-        let texts: Vec<String> = chunks.iter().map(|c| c.text.clone()).collect();
+        // 用上下文增强文本嵌入(标题·日期·面包屑+正文);展示/FTS 仍用原 text
+        let texts: Vec<String> = chunks.iter().map(|c| c.embed_text.clone()).collect();
         println!("生成向量中...");
         let vectors = emb.embed_passages(&texts)?;
         let n = store::insert_chunks(&collection, &chunks, &vectors)?;
@@ -237,7 +238,8 @@ fn incremental(
     if !chunks.is_empty() {
         println!("重新嵌入 {} 个内容块...", chunks.len());
         let mut emb = embedder::Embedder::new()?;
-        let texts: Vec<String> = chunks.iter().map(|c| c.text.clone()).collect();
+        // 与全量重建一致:嵌入用上下文增强文本
+        let texts: Vec<String> = chunks.iter().map(|c| c.embed_text.clone()).collect();
         let vectors = emb.embed_passages(&texts)?;
         let n = store::upsert_chunks(&collection, &chunks, &vectors)?;
         println!("✅ upsert {} 块", n);
