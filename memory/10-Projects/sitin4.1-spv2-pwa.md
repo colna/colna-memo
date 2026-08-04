@@ -63,5 +63,11 @@ tags: sitin4.1, spv2, ce, snapchat, app-pwa, 进度
 
 - `5bf52bcb4` feat: add snapchat authorize one-time task (id 137)
 - `293ad1e98` fix: close & complete social login modal per platform
-- `8507a8f22` feat: allow chat access when any social authorized
-- `b9674ae22` Merge origin/main(落后 72,唯一冲突 proto submodule)
+- `8507a8f22` feat: allow chat access when any social authorized ← **当前 head**
+- ~~`b9674ae22` Merge origin/main~~ **已撤销**(见下)
+
+## ⚠️ 08-03 教训:不要把 main 合进 base≠main 的 PR
+
+- PR #824 的 **base 是 `feat/sitin4.1`**(不是 main)。我按用户「pull 一下 main」把 origin/main 合进 head,结果 **main 相对 feat/sitin4.1 超前 72 提交 / 152 文件**全灌进 PR diff → 文件数从 **44 炸到 194**(首页 30 全是 minerva 无关代码,连累 AI review 审错对象)。
+- **修复**:`git reset --hard 8507a8f22`(合并前)+ `git push --force-with-lease` 撤销 merge,PR 回到 44 文件。
+- **规则**:给 PR「合基线」时,合的必须是**该 PR 的 base 分支**(这里是 feat/sitin4.1),**不是 main**。base≠main 时合 main 会把两者全部差异塞进 diff。下次先 `gh api .../pulls/<n> --jq .base.ref` 看清 base 再动手。
