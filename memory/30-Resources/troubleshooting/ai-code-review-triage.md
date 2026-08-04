@@ -135,3 +135,23 @@ if (!open) return null;      // ← 只是不渲染内容，组件实例【不�
 
 - 落地：PR #571（merge commit `aac2f1d0e`）
 - [[react-effect-timer-callback-dep]]（同批修的另一个 React 生命周期坑）
+
+## CI 基础设施:中转 524 / streaming / reasoning_effort(2026-08-03/04,sitin-next)
+
+> 上面讲的是「评审意见质量分诊」;这节是「让 workflow 跑出评审」的基础设施坑。sitin-next 的 `.github/workflows/ai-code-review.yml`(github-script 里 fetch 中转)切到 xingsuancode `gpt-5.6-sol` 后踩的。
+
+- **现象**:PR 上 AI Review 报 `524` + `{"error":"openai_error","type":"bad_response_status_code"}`;后来又出现「跑满 12 分钟、正文 0 字」。
+- **根因链**:`524` 是 **Cloudflare idle 超时**(实测 **~125s**),来自中转**上游**(xingsuancode 边缘是 nginx,只透传状态码;nginx 超时会给 504 不是 524)。**不是**鉴权/模型问题(小请求 200 秒回)。
+- **两个必须同时改的点**(缺一不可,实测):
+  1. **`stream: true`**:流式下推理阶段持续吐 keep-alive 块,不断重置 idle 计时器 → 根治 524(连接能活过 234s+)。
+  2. **`reasoning_effort: "low"`**:`gpt-5.6-sol` **默认推理就很重**——实测 `max`/`medium`/**不带该字段(默认)** 非流式全 524/125.5s,**只有 `low` 过**(~60s / 出内容)。
+- **「正文 0 字」= stream 开了但 reasoning_effort 还是 max/默认**:流式撑住不 524,但模型把整段预算全花在「思考」(reasoning token 不算 content),流结束正文为空。**光删掉 `max` 没用(默认就重),必须主动写 `low`。**
+- **github-script 流式写法**:非流式是 `response.json()`;流式要 `response.body.getReader()` 逐块解析 SSE(`data: {...}` → 累积 `choices[0].delta.content`,遇 `[DONE]` 结束),否则解析不到。心跳 `console.log` 进 Actions 日志便于观察。
+- **实测数字**:stream+low → **117s / 正文 7160 字 / 审 26 文件**;stream+max → 711s / 0 字;非流式任意档 → 524@125.5s。
+- **教训**:改 AI review 的模型/参数,`stream` 和 `reasoning_effort` 要**一起**改;只改注释不改值(注释写 low、值留 max)会得到「不报错但 0 字」的假成功,比 524 更隐蔽。
+
+## proto submodule 合并/更新(sitin-next,2026-08-03)
+
+- **合 main 遇 `business-pwa-proto/proto` submodule 冲突**:用 `git merge-base --is-ancestor A B` 判祖先——谁包含对方取谁(本次 ours release/test ⊇ main);`src/gen` 是生成代码**不信 auto-merge**,`git checkout HEAD -- src/gen` 取超集侧,再 `pnpm --filter @heyhru/business-pwa-proto build` 重建 dist。
+- **给 PR「合基线」要合它的 base 分支,不是无脑合 main**:PR base=feat/sitin4.1 时误合 main,把 main 相对 base 的 152 文件全灌进 diff(44→194)。先 `gh api .../pulls/<n> --jq .base.ref` 看清 base。
+- **更新 test proto**:submodule `git fetch origin release/test && git checkout <sha>` → `bash scripts/generate.sh`(protoc 在 /opt/homebrew/bin)→ `pnpm --filter business-pwa-proto build` → app-pwa `tsc -b` 验证。

@@ -63,8 +63,22 @@ tags: sitin4.1, spv2, ce, snapchat, app-pwa, 进度
 
 - `5bf52bcb4` feat: add snapchat authorize one-time task (id 137)
 - `293ad1e98` fix: close & complete social login modal per platform
-- `8507a8f22` feat: allow chat access when any social authorized ← **当前 head**
+- `8507a8f22` feat: allow chat access when any social authorized
 - ~~`b9674ae22` Merge origin/main~~ **已撤销**(见下)
+- `731bc2bfc` feat: ai code review(他人推:CI 流式 workflow,但 reasoning_effort 误留 max)
+- `c480df8e2` 交换请求弹窗多社媒化 Social Requests(figma 7268:969)
+- `3da1760d2` fix(ci): reasoning_effort max→low(修 0 字空评审)
+- `bce6f89a1` 统一多社媒可用口径 selectPlatformUsable,修状态一致性(CR 批1:App 过期放行/InsExchangeBubble/startRobot 返回值/bridge fallback)
+- `fc282c3dc` snapchat 授权 finish 流程对齐 IG(bindSocial/finishSocialBind)
+- `78c6de3b6` chore: 更新 proto 到 release/test b23ea527 + regen gen
+- `bfe22d104` 结合 CE PR#104 修 CR 批2:setInsState 删/发卡按平台取名片/批量按平台校验 ← **当前 head**
+- PR#824 标题已改为「SP V2 PWA 多社媒化(IG + Snapchat)· Phase 0/1/3 全链路」
+
+## CR 已修 / 待办(2 轮 AI Review)
+
+- **已修**:App.tsx snapchat 过期放行(selectPlatformUsable 排除 abnormal)、InsExchangeBubble 按平台判登录、startRobot 接返回值失败不置登录态、bridge legacy 降级加 `platform!=="instagram"` 守卫、showInsModal 删多余 setInsState(false)(修 IG 重连抽屉失效)、发卡 TIM payload 按 cardType 取 getContactCard(不再写死 IG 账号)、handleAcceptExchange 校验批量所有涉及平台(不只 messages[0])、getContactCard 参数 CardType→number。
+- **未改(follow-up)**:#3 bindSocial 失败继续(旧 IG best-effort 设计)、showInsModal 联合参数 overload(仓内无旧调用)、/dev/* DEV 门禁(既有惯例统一改)、CardType 本地/proto 彻底统一、insStore/bridge 单测、去 222222/333333 调试日志。
+- **卡后端(FE-2.2)**:listUserInsExchangeOrder 订单仍无 cardType、CE 交换 TaskType 未加(b23ea527 仍无)。CE PR#104 只覆盖 blurred-card/free-exchange 侧(cardType/platform_online/saveCard/getCard by type 已就绪)。
 
 ## ⚠️ 08-03 教训:不要把 main 合进 base≠main 的 PR
 
