@@ -85,3 +85,9 @@ tags: troubleshooting, colna-memo, git
 - **修法**:`COLNA_PROFILE=release ./colna sync`(release 二进制是 768 维,与索引一致)。
 - **一次性彻底修**:`cargo build`(重编 debug 到 e5-base 768),或把包装脚本默认 profile 改成 release。
 - **教训**:embedder.rs 改了模型/维度后,**debug 与 release 两个二进制都要重编**,否则用哪个过期就哪个爆维度不一致。
+
+## E5 模型升级后的 state 版本迁移(2026-08-05)
+
+- **风险**:只升级 `embedder` 的模型/维度而不改变 `.colna/state.json` 格式时,旧 384 维索引的 state 仍可能通过文件 hash、chunk 数量校验,被误判为可增量使用。
+- **修法**:把 `IndexState::FORMAT_VERSION` 从 v2 升到 v3,旧 state 自动触发干净的全量重建;重建后再执行 `flush → optimize → stats` 校验。
+- **教训**:索引 state 不只是文件增量缓存,还要视为 embedding 模型与 chunking 规则的兼容性指纹;模型或嵌入输入契约变更必须 bump 版本并配回归测试。
