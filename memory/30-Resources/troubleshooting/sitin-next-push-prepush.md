@@ -52,3 +52,16 @@ git checkout <base> && npx turbo run build --filter=<失败的包> --force
 - sitin-next 的 pre-commit 跑**全量 turbo lint**、pre-push 跑**全量 build/test**。单包改动常被**无关包既有失败**挡下:实测 `business-minerva-users` 的 `no-useless-assignment` lint error(#679 引入)、`business-minerva-upgrade#build` 失败。
 - 处理:**本包自己** `pnpm --filter <包> lint` + `tsc --noEmit -p` 验证通过后,`--no-verify` 绕过整体 hook(需用户授权;CLAUDE.md 默认禁止)。本轮多个 PR(#730/731/732/733/734/741/743)都这么走。
 - **shell 坑**:切分支命令若用 `&&` 串联且首条走了管道(`git checkout ... | tail`),管道会**吞掉非零退出码** → checkout 失败仍继续;再叠加无 `cd` 前缀 **cwd 漂移**,一次误在 colna-memo 建了 sitin-next 的分支。→ 切分支命令**带绝对 `cd` 前缀**、**别把会失败的 `git checkout` 接管道**。
+
+## 2026-08-06:`business-pwa-proto` dist 过期(切分支/pull gen 后本地 tsc 一堆假错)
+
+- **现象**:改完 app-pwa 单独跑 `pnpm --filter @heyhru/app-pwa exec tsc --noEmit`,报一堆 `Module has no exported member 'TaskType'/'ConversationState'/'HasContactCard'`、`Property 'cardType' does not exist` —— **不是自己的改动**。
+- **根因**:`business-pwa-proto` 的 **`dist`(编译产物)gitignored、不随切分支/pull 更新**,而 `src/gen`(checkin)变了 → app-pwa 引用的 `dist` 类型过期。**一天内切分支/pull gen 反复触发**(sp-snapchat↔sitin4.1、用户 push 新 gen)。
+- **修法**:`pnpm --filter @heyhru/business-pwa-proto build`(tsup 秒级)重建 dist → tsc 干净。**pre-push 的 `turbo build --affected` 会先构建依赖**,所以本地这堆假错**线上不挂**,不用慌;只是本地单独 tsc 会看到。
+- **判定**:报错文件/行是不是自己碰的?proto/gen 类型的成员缺失、cardType 缺属性 → 十有八九是 dist 过期,先 rebuild proto 再看。剩 `web-util-media`(GiftBubble/ChatFooter)同理,别的包 dist 过期同样 rebuild 或交给 pre-push。
+
+## 2026-08-06:commitlint `subject-case` 拦大写英文词开头
+
+- **现象**:`git commit` 过了 pre-commit(lint+circular)却在 commit-msg 报 `found 1 problems`,`npx commitlint` 显示 `subject must not be sentence-case, start-case, pascal-case, upper-case [subject-case]`。
+- **根因**:subject 以**大写英文词开头**(如 `fix(app-pwa): CE 完单...`,`CE` 触发 upper-case)。中文开头 / 小写英文开头都 OK。
+- **修法**:subject 首词用中文或小写(`fix(app-pwa): 完单按...`)。body 里的大写词(IG/SC/CE)不受限。

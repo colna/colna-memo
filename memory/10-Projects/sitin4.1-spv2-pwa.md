@@ -85,3 +85,40 @@ tags: sitin4.1, spv2, ce, snapchat, app-pwa, 进度
 - PR #824 的 **base 是 `feat/sitin4.1`**(不是 main)。我按用户「pull 一下 main」把 origin/main 合进 head,结果 **main 相对 feat/sitin4.1 超前 72 提交 / 152 文件**全灌进 PR diff → 文件数从 **44 炸到 194**(首页 30 全是 minerva 无关代码,连累 AI review 审错对象)。
 - **修复**:`git reset --hard 8507a8f22`(合并前)+ `git push --force-with-lease` 撤销 merge,PR 回到 44 文件。
 - **规则**:给 PR「合基线」时,合的必须是**该 PR 的 base 分支**(这里是 feat/sitin4.1),**不是 main**。base≠main 时合 main 会把两者全部差异塞进 diff。下次先 `gh api .../pulls/<n> --jq .base.ref` 看清 base 再动手。
+
+## 08-06 多社媒全链路对齐(6 commit,进 PR #824)
+
+| commit | 内容 |
+|---|---|
+| `094b8382c` | 冷启动补 SC 掉线探测(checkInsAbnormal 并行探 IG+SC)+ checkSocialProxyPageAbnormal 降级非 IG 隔离 |
+| `64b925f90` | **授权判据统一到后端名片 hasContactCard**(Proto 21008):冷启动回填 authByPlatform,tryStartInsRobot 去 insId/insState |
+| `be1b79d8d` | 完单按订单平台判登录(靠后端新加 `InsExchangeOrderInfo.card_type=13`):checkPendingOrders 填 cardType、handlePeerAccepted 加平台 gate、入口去 isInsLoggedIn 一刀切;方案 B 保留 Social Requests 弹窗 |
+| `9f535cc09` | **未授权/登录态失效两状态解耦**:resetInsState 改回登出全清(只被 useUserInit 登出调)、SC 补 setPlatformLoggedIn、showInsModal 授权判据统一 authByPlatform |
+| `1f173b776` | 授权入口按状态分流 `authorizeOrLogin`:未授权→大抽屉 showInsModal / 授权过→直接 openSocialProxyWebView;四入口(任务/workspace/胶囊 PausedCard/chat)全覆盖 |
+| (未提交) | review 修 handleAcceptExchange 回执 accountID/avatarUrl 按 cardType 取名片(女被动漏了女主动的处理)+ platformLoggedIn 复用模块级 |
+
+**三态解耦最终口径**:授权=`authByPlatform`(hasContactCard 回填/finishSocialBind 置/登出清)、登录=`loggedInByPlatform`(startRobot/探测/openSocialLogin,IG+SC 都写)、异常=`abnormalByPlatform`;三独立字段独立数据源,判"授权过"全局统一 authByPlatform。**小抽屉 showSocialAuthDrawer 只在系统检测(checkSocialProxyPageAbnormal/openSocialLogin)登录态丢失时弹**;入口点击按状态分流。
+
+**观察(未改,产品定)**:App.tsx authBlock 已多社媒但枚举名 ig-unbound/ig-login-lost 遗留;AiGoldCashoutCard:66/Settings:31 判绑定仍用 insId(IG),SC 管理入口待定。
+
+## FE-2.2 强制 CE 交换任务 · 前端方案(后端已给 TaskType,待实现)
+
+RFC 需求 6 / 图 3.2(wiki `V33ZwbuaKiqtVHkr4YCc29vWnZK`)。这是多社媒最后一块没做的。
+
+**触发场景**:双登录态用户、当前仅单社媒在线、有待完成男方 CE 订单属**另一(未登录)社媒** → 强制任务(优先级最高、红黄绿可见、阻塞流程、完成后解除、点接受跳官网登录)。男主动订单倒计时同男端、结束消失不可关闭;系统代发无倒计时可关闭。**后端判触发并下发**,前端只渲染。
+
+**后端数据结构**(挂 convState.tasks,与 probe 同源):
+```ts
+{ id, taskType: TaskType.SOCIAL_ACCOUNT_AUTHORIZATION /*=4*/, ceType: IG|SC, reward, timeoutSeconds }
+```
+
+**前端方案(复用 probe 那套 anomaly 机制)**:
+1. proto:`TaskType.SOCIAL_ACCOUNT_AUTHORIZATION=4` + `Task.ceType`(建议复用 CardType 值);
+2. `useChatConv.getSocialAuthTask`(对齐 getProbeTask);
+3. `chatAlertStore` 加 socialAuth info + 置**最高优先级**;
+4. `GlobalAnomalyBanner` 渲染 + 红黄绿跳转 + 新阻塞任务卡(参考 ProbeTaskDrawers);
+5. 倒计时复用 `useTaskRemaining`(锚 createdAt+timeoutSeconds);男主动(timeoutSeconds>0)不可关、系统代发可关;
+6. 点 Accept → `cardTypeToPlatform(ceType)` → `openSocialProxyWebView(platform)`;
+7. 完成解除以后端下发的 convState 移除 task 为准(前端登录成功后 refresh ListConversationStates)。
+
+**待用户拍板 3 点**:① ceType 是否=CardType(IG=1/SC=2);② "可关闭"用 `timeoutSeconds===0` 还是单独字段;③ social-auth 优先级是否绝对高于 probe。
