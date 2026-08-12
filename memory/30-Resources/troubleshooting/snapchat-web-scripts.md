@@ -151,3 +151,26 @@ Snapchat 页面改写/中和了 `console`,直接 `console.log` 不显示。脚�
 - **判据**:日期分隔 li 的 `<time>` 是**直接子**(`:scope > time` 命中);消息 li 的 `<time>` 是**深层**。
 - **修法**:`li.querySelector(":scope > time")` 只认直接子。commit 71a11443e。
 - 通用教训:SC DOM 抽取区分「结构节点 vs 内容节点」优先用 `:scope >` 直接子,避免后代搜索串味。
+
+## SC 消息抽取 / 增量 / DM 上报 一批坑(2026-08-12)
+
+**1. 提取 0 条:消息 li 内的 `<time>` 被当日期分隔符**
+`getChatMessages` 用 `li.querySelector("time")`(后代)判日期分隔符。SC 每条消息 li 内带时间戳 `<time>`(16:08)→ 消息 li 全被当分隔符跳过 → 0 条(但「气泡总数」正常,那是后代 `div[style*=border-color]` 计数)。**修:`:scope > time` 只认直接子。** 日期分隔 li 的 time 是直接子,消息的 time 是深层。
+
+**2. senderName = 时间**
+`parseSenderFromHeader` 倒序取最后一个叶子 span,现在 header 末尾是 `<time>` → senderName 变"16:08"。**修:跳过 `<time>` 内 span + 纯 `HH:MM` 文本**,名字在时间之前。
+
+**3. dateLabel 空(端字段名不一致)**
+脚本消息发 `date`,端 `SnapMessageDto` 读 `dateLabel` → Gson 对不上,端落库/上报 CHAT_HISTORY 日期空。**修:脚本补 `dateLabel=date`(保留 date)。** 教训:改字段前核对端 DTO 字段名。
+
+**4. 增量:端已备 orderKey 游标,脚本要主动去拿**
+端 `getLastMessageId`:IG 返回最新消息 id,SC 返回 `getLastOrderKey`(最新 orderKey 数值序,空 orderKey 不参与)。脚本 `filterByCursor` 用 `BigInt(orderKey) > 游标`。**IG 脚本调 getLastMessageId,SC 之前没调** → 后端不传游标就每次全量。修:SC 也 `lastOrderKey = params.lastOrderKey || bridgeGetLastMessageId(chatId)`。三层去重:脚本 orderKey 游标 → 端 Room 按 id upsert → 后端按 id。
+
+**5. NEW_MESSAGE 双报:typing 被当未读**
+DM listener `diffAndReport` 逻辑:未读下 status/timestamp 变化就重报。打字指示器"输入中…"被 `isItemUnread`(嵌套三层启发式)判未读 → 先报一次;真消息 status 变再报一次。**修:`utils.notUnreadStatus` 加 typing 变体("输入中…/正在输入…/Typing…/Escribiendo…",省略号 `…` 和三点 `...` 都列,matchLabel 是精确比对)。**
+
+**6. 端 uploadMessages → CHAT_HISTORY 链路(端不是转发脚本 result)**
+`AndroidBridge.uploadMessages` → 落 Room(id 去重 / snap_chat_state 缓存双方身份 / 媒体落盘)→ `ActionDispatcher.startUploadSnap` 组批(200/批,媒体传 OSS)→ 组 CHAT_HISTORY(顶层身份取自 snap_chat_state)→ SCRIPT_EVENT 发后端 → ACK 后 markUploaded。script getChatMessages 的 onResult result 缺 `interaction:true` 会被后端 shouldRoute 挡,但消息走这条独立通道不丢。
+
+**7. 目标会话解析(getChatMessages / sendMessage 通用)**
+优先级 chatId(threadId)> manSocialNickname[> 第一个未读]。先判当前窗口是否已在目标(chatId 命中 URL `getChatIdFromUrl()` / nickname 命中顶栏 `[aria-haspopup="listbox"]`),在则跳过,否则 chatId→navigateToChat(整页刷新,pipeline finally 清 state 后从 step0 幂等重跑)/ nickname→搜索框输入+点卡片(SPA 不刷新)。忽略名单用 `SP.isIgnoredContact`(startDMListener 暴露,共享一份)。
