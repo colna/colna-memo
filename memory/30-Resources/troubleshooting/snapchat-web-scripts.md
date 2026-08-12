@@ -174,3 +174,9 @@ DM listener `diffAndReport` 逻辑:未读下 status/timestamp 变化就重报。
 
 **7. 目标会话解析(getChatMessages / sendMessage 通用)**
 优先级 chatId(threadId)> manSocialNickname[> 第一个未读]。先判当前窗口是否已在目标(chatId 命中 URL `getChatIdFromUrl()` / nickname 命中顶栏 `[aria-haspopup="listbox"]`),在则跳过,否则 chatId→navigateToChat(整页刷新,pipeline finally 清 state 后从 step0 幂等重跑)/ nickname→搜索框输入+点卡片(SPA 不刷新)。忽略名单用 `SP.isIgnoredContact`(startDMListener 暴露,共享一份)。
+
+## followUserById:已是好友被误判 USER_NOT_FOUND(2026-08-12)
+
+搜已是好友的人,卡片落「我的好友」分区,**无任何按钮**(空 `tg1Lo`)。`classifyFollowType` 只认 Add/Accept/状态文本(Added/Pending/Accepted/Friends)按钮,无按钮→返回 null→`findFollowAction`/`waitForFollowAction` 返回 null→Step 3 报 `USER_NOT_FOUND`。ALREADY_ADDED 分支只覆盖「有状态文本按钮」,漏了「无按钮的好友分区卡片」。
+- **修**:`findFollowAction` 里 classification+firstAction 都空时,若某匹配卡无 `<button>` 且分区标题命中 `myFriendsSection`(我的好友/My Friends/Mis amigos)→ 置 ALREADY_ADDED,返回 success(added:false)。commit a680d9eea。
+- 通用:followUserById 的分区(我的好友/添加/已添加我)语义靠 `getCardSectionKey`(向上找无按钮的分区标题 gridcell)。「已是好友」不一定有按钮,判定别只依赖按钮文本。
