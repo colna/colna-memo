@@ -138,3 +138,16 @@ sitin-next/packages/app-ins-scripts/
 > 检测 WebView **只注入 JSBridge、无 AndroidBridge**,故 `bridge.eventTrack/log` 无效(`AndroidBridge.event 未注入`),`sp_check_login_status` 埋点在该 WebView 丢失。
 
 相关：[[ui-automation-selectors]] · [[social-proxy-scripts-container-app]] · [[sitin4-endchat-backend-gap]] · [[android-webview-multi-social-memory]] · [[pwa-video-call-native-bridge]]
+
+## SC 页面 console 被中和 → 用隐藏 iframe 的干净 console(2026-08-12)
+
+Snapchat 页面改写/中和了 `console`,直接 `console.log` 不显示。脚本 `bridge.log`(`snapchat/actions/bridge.js`)的解法:建一个隐藏 iframe,取 `iframe.contentWindow.console`(干净原生 console),缓存为 `window.__spConsole`,输出带 `%c[SC-Scraper]` 橙色前缀,同时 `AndroidBridge.log` 发原生。
+- 手动调试:脚本加载后直接 `window.__spConsole.log(...)`;或自己建 iframe 取 console。
+- 诊断脚本统一 `var C = window.__spConsole || console;`。
+
+## getChatMessages 提取 0 条:消息 li 内的 `<time>` 被误判成日期分隔符(2026-08-12)
+
+`getChatMessages.js` 提取循环用 `li.querySelector("time")`(后代搜索)判断日期分隔符。Snapchat 每条消息 li 内部带消息时间戳 `<time>`(如 16:08),后代搜索命中 → 消息 li 全被当日期分隔跳过 → 提取 0 条(但「气泡总数」正常,因为那是后代 `div[style*=border-color]` 计数)。
+- **判据**:日期分隔 li 的 `<time>` 是**直接子**(`:scope > time` 命中);消息 li 的 `<time>` 是**深层**。
+- **修法**:`li.querySelector(":scope > time")` 只认直接子。commit 71a11443e。
+- 通用教训:SC DOM 抽取区分「结构节点 vs 内容节点」优先用 `:scope >` 直接子,避免后代搜索串味。
