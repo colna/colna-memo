@@ -180,3 +180,8 @@ DM listener `diffAndReport` 逻辑:未读下 status/timestamp 变化就重报。
 搜已是好友的人,卡片落「我的好友」分区,**无任何按钮**(空 `tg1Lo`)。`classifyFollowType` 只认 Add/Accept/状态文本(Added/Pending/Accepted/Friends)按钮,无按钮→返回 null→`findFollowAction`/`waitForFollowAction` 返回 null→Step 3 报 `USER_NOT_FOUND`。ALREADY_ADDED 分支只覆盖「有状态文本按钮」,漏了「无按钮的好友分区卡片」。
 - **修**:`findFollowAction` 里 classification+firstAction 都空时,若某匹配卡无 `<button>` 且分区标题命中 `myFriendsSection`(我的好友/My Friends/Mis amigos)→ 置 ALREADY_ADDED,返回 success(added:false)。commit a680d9eea。
 - 通用:followUserById 的分区(我的好友/添加/已添加我)语义靠 `getCardSectionKey`(向上找无按钮的分区标题 gridcell)。「已是好友」不一定有按钮,判定别只依赖按钮文本。
+
+## CHAT_HISTORY 身份字段(creatorSocialId/manSocialId)口径(2026-08-12)
+
+端组 CHAT_HISTORY 时:`creatorSocialId` = `snap_chat_state.selfUserId` = 批内最后一条 `sender=="me"` 消息的 `senderId`;`manSocialId` = peerUserId = 最后一条 `sender=="them"` 的 senderId。端 `refreshIdentity` **空值不覆盖旧值**(dom 降级批无 senderId 时保留)。`sender`(me/them)由脚本气泡 header 颜色 `isMeColor` 判;`senderId` 由 fiberMessages 抽(`sender.str`,Snapchat UUID)。
+- 若后端要「creatorSocialId=操作账号 handle、manSocialId 空(靠 chatId+nickname 认男方)」:在 getChatMessages 覆盖 senderId —— me→入参 womanSocialId、them→""。commit b477f6849。改 senderId 不影响 id(=conversationId:orderKey)。
