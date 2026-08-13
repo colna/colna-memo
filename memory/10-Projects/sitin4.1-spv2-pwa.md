@@ -122,3 +122,23 @@ RFC 需求 6 / 图 3.2(wiki `V33ZwbuaKiqtVHkr4YCc29vWnZK`)。这是多社媒最�
 7. 完成解除以后端下发的 convState 移除 task 为准(前端登录成功后 refresh ListConversationStates)。
 
 **待用户拍板 3 点**:① ceType 是否=CardType(IG=1/SC=2);② "可关闭"用 `timeoutSeconds===0` 还是单独字段;③ social-auth 优先级是否绝对高于 probe。
+
+## 三个「一次性/社媒授权」任务(RFC KpwEw8wU / V33Zwbua · 2026-08-12 起,待 2 个 id)
+
+RFC 原文(「新增一次性任务」格):Authorize snapchat 💲0.5;未登录对应社媒且有未完成社媒交换订单时展示 Social Connect on Instagram / Snapchat(金额=累积待处理订单金额合计),点击跳转官网登录。
+
+**Task 1 — Authorize Snapchat 💲0.5(taskId 137,已知,可直接做)**
+- 现状:挂在 Welcome Checklist(`taskRegistry` 的 `BindSnapchatAccount` 有 `v4OnboardingOrder:5 + v4OnboardingGating:false`)。用户判定「位置写错」。
+- 改法:改 `types/taskRegistry.ts` 的 `[TaskId.BindSnapchatAccount]` —— **删** `v4OnboardingOrder/v4OnboardingTitle/v4OnboardingGating`,**加** `category:"onboarding" + onboardingOrder:5 + onboardingTitle:"Authorize Snapchat"` → 从 Welcome Checklist 挪到**首页 Task 栏**(`OnboardingTaskList`,基础列表=`onboardingTaskConfigs()`=category:onboarding)。奖励 💲0.5 仍取后端 `task.reward`。颜色按其在 Task 栏的 index 轮转(黄/粉/紫/蓝)。
+
+**Task 2/3 — Social Connect on Instagram / Snapchat(taskId 待用户给,先预留)**
+- **预留 id**:⏳ 待用户提供 2 个 taskId。custom 段现用到 **200013**(SecondEarn=200001…SeventhVideoDuration=200013),新 id 大概率 200014/200015,但**以用户给的为准**。占位命名建议 `SocialConnectInstagram` / `SocialConnectSnapchat`。
+- **归属**:首页 Task 栏;`source:"custom"`(前端维护,非后端下发)。
+- **展示条件**:该社媒**未登录/未授权** 且 **有该社媒未完成 CE 交换订单**。
+- **金额(动态)**:该平台**累积待处理订单金额合计** = `listUserInsExchangeOrder()` 按 `order.cardType` 汇总 `pwaFollowReward`——**复用** `components/showSocialAuthDrawer.tsx` 里 `claimableByPlatform()` 的口径。无订单→不展示。
+- **点击**:`openSocialProxyWebView(platform)` 跳官网登录。
+- **机制坑**:现有 custom 任务(`useTask.ts:148` 的 `customTasks` useMemo)是**静态** `CUSTOM_TASK_CONFIGS.map`(`deps:[]`、reward 写死)。Social Connect 需**动态**(依赖 authByPlatform + 异步拉订单算金额 + 条件过滤),不能照抄——要扩展 customTasks 注入逻辑(读 insStore 授权态 + 拉 pending orders 汇总 + 仅在有订单时注入)。
+
+**关键文件**:`types/task.ts`(TaskId 枚举 + `CUSTOM_TASK_CONFIGS`,L100)、`types/taskRegistry.ts`(TaskDef 注册)、`hooks/useTask.ts`(L148 customTasks 注入 / L300 合并)、`http/insApi.ts`(`listUserInsExchangeOrder`)、`utils/bridge.ts`(`openSocialProxyWebView`)、`pages/Home/OnboardingTaskList.tsx`(渲染)。
+
+**待用户**:给 Social Connect IG / Snapchat 两个 taskId → 补占位后实现 Task 2/3。Task 1 可先做。
