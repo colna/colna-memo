@@ -185,3 +185,27 @@ DM listener `diffAndReport` 逻辑:未读下 status/timestamp 变化就重报。
 
 端组 CHAT_HISTORY 时:`creatorSocialId` = `snap_chat_state.selfUserId` = 批内最后一条 `sender=="me"` 消息的 `senderId`;`manSocialId` = peerUserId = 最后一条 `sender=="them"` 的 senderId。端 `refreshIdentity` **空值不覆盖旧值**(dom 降级批无 senderId 时保留)。`sender`(me/them)由脚本气泡 header 颜色 `isMeColor` 判;`senderId` 由 fiberMessages 抽(`sender.str`,Snapchat UUID)。
 - 若后端要「creatorSocialId=操作账号 handle、manSocialId 空(靠 chatId+nickname 认男方)」:在 getChatMessages 覆盖 senderId —— me→入参 womanSocialId、them→""。commit b477f6849。改 senderId 不影响 id(=conversationId:orderKey)。
+
+## ⭐ i18n 精确匹配脆:中文界面误报 noStory / ELEMENT_NOT_FOUND(2026-08-14)
+
+**现象**:中文界面下 `getStory` 误报「no story posted」`noStory:true`(真机截图证明菜单有「查看我的故事」、故事播放器都能开);`followUserById` 卡在「查找 Add Friends 按钮」`ELEMENT_NOT_FOUND`。
+
+**根因**:两处都靠**语言相关文案/属性**精确匹配 DOM:
+- `getStory.findViewMyStoryEntry` 用 `utils.matchLabel(textContent,"viewMyStory")` —— `matchLabel` 是**精确相等**(仅 trim+lowercase)。中文行真实 `textContent` 带多余空白/被同层图标文本污染 → 精确相等漏配。
+- `followUserById` Step0 用 `button[title="<viewFriendRequests 标签>"]` **精确属性选择器**。
+
+**修法**:
+1. getStory 已修(commit `ac220b8d1`,sp-snapchat):新增 `utils.matchLabelContains`(两侧折叠全部空白+小写后 `indexOf`),`findViewMyStoryEntry` 改用它;**仅用于「文案只在目标存在时才出现」的场景**(没 story 时菜单无此项)→ contains 无假阳性。仍取最深节点不误点整菜单。
+2. **真实串必须从真机 DOM 取,不能猜**:`viewFriendRequests` 表里已有「查看好友请求」却仍 ELEMENT_NOT_FOUND → 说明那个「人+加好友」按钮的真实 `title` 根本不是它(要用户 F12 `[...document.querySelectorAll('button[title]')].map(b=>b.title)` 或悬停看 tooltip 拿确切串再补)。**属性精确选择器天生脆,能换 contains/多信号就换。**
+
+## ⭐ WebView 语言由 navigator.languages 定,不是 UA / Accept-Language(2026-08-14)
+
+- Snapchat 是**客户端渲染 SPA**,UI 语言读 `navigator.language/languages`,**不看 UA、基本不看 `Accept-Language` 头**(头只影响服务端返回)。
+- `SNAPCHAT_WEBVIEW_CONFIG`(`app-pwa/src/utils/bridge.ts`)的 `userAgent`/`acceptLanguage`/`headers` **都改不了 UI 语言**;`navigator.languages` 由**设备/WebView locale** 决定(设备中文 → Snapchat 中文,前面那批中文号即此)。
+- 要强制英语,只能 **override `navigator.languages`**:①原生侧 `document_start` 注入 `Object.defineProperty(navigator,'language'/'languages',{get:()=>'en-US'/['en-US','en']})` 或用英文 Configuration 建 WebView(需 Android 端加字段,最稳);②scraper bootstrap patch(和已有 permissions/getUserMedia patch 同理,但**语言在 boot 时读、对注入时机敏感**,必须早于 Snapchat bundle)。UA/viewport 那串是为出桌面布局,和语言无关,别动。
+
+## 部署与日志判读(2026-08-14)
+
+- **部署脚本下发**:`node scripts/upload-all.mjs --platform snapchat --token <JWT>`(默认 dev `admin-api-dev.sitin.ai`;prod 用 `--base-url`+prod token)。**`dist/` 被 gitignore、部署时由 `scripts/build.mjs` 重建**,改 src 后**必须重传**才在真机生效(只 push 源码不够)。成功尾部有「已通知设备更新脚本」。先 `--dry-run` 预览。
+- **日志判读**:同 `requestId`+`timestamp` = 同一次会话(别把旧日志当新结果);`getStory mounted` 只是页面重载重新挂载,非新调用。核对时间戳(北京)判断是否在部署之前。
+- **网络类报错≠脚本 bug**:`bolt-gcdn.sc-cdn.net ... ERR_CONNECTION_TIMED_OUT`(story 媒体 CDN)、`wss://aws.duplex.snapchat.com/...WebSocketConnect` / `BootstrapAttestationSession net::ERR_CONNECTION_RESET`(核心连接/鉴权)= 设备到 Snapchat 网络/代理不稳,会导致 UI 加载不全、任何动作都找不到元素,需在设备网络层排查。
