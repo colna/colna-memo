@@ -209,3 +209,23 @@ DM listener `diffAndReport` 逻辑:未读下 status/timestamp 变化就重报。
 - **部署脚本下发**:`node scripts/upload-all.mjs --platform snapchat --token <JWT>`(默认 dev `admin-api-dev.sitin.ai`;prod 用 `--base-url`+prod token)。**`dist/` 被 gitignore、部署时由 `scripts/build.mjs` 重建**,改 src 后**必须重传**才在真机生效(只 push 源码不够)。成功尾部有「已通知设备更新脚本」。先 `--dry-run` 预览。
 - **日志判读**:同 `requestId`+`timestamp` = 同一次会话(别把旧日志当新结果);`getStory mounted` 只是页面重载重新挂载,非新调用。核对时间戳(北京)判断是否在部署之前。
 - **网络类报错≠脚本 bug**:`bolt-gcdn.sc-cdn.net ... ERR_CONNECTION_TIMED_OUT`(story 媒体 CDN)、`wss://aws.duplex.snapchat.com/...WebSocketConnect` / `BootstrapAttestationSession net::ERR_CONNECTION_RESET`(核心连接/鉴权)= 设备到 Snapchat 网络/代理不稳,会导致 UI 加载不全、任何动作都找不到元素,需在设备网络层排查。
+
+## clickMute「muted=false 但实际已静音」= 回读假阴性(2026-08-18)
+
+- 现象:`clickMute` 返回 `muted=false, verified=true`,但会话实际已静音成功。
+- 根因:`clickMute.js` 的 result 用 `readCheckedState(findByLabel("silent"))` 回读选中态——从 Silent 文案
+  节点向上 4 层扫 `aria-checked/aria-selected/aria-current/data-selected`,**命中第一个 true/false 就返回**。
+  点完 Silent 后面板收起/过渡,`findByLabel("silent")` 可能匹配到摘要行,其祖先带 `aria-selected="false"`
+  被当成 Silent 的选中态 → 报 false。这几个选中态属性**未经真机确认**(文件头注释已标)。
+- 关键区分:`muted` 字段是**不可靠回读**,不代表动作失败;`verified:true` 只表示读到了布尔值,不代表值对。
+- 修法方向:拿到「Message Notifications→Silent」面板真机 DOM,把 readCheckedState 收紧到正确节点/属性;
+  或改成「点了 Silent 且面板确认 = 成功」,不依赖脆弱回读。
+
+## SP 服务端不下发 sendGreet,打招呼走 sendMessage(2026-08-18)
+
+- `app-social-proxy-server`(feature/sp)**从不下发 `sendGreet`**:全树 0 引用,历史所有 sendGreet commit
+  的 scope 都是客户端 `app-ins-scripts`(且服务端派发表不映射它)。
+- 打招呼实际派 `sendMessage`:旧路径 `script.types.ts` `SEND_DM → sendMessage`、v3 `apk-script-map.ts`
+  `SEND_MESSAGE → sendMessage`,`greetingText` 被折进 `messageText`(`replyText||greetingText||text`)。
+- 排「回关后没打招呼」这类问题,要追的是服务端何时派 **SEND_MESSAGE/sendMessage**,不是 sendGreet。
+- sendGreet 只是客户端脚本能力(snapchat 版仅在 `personal/zz/sp-snapchat` 分支,feature/sp 只有 IG 版)。
