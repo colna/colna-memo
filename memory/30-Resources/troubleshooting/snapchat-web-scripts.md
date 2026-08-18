@@ -229,3 +229,10 @@ DM listener `diffAndReport` 逻辑:未读下 status/timestamp 变化就重报。
   `SEND_MESSAGE → sendMessage`,`greetingText` 被折进 `messageText`(`replyText||greetingText||text`)。
 - 排「回关后没打招呼」这类问题,要追的是服务端何时派 **SEND_MESSAGE/sendMessage**,不是 sendGreet。
 - sendGreet 只是客户端脚本能力(snapchat 版仅在 `personal/zz/sp-snapchat` 分支,feature/sp 只有 IG 版)。
+
+### ↑ 已修(2026-08-18):拿到面板真机 DOM,坐实并修复
+- 面板 DOM 确证:三个 `div[role="option"]`(消息通知/全部消息/静音)**aria-selected 恒为 "false"**,
+  选中的静音也是 false → 读 aria 必然假阴性。真正选中信号:选项图标槽里有**勾选 `<svg>`**(未选是空 div)。
+- 修法:`clickMute.js` 的 `readCheckedState` 改为——`el.closest('[role="option"]')` → 取 `a` 的
+  `firstElementChild`(图标槽)→ `!!iconSlot.querySelector("svg")` 判选中;读不到结构才退回 aria 兜底。
+  class(XozKV/Xf4WU)是 hash 不用。同时修好了「已是 Silent 就跳过」的判断。build + test 过。
