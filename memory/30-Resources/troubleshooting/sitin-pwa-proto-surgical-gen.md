@@ -39,3 +39,34 @@ API 封装参数用 `number`,内部 `cardType as CardType`(proto)。
 ## 全新克隆跑 tsc
 app-pwa tsc 前需先 `pnpm build` 内部 workspace 包(common-util-format / web-util-media 等),
 否则报 TS2307 找不到模块(与业务无关)。
+
+---
+
+## 追加(2026-08-19)整包更新到 release/test + 手写字段对齐
+
+**场景**:要把某分支 proto **整体**更新到 `release/test`(不是只补一个接口),用 `proto:test`
+(`cd proto && git checkout origin/release/test && generate.sh && build`)。
+
+### 何时整包 regen 是安全的
+- 先 `git checkout origin/release/test` 提 submodule,`generate.sh` 全量重生成,
+  **然后 `app-pwa tsc -b` 必须 0 error**——若 release/test 删/改了 app 在用的字段,tsc 会炸,
+  那就得连带改 app(范围变大)。今天 tsc 0 → 整包 regen 不连带 app 改动,可直接提交。
+- 只提交**有真实变化**的 gen 文件。
+
+### protoc 版本噪声(重要)
+committed `src/gen` 头部有 `//   protoc  v6.32.0`;本机 brew 是 **v7.35.1**。全量 regen 会给
+**每个** gen 文件那一行改成 v7.35.1(代码字节其余一致)→ 未变的 proto 也“被改”。
+筛掉噪声:对每个改动 gen 文件,若 diff 去掉 `^[+-]//   protoc +v` 行后为空,就 `git checkout` 还原。
+今天 23 个改动里 17 个是纯版本噪声、只留 6 个真变化。
+
+### 手写字段“先行”会和后端对不上(踩过)
+我先行手写 `ReplyReward`/`reward` 到 gen;后端 release/test 实际叫 **`BonusReward`/`bonusReward`**
+(`baseCents/bonusCents/totalCents=int64`、`multiplier=float`,字段号 1/2/3/4)。
+**教训**:动手手写字段前,先 `git show origin/release/test:archat_api/xxx.proto | grep -i <关键词>`
+看后端有没有已经落地、叫什么。对齐时:分支 merge 带真 gen 的 nationwide,`messaging_api.ts` 冲突
+`git checkout --theirs` 取真生成版;app 里 `ReplyReward→BonusReward`、`.reward→.bonusReward`
+(内部 ref/函数名 `lastReplyRewardRef`/`consumeLastReplyReward` 可保留,语义仍准)。
+
+### commitlint 拒自定义 merge 首行
+merge commit 首行若写 `Merge feature/x + 说明…` 会被 commitlint 判 `type-empty` 拒。
+必须用标准 `Merge branch 'feature/x' into <cur>`(commitlint 默认忽略此前缀),说明放正文。
