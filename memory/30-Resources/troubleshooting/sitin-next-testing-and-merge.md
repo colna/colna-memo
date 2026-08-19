@@ -103,3 +103,10 @@ $ git ls-files "packages/app-ins-scripts/dist/instagram" | wc -l
 `git rm --cached` 后,切到新 HEAD 时 git 会把该文件从工作区删掉(它变回未跟踪 + 被 ignore)。2026-07-17 实测:merge 后 `git checkout personal/zz/sp-snapchat`,`dist/snapchat/automation.js` 直接消失。
 
 构建产物无害,`node scripts/build.mjs` 重新生成即可;但**要提前告知团队**,否则别人 pull 完发现产物没了会懵。同源结论见 [[../../50-Daily/2026-07-16]] 里 `.serena` 那三层判断(合并的分支会删 / 其他分支不会 / git 历史永远都在)。
+
+## commitlint 提交规范坑(2026-08-19 踩)
+- **scope 必带**:`feat(app-pwa):` 这种;无 scope 会让 Lerna 把所有包当已改动、下次全量升版。
+- **subject-case**:subject **不能以大写英文词开头**。`feat(app-pwa): Me 页…` / `PWA…` 被判 `subject-case`(sentence/start/upper-case)拒。→ 用中文或小写英文开头(`个人页…` / `chat 金币…`)。
+- **merge commit 首行**:自定义首行(如 `Merge feature/x + 说明`)会被判 `type-empty` 拒。必须用标准 `Merge branch 'feature/x' into <cur>`(commitlint 默认忽略此前缀),说明放正文。
+- **钩子**:pre-commit = 全仓 `pnpm lint` + `pnpm circular`(app-pwa/proto 等 legacy 已从 circular 排除);pre-push = `turbo test/build --affected`,本机因 minerva 需 DB / proto 未 build **必失败** → 前端分支 `git push --no-verify`(既有实践)。
+- **dist 未重建报错**:`business-pwa-proto/dist` 被 gitignore,拉了 proto 变更后本地不重建,dev 运行报 `does not provide an export 'XxxRequest'`。→ `pnpm --filter @heyhru/business-pwa-proto build`(单独 vite 会跳过 proto 构建;`pnpm dev`/turbo 正常先构建)。
