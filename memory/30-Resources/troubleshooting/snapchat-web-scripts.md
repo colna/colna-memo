@@ -236,3 +236,16 @@ DM listener `diffAndReport` 逻辑:未读下 status/timestamp 变化就重报。
 - 修法:`clickMute.js` 的 `readCheckedState` 改为——`el.closest('[role="option"]')` → 取 `a` 的
   `firstElementChild`(图标槽)→ `!!iconSlot.querySelector("svg")` 判选中;读不到结构才退回 aria 兜底。
   class(XozKV/Xf4WU)是 hash 不用。同时修好了「已是 Silent 就跳过」的判断。build + test 过。
+
+## snapchat getChatMessages 内存/OOM 收敛(2026-08-18)
+
+- 症状:Android WebView **主进程被 OOM 杀**(走不到 onRenderProcessGone,那个只兜渲染进程)。
+- 两处诱因(仅 JS 能改):
+  1. Step 3 滚动预加载占位图**不受 maxCount 限、扫全列表**,把整段历史全尺寸图 decode 进 native 内存 → 主因。
+     修:从列表底部往回只加载最近 maxCount 张(更早的会被 `slice(len-maxCount)`/增量过滤丢,预加载纯浪费)。
+  2. Step 5 `Promise.all` 全并发 blob→base64 → 瞬时峰值。修:并发上限队列(worker pool, 4)。
+- 关键坑/纠错:
+  · 「改走 URL 不塞 base64」**对 blob 图不可行**——`blob:https://...` 出了 WebView(Android/服务端)取不到,base64 就是为带出去。CDN https 图才保留 URL(代码本就 base64=null)。
+  · 「释放上一批图」不能在 Step 3 单独做——Step 5 转 base64 还要用那张 blob;要么 Step3+5 合批 load→convert→release。
+  · 释放 DOM img.src 会动 Snapchat React 树,风险高,未做;先靠「限量+限流」,等 logcat 确认 bitmap OOM 再评估。
+  · IG 版 getChatMessages 结构相似但**本次判定正常、未改**;别假设两平台行号一致。
