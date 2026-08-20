@@ -110,3 +110,11 @@ $ git ls-files "packages/app-ins-scripts/dist/instagram" | wc -l
 - **merge commit 首行**:自定义首行(如 `Merge feature/x + 说明`)会被判 `type-empty` 拒。必须用标准 `Merge branch 'feature/x' into <cur>`(commitlint 默认忽略此前缀),说明放正文。
 - **钩子**:pre-commit = 全仓 `pnpm lint` + `pnpm circular`(app-pwa/proto 等 legacy 已从 circular 排除);pre-push = `turbo test/build --affected`,本机因 minerva 需 DB / proto 未 build **必失败** → 前端分支 `git push --no-verify`(既有实践)。
 - **dist 未重建报错**:`business-pwa-proto/dist` 被 gitignore,拉了 proto 变更后本地不重建,dev 运行报 `does not provide an export 'XxxRequest'`。→ `pnpm --filter @heyhru/business-pwa-proto build`(单独 vite 会跳过 proto 构建;`pnpm dev`/turbo 正常先构建)。
+
+## 让分叉的 release 分支「以 feature 为准」对齐(2026-08-20)
+- 场景:`release/test-pwa` 与 `feature/pwa` 真分叉(各有几十上百独有 commit)。要 test 分支内容 = feature/pwa,但保留历史。
+- 做法:切 `release/test-pwa` → `git merge origin/feature/pwa -X theirs --no-edit`(冲突全以 feature/pwa=theirs;因为在 test 上 merge feature,feature 是 theirs)。
+- **`-X theirs` 只解冲突 hunk**,不冲突的对方(test)独有补充会保留 → 可能残留「半个」内容。本次 `app-pwa/src/types/task.ts` test 侧补的枚举块把 `VideoCall2Times` **重复定义**(feature 已有)= TS duplicate enum。
+- **收口 = 让树完全一致**:对残留文件 `git checkout origin/feature/pwa -- <file>` 逐个取 feature 版,`commit --amend`。
+- **验证用树哈希**:`git rev-parse HEAD^{tree}` == `git rev-parse origin/feature/pwa^{tree}` 相等 = 内容(含 submodule 指针)完全一致,比 `git diff --stat` 更硬。
+- 代价:被 merge 的分支(test)独有**内容**被覆盖(其独有 commit 只剩历史)。push 前告知用户哪些独有改动会被盖(尤其非临时的真实修复)。push 是 fast-forward(加一个合并提交),非破坏。
