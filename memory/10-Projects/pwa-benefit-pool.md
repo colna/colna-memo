@@ -42,3 +42,26 @@ tags: [minerva, pwa, tier, 权益池, 后台]
 - 视频收益/文字收益:ledger `pwa_user_balance_change_history`,文字类 change_type = DATING_APP/IG_HOSTING/INS_FOLLOW_REWARD/INS_MESSAGE_TEXT/MESSAGE_TEXT/PWA4,其余(含 NULL)=视频;`to_user_id NOT IN ('-1','0')`。
 - 保底:Go Live≥180min 且当日含加成视频≥$80 → 补到 $100;周退池 ≤$100(均 Nacos 可调)。
 - 阈值占位(数据侧回填):新人有效通话数 X、Opener 阈值 B、文字上浮 Y1、小美上浮 Y2。
+
+## 卡点(2026-08-21,新人+活跃两池已做完 commit 3c0da1796 后剩余)
+
+分支 `personal/zz/admin-pwa-benefit-pool`。三库:`getPgDb()`=archat、`getNamedPgDb("monitor")`=pwa_daily_data、`getNamedPgDb("strategy")`=strategy_feature(女性特征 features JSONB)。
+
+### A. 缺数据源/埋点 —— 算不了(等后端/埋点)
+1. **视频主动发起率(D)**:无数据源、无阈值。列/抽屉已占位显 `—`、标准 `≥ D%`。
+2. **视频拒接率 / 短通话率**(小美今日服务质量):分子依赖新增「挂断方」埋点(女方主动挂断 & <15s / 女方拒绝或超时未接),埋点未上 → 算不出。文档明说「配置项就位≠指标可算」。
+3. **小美周字段**(本周视频收益删保底 / 服务质量达标天数 / 本周 Go Live 有效时长 / 预计最终保底补贴):需 monitor `pwa_daily_data` 周聚合(仅统计每日 09:00–24:00、周一~周日窗)+ guarantee rollup。→ **小美池列表列 + 详情抽屉(每周考核/今日服务质量/保底执行计算)整体卡在这里**。
+
+### B. 阈值 —— 已按「nacos 为准」定(用户 2026-08-24 拍板)
+- B(opener 阈值)、D(视频发起率阈值)未配 → 按 `*_enabled` 视为**不参与判定**;活跃命中分支近似(只用右滑+划卡+收益),抽屉标准列占位。
+- 小美(`pwa_tier_benefit_config` benefits.xiaomei):`daily_required_golive_minutes`=**90**、`weekly_quality_days_min`=**0**、`daily_video_reject_rate_max`/`daily_short_call_rate_max`=**0.5**、`short_call_duration_threshold_seconds`=**15**、周日保底$80/周末$120、周 Go Live≥600 补到$500、`weekly_auto_exit_threshold_micros`=$100(语义反转为「周收益≥$100 达标」之一)、`auto_exit_consecutive_weeks`=**2**(连续2周未达标才退)。**冲突以 nacos 为准**(文档正文说 golive 120/quality_days 3 作废)。
+- 新人/活跃筛选阈值(《筛选指标汇总》定稿固定值,已写死):颜值≥70、新人右滑≥20%/活跃≥15%、曝光·划卡≥20、文字周收益≥$6、视频周收益≥$50、新人平均通话≥80s&通话数≥5(剔<5s/>10000s)。
+
+### C. 需部署 dev 后运行验证(本地测不了)
+1. **strategy SQL** 按「指标获取」文档口径写(`female_daily_features` features->'daily'->>'right_swipe_count'/'swipe_count';`female_user_features` features#>>'{breakthrough,count_total/replied_total}'),dms 只连 archat → 部署后实测表名/字段/`user_id` 类型(strategy 库 user_id 类型未知,service 已 Number 化 join)。
+2. **`STRATEGY_DATABASE_URL` 变量名**:我按 `<PREFIX>_DATABASE_URL` 约定(运维给 envPrefix `STRATEGY_`),需与 k8s 实际注入名对齐,不一致 strategy 连接 warn 降级、被右滑率/曝光/opener 列显 `-`。
+3. **生效前提**:必须部署 minerva-server 到 admin-api-dev(strategy 连接 + business 指标都在后端)。
+
+### D. 前端占位待后端补的字段
+- `invitationStatus`/`invitedAt`:已补查 `pwa_tier_invitation`(list 视图未含);
+- `hitBranch`:minerva 按阈值现算(dora 未把命中分支落 list 视图),活跃因 B/D 未配为近似。
