@@ -249,3 +249,19 @@ DM listener `diffAndReport` 逻辑:未读下 status/timestamp 变化就重报。
   · 「释放上一批图」不能在 Step 3 单独做——Step 5 转 base64 还要用那张 blob;要么 Step3+5 合批 load→convert→release。
   · 释放 DOM img.src 会动 Snapchat React 树,风险高,未做;先靠「限量+限流」,等 logcat 确认 bitmap OOM 再评估。
   · IG 版 getChatMessages 结构相似但**本次判定正常、未改**;别假设两平台行号一致。
+
+## DM 监听去重最终对齐 IG:内存 tick-diff,别用 sessionStorage(2026-08-23)
+
+**结论:SC `startDMListener` 去重改成和 IG 完全一致的内存快照 diff 模型**(`aa1967330`,dev v115)。
+
+- **IG/SC 都整页 reload**:`navigateToInbox` 两边都是 `location.href` 整页刷新(我一度误以为「IG 是 SPA 不刷新」,**错的**)。去重差异是架构选择,不是刷不刷新。
+- **模型**:firstScan 全报 → 之后按 `chatId` 用内存 `_prevSnapshot` diff,信号 `sig=status|timestamp`(SC 对应 IG 的 `lastMessage`);无持久化,reload 后 firstScan 重报**靠后端幂等**兜。
+- **坑1(为什么弃 sessionStorage)**:旧 SC 用 sessionStorage 持久化去重,key=`status|timestamp`;`未接来电` 的 timestamp 为空 → key 退化成 `"未接来电|"` 被永久跳过,挡住合法重报。而当时 `_prevSnapshot` 是**死代码**(build 了没 diff)。
+- **坑2(删去重的回归)**:直接删 sessionStorage(v112)→ observer+轮询每 1~3s 全量重报**刷屏停不下来**。删去重并**没修好** call 不回,只带来刷屏。去重是必需的(挡 reload 首扫重报)。
+- **isInboxPage 守卫**:只在收件箱页 `/^\/web\/?$/` 上报,聊天页 `/web/{chatId}` 直接 return(不扫描/不上报/不动去重状态),避免 getChatMessages/sendMessage 打开会话期间监听误触发。IG 聊天页切 navbar、SC 无 navbar 等价跳过。
+
+## call 不回真因:通话态聊天页打不开,与去重无关(2026-08-23,未修)
+
+- **现象**:`call`/未接来电 的后端回复已生成,但 `sendMessage` 30s `ELEMENT_TIMEOUT` 发不出去。
+- **真因**:带「呼叫中/未接来电」的会话打开后,Snapchat 把页面**弹回收件箱**(`url=/web, inChat=false`),`checkChatPageLoaded` 只轮询输入框 `div[role="textbox"][contenteditable="true"]` → 死等超时。**和 DM 去重无关**(曾被误当去重问题,白删了一轮去重)。
+- **未修 follow-up 方向**:`checkChatPageLoaded` 识别通话 UI / URL 被弹回 `/web` 时**快速失败**;或 `sendMessage`/`getChatMessages` 超时后**自动重导航一次**(通话结束后即可进)。
