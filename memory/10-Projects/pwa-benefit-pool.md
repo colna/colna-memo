@@ -48,9 +48,11 @@ tags: [minerva, pwa, tier, 权益池, 后台]
 分支 `personal/zz/admin-pwa-benefit-pool`。三库:`getPgDb()`=archat、`getNamedPgDb("monitor")`=pwa_daily_data、`getNamedPgDb("strategy")`=strategy_feature(女性特征 features JSONB)。
 
 ### A. 缺数据源/埋点 —— 算不了(等后端/埋点)
-1. **视频主动发起率(D)**:无数据源、无阈值。列/抽屉已占位显 `—`、标准 `≥ D%`。
-2. **视频拒接率 / 短通话率**(小美今日服务质量):分子依赖新增「挂断方」埋点(女方主动挂断 & <15s / 女方拒绝或超时未接),埋点未上 → 算不出。文档明说「配置项就位≠指标可算」。
-3. **小美周字段**(本周视频收益删保底 / 服务质量达标天数 / 本周 Go Live 有效时长 / 预计最终保底补贴):需 monitor `pwa_daily_data` 周聚合(仅统计每日 09:00–24:00、周一~周日窗)+ guarantee rollup。→ **小美池列表列 + 详情抽屉(每周考核/今日服务质量/保底执行计算)整体卡在这里**。
+1. **视频主动发起率(D)**:无数据源、无阈值。→ **【2026-08-25 用户拍板:先不做,前端置空 `—`】**。
+2. **视频拒接率 / 短通话率**(小美今日服务质量):
+   - **视频拒接率**:❌笔记原判「埋点未上」**已推翻**。dora `PwaTierQualityMetric.QUERY` 靠 `user_call_order.reason_type`(FEMALE_CALL_REJECT+FEMALE_NO_RESPONSE ÷ 有效邀请)算,**不依赖新埋点**,archat 可读。可对齐。
+   - **短通话率**:dora 只有 `<1s 女方主动挂断(NORMAL_FEMALE_HANG_UP)` **退化口径**,真·「挂断方 + <15s」埋点确实缺(`short_call_duration_threshold_seconds=15` 留待启用)。→ 置空或标注为代理口径。
+3. **小美周字段** —— ✅**【2026-08-25 解锁,从卡点移出】**。dora `release/test` 实现里四指标全在 **archat/MAIN**,Minerva 可 dms 直读(见下「小美周度四指标 SQL」),**不需 monitor `pwa_daily_data`、不需视图**。唯一前提:`pwa_tier_guarantee_daily` 须由 dora 日/周 job 真跑起来落库(每日 02:13 ET)。
 
 ### B. 阈值 —— 已按「nacos 为准」定(用户 2026-08-24 拍板)
 - B(opener 阈值)、D(视频发起率阈值)未配 → 按 `*_enabled` 视为**不参与判定**;活跃命中分支近似(只用右滑+划卡+收益),抽屉标准列占位。
@@ -63,5 +65,14 @@ tags: [minerva, pwa, tier, 权益池, 后台]
 3. **生效前提**:必须部署 minerva-server 到 admin-api-dev(strategy 连接 + business 指标都在后端)。
 
 ### D. 前端占位待后端补的字段
-- `invitationStatus`/`invitedAt`:已补查 `pwa_tier_invitation`(list 视图未含);
-- `hitBranch`:minerva 按阈值现算(dora 未把命中分支落 list 视图),活跃因 B/D 未配为近似。
+- `invitationStatus`/`invitedAt`:已补查 `pwa_tier_invitation`(list 视图未含);dora 状态机 PENDING/ACCEPTED/REJECTED/EXPIRED 齐全,过期 job(01:07 ET)只改状态**不下架 feed**(隐藏用户需 minerva/前端自己按 EXPIRED 做)。
+- `hitBranch`(命中分支列):→ **【2026-08-25 用户拍板:先不做,前端置空】**。dora `PwaTierEligibilityEvaluator` 算法齐全(NEWCOMER_FACE/SWIPE/CALL、ACTIVE_TEXT/VIDEO)但**只内存实时算、不落库**,`pwa_tier_candidate` 表被 V20260820 删、视图对应列(`matched_branch`/`eligibility_status`/`metrics`)一并没了。要对齐得 dora 补快照表+恢复视图列,当前置空。
+
+## dora release/test 核查(2026-08-25)——已实现可对齐的取数来源
+
+浅克隆 `dora-service@release/test` 核查后确认(详见 `30-Resources/pwa-xiaomei-weekly-sql.md`):
+- **保底**✅:表 `pwa_tier_guarantee_daily`(逐日 golive/gap/finalized/quality_passed)+ 账本 `ext_id` 前缀 `guarantee-daily:`/`guarantee-weekly:`。窗口 America/New_York、09:00–24:00、日周取高不叠加、封顶$500,与笔记口径一致。
+- **视频拒接率**✅:`user_call_order.reason_type`(archat),不依赖新埋点(生产开关默认关)。
+- **邀请状态**✅:detail 视图 `latest_invitation_status/decision/expires_at`。
+- **小美周度四指标 SQL**✅:①本周视频收益(剔保底)—— 退池口径 `WeeklyReviewJob:52`=VIDEO_CALL+MESSAGE_TEXT、补差口径 `VideoMetric:54`=仅 VIDEO_CALL(**两口径别用错**);②服务质量达标天数 `WeeklyReviewJob:62`(`pwa_tier_guarantee_daily` quality_passed);③Go Live 有效时长 `GuaranteeService:16`(`sp_v3_online_session`,IG、1min~24h、9-24点裁剪);④预计保底补贴=纯函数(`weeklyGap/weeklyPayout/weeklyTopUp`)+ `WeeklyJob:68/79` 两条取数。**全在 archat/MAIN**。
+- **仍不做/dora 也没有**:命中分支(不落库,已拍板不做)、视频主动发起率D(已拍板不做)、短通话率真·<15s(埋点缺,退化口径)。
