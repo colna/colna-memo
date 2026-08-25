@@ -39,3 +39,11 @@ tags: [pwa, snapchat, 回归测试, savvy]
 ## 五、快速验证点
 - savvy 包:首页 Task 无「Authorize Snapchat」;有积压订单也不出 Snapchat Social Connect 卡;设置页 Link Social Media 只有 Instagram。
 - haven_pwa 包:以上 Snapchat 全部照常。
+
+## 六、H5 web 环境(2026-08-24 补充 commit cf9b36d2d)
+- **H5 一律不隐藏 Snapchat**:`hideSnapchat` 只由真机 `getApkName` 决定;H5 下 getApkName 返 "" → hideSnapchat=false。即使 URL `?app_name=savvy` 也不隐藏(URL 兜底只用于展示/tracking,不触发隐藏)。
+- **H5 点任意社媒授权入口 → 弹「下载 App」弹窗**(三处一致):
+  - 授权抽屉(showInsModal / authorizeOrLogin):H5 本就弹 `showApkDownloadModal` ✓
+  - Task 一次性授权任务(authorizeOrLogin):同上 ✓
+  - Home Social Connect 卡(openSocialProxyWebView):本次加 H5 判断,非 APK 弹 `showApkDownloadModal("social_connect_card")`(原直调 bridge 在 H5 静默无反应)
+- **回归点**:H5 用 `?app_name=savvy` 打开 → Snapchat 仍显示(不隐藏);点 IG/Snapchat 授权(抽屉/任务/Social Connect 卡)都弹下载 App 弹窗,不再静默无反应。
