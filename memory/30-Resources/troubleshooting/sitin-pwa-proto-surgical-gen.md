@@ -70,3 +70,25 @@ committed `src/gen` 头部有 `//   protoc  v6.32.0`;本机 brew 是 **v7.35.1**
 ### commitlint 拒自定义 merge 首行
 merge commit 首行若写 `Merge feature/x + 说明…` 会被 commitlint 判 `type-empty` 拒。
 必须用标准 `Merge branch 'feature/x' into <cur>`(commitlint 默认忽略此前缀),说明放正文。
+
+---
+
+## 追加(2026-08-25)只加一个 Response 接口 + committed gen 含「手写占位字段」时的干净 regen
+
+**场景**:nationwide 分支加 `getPwaTierInvitationPopup`(proto PR#453,只改 user_api.proto)。
+
+### 先判断:整包同步能不能过 tsc
+- 直接 `git checkout origin/release/test -- archat_api/user_api.proto` 整文件替换后 regen → `app-pwa tsc -b` **炸 7 处**:release/test 把 app 在用字段改/删了(`benefit_config_version`/`terms_version` 移除;`video_income_target_micros` 改名 `required_video_income_micros` + 加 service_quality_passed 等)。→ 整包不安全,退回 surgical。
+
+### committed gen 有「前端先行手写占位字段」时的坑
+- committed `user_api.ts` 的 `PwaTierGuaranteeProgress.videoIncomeTargetMicros`(注释「前端先行占位字段」)**不在任何单一 proto commit**。
+- 从记录指针 `3884fef0` 直接 regen → 会 **-23 行**(丢占位字段),diff 变脏、且 app 用它会编译错。
+- **手法(干净 diff)**:submodule 里 `git checkout 3884fef04 -- archat_api/user_api.proto` 为底,手补占位字段到对应 message(注释/字段号/类型要和 committed gen 完全一致,ts-proto 会把 `//` 注释转成 `/** */`),再追加目标 message,然后 regen。这样 `user_api.ts` 的 diff **只剩目标 message**(+ 偶发一处相邻字段换行的格式化噪声,无害)。
+- 目标是 Response-only 接口:gen 出 `GetPwaTierInvitationPopupResponse`(interface + MessageFns)即可,自足(引用已存在的 PwaTierResponseMeta/GetPwaTierMeResponse)。
+
+### Response-only 接口前端调不通的两个前置(后端侧)
+- httpClient `requestPost2(ReqMsg, payload, ResMsg)` 靠 **Request message 的 `$type` → protoIdMapping** 推 protoId 和 url。
+- 只有 Response、没有 `XxxRequest` message → 无法发起;且 `protoIdMapping.json` 由 `ProtoConfig_*.json` 的 `id` 生成,PR 只加 .proto message 没登记 ProtoConfig id → mapping 里没有该接口。两者都要后端补齐才能真正调。
+
+### 环境坑(复用「shared checkout」)
+- `sitin-next3` 被并发会话反复横跳分支。改 gen 前后锁定分支,未提交的 gen diff 先 `git diff > scratchpad/xxx.patch` 备份防横跳丢失。
