@@ -142,3 +142,22 @@ RFC 原文(「新增一次性任务」格):Authorize snapchat 💲0.5;未登录�
 **关键文件**:`types/task.ts`(TaskId 枚举 + `CUSTOM_TASK_CONFIGS`,L100)、`types/taskRegistry.ts`(TaskDef 注册)、`hooks/useTask.ts`(L148 customTasks 注入 / L300 合并)、`http/insApi.ts`(`listUserInsExchangeOrder`)、`utils/bridge.ts`(`openSocialProxyWebView`)、`pages/Home/OnboardingTaskList.tsx`(渲染)。
 
 **待用户**:给 Social Connect IG / Snapchat 两个 taskId → 补占位后实现 Task 2/3。Task 1 可先做。
+
+## 2026-08-27 · reland 落地 + 三任务状态更新(已做)
+
+**背景**:#960(d2e5198)把 SP-V2 移植进 feature/pwa 时,整体覆盖了 #935 的实验感知 onboarding → onboarding_b「任务完不成」。走 **revert(#1027)+ reland(#1028)** 修复。
+
+**确立原则**:**「onboarding 用 feature/pwa 好版为基,多社媒(SP-V2)需要时在其上加」**。reland = 好版 onboarding 簇 + SP-V2 纯功能文件,混合文件外科手术。
+
+**已落地(feature/pwa,#1028 已合并)**:
+- onboarding 实验簇 7 文件回好版(useOnboardingCompleted/onboardingTasks/useTask/useUserInit/App/OnboardingTaskList/sitin4Debug),修复 B 组完不成。
+- **Task 1「Authorize Snapchat」(taskId 137)= 已做**:useTask 补 `case BindSnapchatAccount → authorizeOrLogin("snapchat","media_task_from_tasklist")` + getTaskTitle。(与原 SP-V2 逐字一致,只是标题加后端兜底。)
+- **AIPersonaPlaceholder**:回好版 5 态 + 授权页(ig-unbound/ig-login-lost)用 SP-V2 EarnToChatState(IG/Snapchat 双按钮,useUA 非 haven 隐 SC)。
+
+**已落地(PR #1040,social-connect-card 分支,待合)**:
+- **Task 2/3「Social Connect on IG/Snapchat」= 已做,但实现与原计划不同**:不是新 custom taskId(200014/200015),而是**复用 d2e5198 原 SocialConnectCard**——**无 taskId 的前端条件卡**,加性移植进好版 OnboardingTaskList。触发 `pendingByPlatform[platform]>0 && loggedInByPlatform[platform]!==true`;金额=该平台积压订单合计;点击 `openSocialProxyWebView(platform)`;useUA 非 haven 隐 SC;渲染排任务卡前;null 守卫 `displayTasks==0 && socialConnectCards==0`。→ **原笔记里「待 2 个 taskId」作废,不需要新 id**。
+- **CE 派发按平台隔离(fix)**:原 SP-V2(#960 起)登一个平台会 `checkPendingOrders()` 全量 → handleAcceptExchange 给「所有涉及平台」tryStartInsRobot 且整批 return。改:`checkPendingOrders(scopePlatform?)`,登录订阅按刚上线平台传 scope、只 filter 派发该平台订单(pendingByPlatform 卡金额仍全量;init 全量不变)。⚠️ 未实机验证。
+
+**仍待做**:① `useUserInit.resetSocialAuthDrawerDismissed`(遗漏,2 行)未补;② PR #1040 待 review/合;③ 上面两项(SocialConnectCard + CE 隔离)需实机验证;④ social-auth 阻塞任务(RFC 那套 GlobalAnomalyBanner)仍未做;⑤ 生产 release/online-pwa 的 onboarding 仍坏版待修。
+
+**分支现状**:feature/pwa=含 reland;test-pwa2=已强拉齐到 social-connect-card(同 commit);online-pwa-pre 用 #1029 对齐(内容级)。
