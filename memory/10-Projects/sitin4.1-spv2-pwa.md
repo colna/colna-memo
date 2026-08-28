@@ -154,7 +154,7 @@ RFC 原文(「新增一次性任务」格):Authorize snapchat 💲0.5;未登录�
 - **Task 1「Authorize Snapchat」(taskId 137)= 已做**:useTask 补 `case BindSnapchatAccount → authorizeOrLogin("snapchat","media_task_from_tasklist")` + getTaskTitle。(与原 SP-V2 逐字一致,只是标题加后端兜底。)
 - **AIPersonaPlaceholder**:回好版 5 态 + 授权页(ig-unbound/ig-login-lost)用 SP-V2 EarnToChatState(IG/Snapchat 双按钮,useUA 非 haven 隐 SC)。
 
-**已落地(PR #1040 ✅ 已合并 feature/pwa,08-27 11:30)**:
+**已落地(PR #1040 ✅ 已合并 feature/pwa,北京 08-27 19:30)**:
 - **Task 2/3「Social Connect on IG/Snapchat」= 已做,但实现与原计划不同**:不是新 custom taskId(200014/200015),而是**复用 d2e5198 原 SocialConnectCard**——**无 taskId 的前端条件卡**,加性移植进好版 OnboardingTaskList。触发 `pendingByPlatform[platform]>0 && loggedInByPlatform[platform]!==true`;金额=该平台积压订单合计;点击 `openSocialProxyWebView(platform)`;useUA 非 haven 隐 SC;渲染排任务卡前;null 守卫 `displayTasks==0 && socialConnectCards==0`。→ **原笔记里「待 2 个 taskId」作废,不需要新 id**。
 - **CE 派发按平台隔离(fix)**:原 SP-V2(#960 起)登一个平台会 `checkPendingOrders()` 全量 → handleAcceptExchange 给「所有涉及平台」tryStartInsRobot 且整批 return。改:`checkPendingOrders(scopePlatform?)`,登录订阅按刚上线平台传 scope、只 filter 派发该平台订单(pendingByPlatform 卡金额仍全量;init 全量不变)。⚠️ 未实机验证。
 
