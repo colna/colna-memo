@@ -92,3 +92,24 @@ merge commit 首行若写 `Merge feature/x + 说明…` 会被 commitlint 判 `t
 
 ### 环境坑(复用「shared checkout」)
 - `sitin-next3` 被并发会话反复横跳分支。改 gen 前后锁定分支,未提交的 gen diff 先 `git diff > scratchpad/xxx.patch` 备份防横跳丢失。
+
+---
+
+## 追加(2026-09-01)整包对齐 release/online:何时是「删除型 regen」+ pre-push 被无关包拖累
+
+**场景**:feature/pwa 把 proto 整体对齐 `release/online` 并 regen(PR#1077)。
+
+### 现版工具链变化(好消息)
+- `generate.sh` 头部已改用 `// @ts-nocheck`,**不再写 protoc 版本行** → 8/19 记的「protoc 版本噪声」坑消失,diff 干净很多。
+- 包内已有现成脚本:`proto:online`(fetch+checkout origin/release/online+generate.sh+build)、`proto:test` 同理。想整包同步直接用,不必手敲。
+
+### 判断「删除型 regen」是否安全的套路
+- committed `src/gen` 常**领先** online(混入 live_api + test/nationwide 才有的接口)。整包 regen 到 online 的净效果往往是**删除**(本次删 live_api.ts 9749行 + Live*/GetPwaMatchFeeds/PwaSwipeCard/GetFaceVerifyConfig/GetClinkPrewarmSession/GetConversationChatMode 等一批 mapping)。
+- 安全门槛两步:① 从 `git diff protoIdMapping.json` 抽出被删接口名,`grep -rl '\bXxxRequest\b\|\bXxxResponse\b' packages --include=*.ts(x)` 排除 proto 自身,确认**全仓库零引用**；② `app-pwa tsc -b` 必须 0 error(唯一消费 proto 的 app;app-cashier 不引用 proto)。两者都过 → 整包删除安全。
+- 判断新增:`git diff protoIdMapping.json | grep '^+' ...` 为空 = online 相比 committed 无新增接口,本次纯删除+字段对齐。
+
+### app 走 dist 不走 src(重要)
+- `business-pwa-proto` package.json exports `./gen/*` → **./dist/gen/*.d.ts**。改 src/gen 后 app-pwa tsc 看不到,**必须先** `pnpm --filter @heyhru/business-pwa-proto build` 更新 dist；再 build app-pwa 依赖(web-util-http/common-util-format/web-util-media/common-util-event-bus/common-util-timezone,见 app-pwa `vercel:build` filter)才能 `pnpm --filter @heyhru/app-pwa exec tsc -b`。
+
+### pre-push 会被无关包全量拖累
+- `.husky/pre-push`=`pnpm test --affected && pnpm build --affected`。改 proto 让一堆下游 minerva 包变 affected,它们因刚 pull 大量 commit **未 install/build**(新包如 server-ext-onerway 无 dist)报 TS2307,且 business-minerva-payhub 自身有 TS7006/TS2347 真错 → pre-push 挂。**与 proto 改动无关**。按全局约定「无关包全量 hook 拖累」凭用户逐次授权 `git push --no-verify`。pre-commit(lint+circular)不受此影响,正常过。
