@@ -31,7 +31,7 @@ tags: [sitin-rn, koda, buglist, feishu-base]
 - **UI/设计稿还原(12)**:R00228/R00232/R00234/R00235/R00236/R00237/R00241/R00243/R00245/R00246/**R00247✅**/R00249。
 - **文案(2)**:R00229 CE 介绍页文案 ✅已修(PR #347,merge `c7be799b`)· R00240 首页 say hello 文案。
 
-> **进度**:R00243/R00244/R00246 已修复合入 `feature/koda-android`(PR #351,merge `cead46f1`)——设置页 Your character 卡跳已有编辑页/拉黑数量/privacy 版式。R00245(Your story)无后端支撑,决策**暂不做**(维持有意省略)。R00247 已修复合入 `feature/koda-android`(PR #350,merge `b297915f`)——legal-document 重写为 Koda 版式。R00249 核查=前端已达标,单 KPOP 是后端数据。R00229 已修复合入 `feature/koda-android`(2026-09-02)。根因=chemistry-how 绝对定位画布标题两行溢出压正文;修法=外层 canvas 改流式。详见当日 Daily。
+> **进度**:R00234/R00237/R00241 已修复合入 `feature/koda-android`(PR #353,merge `3c7015d5`)——消息详情页顶栏/底栏/输入框/键盘/图标对齐 Figma 653:3(R00241=详情页本无 GIF,对齐即解决)。R00243/R00244/R00246 已修复合入 `feature/koda-android`(PR #351,merge `cead46f1`)——设置页 Your character 卡跳已有编辑页/拉黑数量/privacy 版式。R00245(Your story)无后端支撑,决策**暂不做**(维持有意省略)。R00247 已修复合入 `feature/koda-android`(PR #350,merge `b297915f`)——legal-document 重写为 Koda 版式。R00249 核查=前端已达标,单 KPOP 是后端数据。R00229 已修复合入 `feature/koda-android`(2026-09-02)。根因=chemistry-how 绝对定位画布标题两行溢出压正文;修法=外层 canvas 改流式。详见当日 Daily。
 
 **同批**:R00241~R00248 都带 `(ID：2100065646)`,同一测试同批提。
 **设计稿**:Figma Koda `https://www.figma.com/design/RwULBso4PNCNqKYZbW6VSY/Koda`。
