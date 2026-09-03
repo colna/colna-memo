@@ -22,7 +22,7 @@ tags: [sitin-rn, koda, buglist, feishu-base]
 | 消息 chat | 6 | R00228✅/R00234✅/R00235✅/R00236✅/R00237✅/R00241✅ |
 | 设置 settings | 5 | R00243✅/R00244✅/R00245⏸/R00246✅/R00247✅ |
 | 首页 discovery | 4 | R00223✅/R00240✅/R00242✅/R00248✅ |
-| 我的 me | 3 | R00222/R00232/R00249 |
+| 我的 me | 3 | R00222/R00232⏸/R00249🔎后端 |
 | 拉黑 block | 1 | R00227✅ |
 | CE | 1 | R00229(P2) |
 
@@ -46,3 +46,14 @@ tags: [sitin-rn, koda, buglist, feishu-base]
 
 ## 建议开工顺序
 B 类逻辑缺陷 → A 类缺页面硬伤(R00243/R00245/R00232)→ 纯 UI 对齐与文案。
+
+## R00249 兴趣标签分类 —— 接口与定性(2026-09-03)
+
+**接口**:`GetInterestTabsRequest` → `POST /userApi/getInterestTabs`,返回 `GetInterestTabsResponse.tabs: InterestTab[]`(每个 = `{key 分类名, sortKey, tags[]}`)。请求体有可选 `interestTabType`(枚举),但**koda 与 iris 都空参 `{}` 调**。
+- koda 调用链:`edit-profile/interests-profile-editor.tsx → services/user.getInterestTabs → business-edit-profile/index.ts:242 → client.call(GetInterestTabsRequest,{})`。
+- **iris 处理方式和 koda 一模一样**:同一个共享 `business-edit-profile.getInterestTabs()`、同样空参、同样按 `tab` 分组渲染(iris 用 `picker-edit-sheets.tsx`)。客户端两 app 无区别。
+
+**定性:R00249 是后端/数据问题,不是客户端能修的。** 前端已按 `tab.key` 分组。分类和标签**全由该接口返回决定**。
+- iris **mock** 返回的是干净多分类(Outdoors/Food & drink/Music & film/Making things/Culture/At home/Out and about,各带 key+sortKey+tags)——印证设计稿意图。
+- koda 连的 **dev 后端**返回一个「KPOP」大分类 + 一堆「for pic」seed 标签,所以看着「没分类」。
+- **处置**:转后端把兴趣标签配成多分类,或换生产环境验证;不改客户端。
