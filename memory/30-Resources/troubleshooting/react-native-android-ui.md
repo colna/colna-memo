@@ -12,3 +12,9 @@
 **根因**:容器用 `flexDirection:row` + 文字 `flex:1`,但该容器/其父级的宽度是「按内容 hug」而非确定值(常见叠加 `alignSelf:"stretch"`,让卡片去 stretch 到某个很窄的兄弟宽度)。没有确定主轴宽度时,`flex:1` 文字按 min-content 收缩 → 每行一个字。
 **修法**:给该卡片/容器一个**确定宽度**(`width` 或 `maxWidth` 一个具体数),不要靠 `alignSelf:stretch` + `flex:1` 去撑。
 **出处**:koda `chat-bubble.tsx` 的 ContactPrivacyNotice(发联系方式拦截提示),`alignSelf:stretch`→`width:268` 修好(R00228)。
+
+## Figma IMAGE-SVG 节点别凭猜,导出看(2026-09-02)
+
+**坑**:Figma `get_figma_data` 返回的 `[IMAGE-SVG]` 节点通常只给尺寸/位置,不给路径内容(fills 常为空 `[]`)。据此判断「这里有没有图标/是什么图标」会误判——例如首页距离胶囊的 pin 被当成「无图标」误删、Interest 按钮的书本图标被当成心形。
+**做法**:凡是要还原的小图标(IMAGE-SVG),用 `mcp__figma__download_figma_images` 按 nodeId 导出 SVG 看真实路径,再用 react-native-svg 逐字转写;拿不准就找用户要放大截图确认。
+**出处**:koda 首页卡 distance pin(609:258)+ Interest 图标(361:3509),PR #358。
