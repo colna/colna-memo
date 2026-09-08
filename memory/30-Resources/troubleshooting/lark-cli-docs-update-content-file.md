@@ -42,7 +42,8 @@ within the current directory (hint: cd to the target directory first)
 `ok: true`、`revision_id` 还涨了，但**文档一个字没变**。那句 warning 说的是「指令没有
 产生任何改动，可能内容与当前文档相同，或格式不符合预期」——实际原因是太大。
 
-**分片写**：先 `overwrite` 写头部，再逐片 `append`。实测 5000 字符一片稳定成功。
+**分片写**：先 `overwrite` 写头部，再逐片 `append`。实测 **5400 字符一片稳定成功**，
+43 片连写全部 success（总量 206K）。
 
 ## 写完一定要验
 
