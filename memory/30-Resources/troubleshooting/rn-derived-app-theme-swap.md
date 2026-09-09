@@ -69,7 +69,35 @@ const MIGRATED = [/^app\/login\.tsx$/, /^app\/onboarding\//, /^components\/onboa
 
 按**标签**走 —— 标签是能读到数的那个;跟着线走会出现「指针停在 30 上、30 的标签却偏出去半格」。把这个取舍写进代码注释,否则下一个人会以为是实现错了。
 
-## 7. 分支命名
+## 7. ⚠️ Figma 落地必须同时取「结构数据」和「渲染图」
+
+2026-09-09 第二次踩:只用 `get_figma_data` 拿结构 JSON 就开做,结果整轮返工。结构数据里图片只是一行 `imageRef`,**看不出画的是什么** —— 于是:
+
+- 五屏各自不同姿势的吉祥物(挥手 / 抬手 / 小号正面 / 抱红心),被我当成同一张图用了两张;
+- 漏掉的整整一屏(Splash),在结构 JSON 里和其它屏长得一样平平无奇。
+
+`figma-to-react-native` skill 原文就写着 **"Fetch the target node's structure **and a rendered image**"**。照做:
+
+```
+mcp__figma__download_figma_images  nodes=[{nodeId, fileName}]   # 整屏渲染成 PNG
+```
+
+然后**逐张 Read**。渲染图还能一眼看出结构数据读不出来的东西:间距的实际观感、图片内容、以及稿子自己的不一致。
+
+⚠️ `download_figma_images` 的 `localPath` 是相对 **MCP server 的 image dir**(这里是工作区根),写 `apps/luka/...` 会落到 `<工作区根>/apps/luka/...` 而不是 `sitin-rn/apps/luka/...`。下完先 `ls` 确认位置。
+
+## 8. 推倒重来 ≠ 每一行都重写
+
+同一天返工时的有效做法:被判「完全不对」的是**屏幕**,而 design token 和年龄标尺的交互机制是逐个从规格读的、已经跑过测试的。切了新分支之后:
+
+```bash
+git cherry-pick <token commit>                     # 整个提交拿回来
+git checkout <旧commit> -- path/a path/b path/c    # 只拿几个文件
+```
+
+省下的时间全部花在「逐屏对渲染图」上。
+
+## 9. 分支命名
 
 `sitin-rn` 的 `AGENTS.md` 规则 3:**⛔ 不许 `feature/<App名>` 这类常驻集成分支**,只许 `personal/<人>/<事>` 或 `feat|fix|docs|chore/<事>`,且合入目标唯一是 `main`。建分支前先看 AGENTS.md。
 
