@@ -38,7 +38,7 @@ const MIGRATED = [/^app\/login\.tsx$/, /^app\/onboarding\//, /^components\/onboa
 
 | 现象 | 根因 | 修法 |
 |---|---|---|
-| `pnpm boundaries` 报 `identity leak: contains "blueprint"` | 它扫的是**文本**,不是 import —— 中文注释里提一句「blueprint 那套按钮」就算泄漏 | 注释里改说「模板」/「派生来源」 |
+| `pnpm boundaries` 报 `identity leak: mentions "<app名>"` | 它扫的是**文本**,不是 import —— 中文注释里提一句「blueprint 那套按钮」「跟 Koda 同一个做法」就算泄漏。**这个坑很容易连踩两次**:写实现说明时引用另一个包是最自然的表达 | 注释里改说「模板」/「派生来源」/「本仓库另一个包」 |
 | `pet-flat-background.test.ts` 挂 | `src/assets/pet/pet-flat.mp4` 无 alpha,底色被**烤进视频**,与 `Colors.tagBg` 绑死 | `pnpm render-pet-flat <app>`(要 ffmpeg) |
 | `design/README.md` 写着别的包的名字和命令 | `pnpm new-app` 派生时没重写这个文件 | 落地新视觉时顺手重写,别信里面的色表 |
 
