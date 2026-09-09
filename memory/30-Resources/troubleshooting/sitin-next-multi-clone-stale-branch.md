@@ -17,3 +17,5 @@ tags: [git, sitin-next, worktree, 排错]
 2. 认「哪个 clone 是该分支的实际工作副本」——PWA 运营池/分级 tier 相关在 **sitin-next3**(见 `10-Projects/pwa-benefit-pool.md`)。
 3. 建 worktree 分析时,从**最新的那个 clone**或直接 `git worktree add <path> origin/<branch>`(用 origin ref)。
 4. 改动需跑 lint/tsc → 直接在有 node_modules 的主 clone(sitin-next3)上切分支干活(scratchpad worktree 没装依赖,工具链跑不了);其未跟踪 docs 目录不影响切分支。
+
+**相关**:[sitin-rn / sitin-rn2 双 clone 跑错目录 → pnpm script not found](sitin-rn-multi-clone-wrong-app.md) —— 同一类问题在 sitin-rn 上的另一种表现。
