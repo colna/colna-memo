@@ -66,6 +66,28 @@ read -r W H PIXFMT CODEC < <(ffprobe ... -show_entries stream=width,height,pix_f
 ffprobe 按它自己的固定顺序输出(`codec_name` 在 `width` 前面)。**必须带 key 输出、按 key 取值**
 (`-of default=nw=1` 然后 `sed -n 's/^width=//p'`),不能按位置读。
 
+## 坑四:`hevc_videotoolbox` 的三个参数不能自由发挥(ffmpeg 7.1.1 会编出打不开的文件)
+
+2026-09-09 在另一台 Mac(ffmpeg **7.1.1**)上,`compress-mov.sh` 编出的 MOV 让
+AVFoundation 报 **`Unable to start decoder`** —— 文件根本打不开;同一份 ProRes 4444
+源在本机 ffmpeg 9.0.1 上完全正常。对照组 `pet.mov` 用 swift 校验读到 `0.5612`,
+证明 swift 环境没问题,是产物坏了。
+
+差别在三个参数。仓库里两份能出好文件的脚本(`optimize-pet-mov.mjs`、
+`render-pet-animation.mjs`)**都不这么写**:
+
+| | 错误写法 | 正确写法 |
+|-|-|-|
+| 软编回退 | `-allow_sw 1` | **不给** —— VideoToolbox 的软件 HEVC 编码器不支持 alpha,回退后静默产出坏文件 |
+| 码率 | `-q:v <0-100>` 恒定质量 | `-b:v 400k`(320×320 的档,按面积等比放大) |
+| 像素格式 | `-pix_fmt bgra` | 滤镜链里 `format=gbrap,premultiply=inplace=1,format=bgra` |
+
+另外补 `-map 0:v:0 -map_metadata -1 -movflags +faststart`。**premultiply 必须和裁剪、
+缩放拼在同一条滤镜链里** —— 颜色和 alpha 走同一次重采样,边缘才不会错开一个像素出白边。
+
+**教训**:这类硬件编码器的参数不要自己推,直接抄仓库里已经跑通的那一份。
+本机能跑 ≠ 参数正确,只说明本机的 ffmpeg 兜住了。
+
 ## 编码参数
 
 | 场景 | 参数 |
