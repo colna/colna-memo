@@ -39,6 +39,23 @@ print(sum(1 for v in a if v<8)/len(a))'
 老版本 ffmpeg 仍会静默拍平成黑底、**中途不报错**,这是最危险的一种失败。稳妥写法是
 「ffmpeg 解不出 alpha + AVFoundation 解得出」时**拒绝执行**并提示升级 ffmpeg。
 
+**2026-09-09 在第二台机器上坐实了版本差异。** 另一台 Mac(`/Users/colna/WORK/sitin-rn`)
+上对**线上在用、确定带透明**的 `pet.mov` 跑同一条命令,读到 `0.0`:
+
+```bash
+ffmpeg -v error -i apps/luka/src/assets/pet/pet.mov -frames:v 1 \
+  -vf "format=rgba,scale=64:64" -f rawvideo -pix_fmt rgba - | \
+  python3 -c "import sys;d=sys.stdin.buffer.read();a=d[3::4];print(sum(1 for v in a if v<8)/len(a))"
+# 0.0        ← ffmpeg 9.0.1 上是 0.5537
+```
+
+**判别手法(便宜且可靠)**:拿一个已知带透明的文件当对照组跑一遍。对照组读到 0
+= 解码器不行;对照组正常而目标读到 0 = 文件真丢了 alpha。
+
+**由此引出的设计教训**:压缩脚本的输出校验**不能只用 ffmpeg**。同一段素材,输入是
+ProRes(谁都解得动)读到 0.7980、输出是 HEVC 读到 0 —— 这个不对称本身就是信号。
+`compress-mov.sh` 已改成 ffmpeg 读不到时用 AVFoundation 复核(commit `4f1441a4`)。
+
 ## 坑三:`ffprobe` 不按 `-show_entries` 的顺序输出字段
 
 ```bash
