@@ -47,3 +47,20 @@ chrome --headless=new --virtual-time-budget=800 --dump-dom "file://page.html" \
 ```
 
 截图用 `--headless=new --run-all-compositor-stages-before-draw`，比 `--virtual-time-budget` 稳。
+
+## 4. 让一个元素「从某块底色后面探出」
+
+子元素永远画在父元素自己的 `background` 之上，所以把吉祥物放进卡片里只会「站在卡上」，
+拿不到「从卡后探头」的效果。
+
+```css
+.band{ position:relative; isolation:isolate; }        /* 免得 z-index 泄到外面 */
+.band::before{ content:""; position:absolute; inset:0; z-index:1;
+               background:var(--band); border-radius:18px; }   /* 底色单独画一层 */
+.band .pet { position:absolute; z-index:0; bottom:0; }          /* 探出的那位在底色下面 */
+.band p    { position:relative; z-index:2; }                    /* 文字在最上面 */
+```
+
+调「露多少」有两个数联动，别只调一个：
+`pet` 的高度、以及条自身的高度（文案换行会把条撑高，露出的比例跟着变）。
+文案能不能一行放下，直接决定探出来的是「整个头」还是「两只耳朵」。
