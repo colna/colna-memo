@@ -56,3 +56,24 @@ CLAUDE.md 说输出文件放 `$OUTPUTS_DIR`,但**实测该变量没导出到 she
   3. 角色设定整段
   4. **WHAT MUST VISIBLY CHANGE**:逐条写「现在这只哪里错了、应该是什么样」—— 只给正面描述模型会偷懒不改
 - **实测残留**:细小特征(如「胡须几乎看不见」)最难压住,模型倾向画显眼的长胡须。这类特征要在 3 和 4 里**重复两次**才有机会生效。
+
+## 要透明底:站点这条路做不到,得「纯白底 + 本地抠」
+
+- **根因**:`drivers/gpt-image.ts` 的 `buildSubmit` 只发
+  `{model, prompt, n, size, response_format}`,**没有 OpenAI 的
+  `background: "transparent"`**。所以走 AIGC-Studio 永远拿不到真透明 PNG。
+  (要真透明得改仓库那一处 + 确认 callapi.top 跟进了该参数。)
+- **折中办法**:出纯白底再抠,两步都有讲究。
+  1. prompt 里必须同时写死这几条,少一条就白干:
+     ```
+     PURE FLAT WHITE #FFFFFF background and nothing else.
+     NO glow, NO halo, NO vignette, NO gradient, NO coloured rim light.
+     NO drop shadow, NO contact shadow, NO ground plane, NO reflection.
+     ```
+     **模型默认会给暖光晕 + 接地阴影**,抠完就是一圈脏边。
+  2. `.claude/skills/image-gen/scripts/cutout_bg.py`(工作区 skill)。
+- **抠图关键:不能「把白像素全变透明」**——角色身上的白毛会被打穿。
+  正确做法是**从画布四边 flood fill**,只有与边缘连通的背景才去掉;角色内部的白色
+  被前景包围,碰不到。边界按「离背景色的距离」给部分 alpha,毛发边缘才是软过渡。
+- **验收**:把结果叠到深青 / 深洋红这类深色底上看白边,别只看棋盘格预览。
+- 依赖 numpy + Pillow,**系统 `/usr/bin/python3`(3.9) 两个都有**;Homebrew python3 没有。
