@@ -93,3 +93,35 @@ const HIT_SLOP = { top: 6, bottom: 6, left: 8, right: 8 };  // 34 + 6 + 6 = 46pt
 ```
 
 看起来小、点起来不小。
+
+## 6. 「让 B 区和 A 区等高」不要靠调间距凑
+
+需求常见形态：「右边这坨文字和按钮，高度要和左边头像一致」。
+
+**别去挨个调 margin 试**——数据一变（少一个字段、名字换行）又不齐了。
+把它变成结构约束：
+
+```tsx
+<View className="flex-row items-start">
+  <Avatar size={AVATAR} />
+  {/* 写死总高 = 基准元素，行间距交给 justify-between 去分 */}
+  <View className="ml-4 flex-1 justify-between" style={{ height: AVATAR }}>
+    <NameRow />   {/* 各行不再自己加 mt-* */}
+    <FactsRow />
+    <ActionRow />
+  </View>
+</View>
+```
+
+代价是**每一行占多少必须是确定的数**，且加起来要放得下：
+
+```
+名字 22 + 事实 16 + 按钮 28 = 66 ≤ 76(头像)，余 10 由 justify-between 分成两道间距
+```
+
+两个容易翻车的点：
+
+1. **文字行要写死 `lineHeight`**。交给字体默认行高，这一行就是「大约 26」，
+   `justify-between` 会按实际值分配，结果每台设备、每种字体都不一样。
+2. **这笔账跨文件**（按钮高度往往在另一个组件里）。光靠命名藏不住这种耦合，
+   两边注释里都要写明「改这个数之前先看那边的账」。
