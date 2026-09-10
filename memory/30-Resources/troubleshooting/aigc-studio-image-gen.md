@@ -44,3 +44,15 @@ Cookie: aigc_session=<JWT>
 CLAUDE.md 说输出文件放 `$OUTPUTS_DIR`,但**实测该变量没导出到 shell**(读出来是空)。
 脚本里拿它当默认值会静默落到当前目录。要发回飞书就传绝对路径,或落盘后 `cp` 到
 系统提示给的 `.../metabot-outputs-max/<chat_id>`。
+
+## 要「照 B 图的样子改 A 图」但只能传 1 张参考图
+
+- **约束**:driver 的 `refImages: { max: 1 }`,`/images/edits` 只吃一张图。想「把 A 图里的角色换成 B 图里的角色」时,两张图喂不进去。
+- **做法**:**传要改的那张(A)当参考图,把 B 的形态用文字写死在 prompt 里**。
+  文字描述若已有权威版本(如 `Luka-Swipe-Deck-Prompt-EN.md` 的 MASCOT 段落),直接整段抄进去,别自己重写 —— 那段本来就是角色设定的真源。
+- **prompt 结构**(实测有效):
+  1. `Edit the attached image. Change ONE thing only: REPLACE X ...`
+  2. **KEEP EXACTLY AS IS** 逐项枚举要保留的元素(背景/文案原文/装饰/构图/姿势),越具体越不会被重画
+  3. 角色设定整段
+  4. **WHAT MUST VISIBLY CHANGE**:逐条写「现在这只哪里错了、应该是什么样」—— 只给正面描述模型会偷懒不改
+- **实测残留**:细小特征(如「胡须几乎看不见」)最难压住,模型倾向画显眼的长胡须。这类特征要在 3 和 4 里**重复两次**才有机会生效。
