@@ -61,3 +61,16 @@ c = Image.new("RGBA", im.size, (26,20,16,255)); c.alpha_composite(im)
 vis = A > 20
 bad = ((np.minimum(r,b) - g) > 25) & vis      # 可见像素里还有多少偏幕布色
 ```
+
+## 附：多轮改图时，参考图要先落到自己的目录
+
+飞书发来的图落在 `/var/folders/.../metabot-downloads-max/`，**这个目录会被清空**
+（实测几分钟内就没了），第二轮 `--ref` 会直接报 `参考图不存在`。
+
+拿到参考图第一件事：
+
+```bash
+cp "$FEISHU_IMG" "$SCRATCHPAD/ref-<说明>.png"
+```
+
+之后所有轮次都引用 scratchpad 里的副本。
