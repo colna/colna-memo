@@ -112,3 +112,41 @@ commit，那颗震动**从来没响过**。换容器时沿用旧的 `SCROLL_THRE
   且**不需要测量**。不换行只会切出半颗。
 - **设计稿在溢出问题上通常帮不上忙**：示例数据都是短词，正好排满一行，从没碰到过溢出。
   别指望翻稿子能找到答案，这是实现要自己定的取舍。
+
+## 五、expo-video：卸载时对已释放的播放器调方法会崩
+
+```
+FunctionCallException: Calling the 'pause' function has failed
+→ NotFoundException: Unable to find the native shared object
+```
+
+`useVideoPlayer` 内部是 `useReleasingSharedObject`，它注册的 `useEffect(…, [])` 在
+cleanup 里 `release()` 掉原生播放器。它在组件里**先于**你自己那个 `useFocusEffect`
+声明，而 **React 按 effect 的声明顺序跑 cleanup** —— 于是卸载时是「先释放、后 pause」，
+第二步对着一个已经没了的原生对象调方法。
+
+顺序改不了（要拿到 `player` 就得先调 `useVideoPlayer`），只能在调用处兜住：原生对象
+释放后 JS 侧没有任何标志可查，`try { player.pause() } catch {}`，调不动就算了。
+
+**为什么很久都没炸**：这条路径要求组件真的卸载。播放器挂在 tab 屏上时几乎永远不卸载；
+是新加的挂载点（切换子视图、路由返回）把它激活的。**给一个已有的视频组件加新的使用
+位置时，先想清楚这个位置会不会卸载。**
+
+## 六、写死的尺寸要按最小屏反推一遍
+
+`SCRIM_HEIGHT = 260`（卡片底部压暗的高度）在 390 屏上没问题，在 iPhone SE 上等于整个
+卡高 —— 渐变从上盖到下，整张照片显灰，正是那行注释自己写的「再高整张照片会显灰」。
+
+凡是「盖住某一带」的绝对像素值，都该写成 `Math.min(上限, 容器 * 比例)`。同类的还有
+「卡片下方那块占多高」这种从可用高度里扣的常量：算错 5pt 不会报错，只会让下面的东西
+悄悄贴边。
+
+## 七、共用工作区：提交前先确认分支
+
+用户在同一个 clone 上跑模拟器、切分支，而 agent 同时在改文件。踩过两次：
+
+- 改到一半分支被切走，**提交落到了别人新建的分支上**；
+- 切换过程中**已改好的文件被还原**，提交里少了一个文件，靠 push 前的 typecheck 才发现。
+
+→ `git add` 之前跑一次 `git branch --show-current`，`git status --short` 的文件清单
+也要和自己改过的对一遍。
