@@ -35,3 +35,30 @@ git worktree add ../<my-wt> <我的分支>  # 之后全程在独立工作树里�
 - 新 worktree **不继承 `node_modules`**，要单独 `pnpm install`（monorepo 有全局 store，不算慢）。
 - 需要暂存时别用裸 `stash`：用一个临时 WIP 提交，或
   `git stash push -u -m "<唯一标签>"` + `git stash apply <sha>`（不要 `pop`）。
+
+## 开 PR 前必查：base 选对了吗
+
+并行会话把基线分支删掉/合并掉之后，你的分支会「悬空」——历史还在，但没有任何
+远端分支包含它的基点。这时直接开 PR，会把基线上那一串**别人尚未合并的提交**
+一起算成你的改动。
+
+```bash
+git branch -r --contains <我的基点>        # 只剩我自己 → 基线没了，别直接开 PR
+git log --oneline -1 origin/<候选 base>    # 信息里带 (#NNN) 的通常就是集成分支
+git rev-list --count origin/<base>..HEAD   # 领先数 > 我实际的提交数 → 基线选错了
+```
+
+摘出自己那几个提交：
+
+```bash
+# 先确认我改的文件在两边一致，rebase 不会冲突
+git diff --stat origin/<base> <我的基点> -- <我改的文件>     # 空 = 一致
+git rebase --onto origin/<base> <我的基点>
+git push --force-with-lease
+```
+
+**rebase 之后一定重跑一遍 typecheck / lint / test 再推** —— 换了基线，之前那次验证
+证明的是另一棵树。
+
+另外：仓库有多条产品线时，`origin/main` 未必是你这条线的 base。
+先 `git show origin/main:<你改的文件>`，报 “不存在” 就说明这条线还没合进 main。
