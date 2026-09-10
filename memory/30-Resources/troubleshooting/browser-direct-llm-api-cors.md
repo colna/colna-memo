@@ -69,3 +69,15 @@ curl -s -i -X OPTIONS '<base>/v1/models' \
 
 要 **2xx 且带 `Access-Control-Allow-Origin`**,缺一不可。选中转站前先跑这条,
 比部署完再排查省一天。
+
+## 补充:CORS 只挡浏览器,服务端调用完全正常(2026-09-10 实测)
+
+拿同一把 key 从命令行打 `api.muskapi.cc`,一切正常:
+
+- `GET /v1/models` → 200,**92 个模型**,图像类有 `gpt-image-2` / `-4k` / `-adobe` /
+  `gpt-image-2.5` / `-flare` / `-sunburst`,以及一批 `gemini-*-image`。
+- `POST /v1/images/generations` → 200,41s 出图,`b64_json` 正常。
+- 还支持 `background: "transparent"` 出真 alpha(见 `aigc-studio-image-gen.md`)。
+
+**所以 403 纯粹是 CORS 白名单的事**,不是 key、不是限流、不是服务故障。
+这类中转站定位就是「服务端调用」,前端要用必须自己加一层同源代理。

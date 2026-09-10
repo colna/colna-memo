@@ -77,3 +77,31 @@ CLAUDE.md 说输出文件放 `$OUTPUTS_DIR`,但**实测该变量没导出到 she
   被前景包围,碰不到。边界按「离背景色的距离」给部分 alpha,毛发边缘才是软过渡。
 - **验收**:把结果叠到深青 / 深洋红这类深色底上看白边,别只看棋盘格预览。
 - 依赖 numpy + Pillow,**系统 `/usr/bin/python3`(3.9) 两个都有**;Homebrew python3 没有。
+
+## 透明底的正解:供应方支持 `background: "transparent"`(2026-09-10 实测)
+
+前面那套「纯白底 + `cutout_bg.py` 抠图」是**因为 AIGC-Studio 的 driver 没传参数**才需要的折中。
+直连 OpenAI 兼容中转时,**直接要真 alpha**:
+
+```jsonc
+{
+  "model": "gpt-image-2",
+  "prompt": "...",
+  "size": "1024x1024",
+  "response_format": "b64_json",
+  "background": "transparent",   // ← 关键
+  "output_format": "png",
+  "quality": "high"
+}
+```
+
+- 实测 `api.muskapi.cc/v1` 支持:返回 `background: "transparent"`,PNG 为 **RGBA**,
+  alpha 范围 `(0, 254)` —— 真透明,不用抠。
+- **prompt 里仍要写死** `NO drop shadow / contact shadow / ground plane / reflection`,
+  否则模型会把阴影画进不透明像素里,alpha 通道救不了。
+- 响应还回 `usage`(input/output tokens、image_tokens),可用来算成本。
+- 耗时:1024×1024 约 **41~55s**(quality medium/high 差别不大)。
+- `quality` 传 `high` 时响应里回显的仍是 `medium` —— 该中转可能没透传,别当成功验证。
+
+**判断某个中转支不支持**:发一次带 `background: "transparent"` 的请求,
+看响应 JSON 的 `background` 字段和产物的 PIL `mode`(要 `RGBA`)+ alpha extrema(最小值要为 0)。
