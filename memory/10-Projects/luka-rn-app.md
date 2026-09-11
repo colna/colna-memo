@@ -35,6 +35,11 @@ tags: [project, sitin-rn, luka, react-native]
   「一张白卡装整条帖子」（`rounded-[20px] border bg-surface`），列表不再画行分隔线；
   点赞用 `HeartGlyph`（稿子 post ActionRow 2271:182），**不是** Feed 卡片的拇指
   `FeedLikeGlyph` —— 两处不是同一个动作。
+- **那只小崽的气泡是全 App 唯一的投影**（`my-feed-pet.tsx` 的 `BUBBLE_SHADOW`：10% `Colors.foreground`、
+  半径 8、下移 2、Android `elevation: 3`）。这套设计讲「层级靠线与留白」，`design/theme.js` 形状语言 §4、
+  `src/theme/shadows.ts`、守门测试三处都写着「没有阴影」—— 这一处是**显式例外**（用户拍板，2026-09-11），
+  **规则本身没放宽**，只在测试白名单里给这一个文件开口子，并在两处文档留了注记。气泡底色 `#F7CFD5`，
+  比 `Colors.peach` #F2B5BC（心形、点赞那种点状元素用）浅一档；尾巴与气泡同色，**尾巴不单吃投影**。
 
 ## 仓鼠素材（`src/assets/pet/`）
 
