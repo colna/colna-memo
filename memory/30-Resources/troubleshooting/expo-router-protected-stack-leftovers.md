@@ -59,3 +59,7 @@ export function popToSessionRoot(): void {
 这类 bug 常常和另一个 bug 叠在同一个用户操作上（当时是「删号请求本身也不成功」）。
 **只修一个都看不出效果** —— onboarding 只有在删除真的成功、拿回 pending 新账号时才会
 出现。排查时先把两条因果链拆开，否则会误判第一处没修好。
+
+## 相关
+
+- [expo-router：深链冷启动进二级页，返回键报 GO_BACK](expo-router-deeplink-back-empty-stack.md)

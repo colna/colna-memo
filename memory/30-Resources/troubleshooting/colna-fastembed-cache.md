@@ -29,3 +29,6 @@ pub fn get_cache_dir() -> String {
   写进 `colna` 包装脚本一处生效（未做，改前要确认）。
 - KB 的 `.gitignore` 已忽略 `/.fastembed_cache` 与 `.fastembed_cache/`；别的仓库没有这条，才会
   显示成未跟踪。
+- sitin-rn 也补上了（2026-09-11，`.gitignore` 的 `# Tooling caches` 段、`.turbo/` 旁边）。
+  **换个仓库做题时冒出 `?? .fastembed_cache/`**：先 `git check-ignore -v .fastembed_cache`，
+  没命中就补一行 ignore；**别 `rm`** —— 那是可再生的模型缓存，删了下次还要重下 1 GB。
