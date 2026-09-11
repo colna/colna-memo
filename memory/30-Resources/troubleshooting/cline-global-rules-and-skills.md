@@ -47,6 +47,18 @@ Cline 读的全局 skills 目录：`~/.cline/skills` 与 `~/.agents/skills`；�
 curl -sS -H 'X-Figma-Token: <token>' https://api.figma.com/v1/me   # → 200 + 账号名
 ```
 
+**2026-09-11 补：token 会过期，过期是全局的。** Figma 的 PAT 有有效期，过期后**所有**文件的
+`get_figma_data` 都回 `403 {"err":"Token expired"}`（不是某一个文件没权限，别往分享设置上想）。
+这时只有换 key：重新生成 PAT，替换 `cline_mcp_settings.json` 里
+`github.com/GLips/Figma-Context-MCP` 这个 server 的 `args` 里 `--figma-api-key` 后面那个值：
+
+```
+~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json
+```
+
+改完 Cline 会自动重载（见上）。`~/.claude.json`、`~/.cursor/mcp.json` 里各有一份同名 key
+（另外两个 agent 用），要一起换就一起换。**token 不要贴进聊天**，改完用上面那条 curl 验。
+
 ## 四、教训
 
 - **「约定写在文档里」≠「机制生效」**（同类前科：`CLAUDE.md` 说靠 `includeIf` 统一 git 身份，实际没有）。要让某个 agent 守规则，先确认**它读哪个文件**，再确认**文件真被读到了**（新会话里让它复述规则，或看设置面板的开关）。
