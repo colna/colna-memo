@@ -102,3 +102,19 @@ git checkout <旧commit> -- path/a path/b path/c    # 只拿几个文件
 `sitin-rn` 的 `AGENTS.md` 规则 3:**⛔ 不许 `feature/<App名>` 这类常驻集成分支**,只许 `personal/<人>/<事>` 或 `feat|fix|docs|chore/<事>`,且合入目标唯一是 `main`。建分支前先看 AGENTS.md。
 
 **相关**:[sitin-rn / sitin-rn2 双 clone 跑错目录](sitin-rn-multi-clone-wrong-app.md)
+
+## 附：boundaries 连注释里的 app 名字都扫（2026-09-10）
+
+在 `apps/luka` 里照着另一个 app 的实现重画了一个组件，注释写「画法参照 <另一个 app>
+的 xxx」—— `pnpm boundaries` 直接判**身份泄漏**，pre-push 失败：
+
+```
+✗ 1 identity leak(s):
+  apps/luka/src/components/me/coin-medallion.tsx mentions "koda" — that is app "koda"'s name.
+```
+
+那道检查是**按字符串扫全文**的，不区分代码与注释（`docs/app-review-strategy.md` §4.2：
+一个 app 的源码里不许出现另一个 app 的名字、域名、scheme、bundle id）。
+
+**跨 app 借鉴代码时：可以照着重画，不能 import，也不能在注释里点名。** 写成「仓库里
+另一个包已有的一版」即可。
