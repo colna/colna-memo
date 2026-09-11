@@ -41,7 +41,8 @@ tags: [project, sitin-rn, luka, react-native]
 | 文件 | 用在哪 | 类型 |
 | --- | --- | --- |
 | `pet.mov` / `panda.mov` | Nearby / Chats 顶部横幅 | HEVC+alpha，**仅 iOS** |
-| `tilt-head.mov` | 划卡页大图模式、Profile 大头像下沿 | 同上 |
+| `tilt-head.mov` | 划卡页大图模式 | 同上 |
+| `tilt-head-circle.mov` | Profile 大头像下沿（`PET_TILT_HEAD_CIRCLE_SOURCE`） | 同上；同一姿势的**圆版**：底边平切、内容顶满画布。母版 124.5 MB ProRes 4444 → 556 KB |
 | `stay-all.mov` | Profile · My feeds 引导行那只站姿小崽（`PET_MY_FEED_SOURCE`） | 同上；母版 245 MB ProRes 已压到 714 KB |
 | `stay.mov` | 他人资料页大图左下 | 同上 |
 | `luka.mov` | Feed 发帖按钮上方、发帖页输入区右侧 | 同上 |
