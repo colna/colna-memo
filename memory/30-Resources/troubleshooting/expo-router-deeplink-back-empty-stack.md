@@ -55,6 +55,18 @@ export function useGoBack(fallback?: Href): () => void {
 - 模拟器里让 dev client 冷启动进 JS（而不是它自己的启动页列表）：
   `xcrun simctl openurl booted 'luka://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081'`，
   之后再深链具体页面。
+- **完整冷启动链路**（模拟器已关时可以整套自己跑，不用等用户）：
+
+  ```sh
+  xcrun simctl boot <UDID>        # 先在 `xcrun simctl list devices available` 里挑
+  xcrun simctl openurl booted 'luka://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081'
+  sleep 35                        # 首屏 bundle 下来要等，别急
+  xcrun simctl openurl booted 'luka://<业务深链>'
+  xcrun simctl io booted screenshot /tmp/x.png
+  ```
+
+  ⚠️ **顺序反了会误判**：app 还没连上 Metro 时直接打业务深链，拿到的是 dev client 自己的
+  launcher（DEV SERVERS 列表那屏），截图看着像「深链压根没生效」。先连 Metro，再打业务深链。
 
 ## 连带教训
 
