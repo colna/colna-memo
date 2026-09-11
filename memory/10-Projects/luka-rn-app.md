@@ -30,6 +30,11 @@ tags: [project, sitin-rn, luka, react-native]
   真要改就改这一个值，三处一起变。
 - `tests/design/shape-language.test.ts` 是**迁移进度条**：按文件列白名单，一屏改完把文件
   加进去。三组条目插在同一个锚点，**多分支并行时这里必冲突**，解法是三组都留。
+- **My feeds（Me 页第二段）已按稿子卡片化**：发帖条 `feed-composer-bar`、帖子卡
+  `my-feed-post-card`、骨架 `my-feed-loading-skeleton` 三处都进了白名单。帖子卡是
+  「一张白卡装整条帖子」（`rounded-[20px] border bg-surface`），列表不再画行分隔线；
+  点赞用 `HeartGlyph`（稿子 post ActionRow 2271:182），**不是** Feed 卡片的拇指
+  `FeedLikeGlyph` —— 两处不是同一个动作。
 
 ## 仓鼠素材（`src/assets/pet/`）
 
@@ -37,6 +42,7 @@ tags: [project, sitin-rn, luka, react-native]
 | --- | --- | --- |
 | `pet.mov` / `panda.mov` | Nearby / Chats 顶部横幅 | HEVC+alpha，**仅 iOS** |
 | `tilt-head.mov` | 划卡页大图模式、Profile 大头像下沿 | 同上 |
+| `stay-all.mov` | Profile · My feeds 引导行那只站姿小崽（`PET_MY_FEED_SOURCE`） | 同上；母版 245 MB ProRes 已压到 714 KB |
 | `stay.mov` | 他人资料页大图左下 | 同上 |
 | `luka.mov` | Feed 发帖按钮上方、发帖页输入区右侧 | 同上 |
 | `play-phone.mp4` | People·Connections 页头横卡 | **普通 MP4，两端都能播** |
