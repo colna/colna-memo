@@ -19,7 +19,10 @@ Cookie: aigc_session=<JWT>
 
 - status:`pending → processing → done / failed`
 - 模型 `gpt-image-2` / `gpt-image-2-all`;画幅只认 `1:1`(1024²)/`3:2`(1536×1024)/`2:3`(1024×1536)/`auto`
-- 参考图**最多 1 张**、**只接 URL 不接 base64**,本地图先 `POST /api/uploads` 换 OSS 公共 URL
+- 参考图口径**看部署版本**:
+  - 线上现行(截至 2026-09-11 未更新):**最多 1 张**、**只接 URL 不接 base64**,本地图先 `POST /api/uploads` 换 OSS 公共 URL
+  - 分支 `feature/aigc-dev` 已改成 **最多 4 张 + 接受 data URI**(`refImages: {max:4, inline:true}`),
+    多张时 multipart 字段名是重复的 `image[]`。**callapi 是否真透传多图尚未实测**,上线前先打一发双图请求验。
 - cookie 是 jose HS256 JWT,**7 天过期**(`web/lib/session-token.ts` 的 `SESSION_COOKIE`)
 - 实测出图 **~125s**,1254×1254 PNG 2.6MB,落 `n8n-video-resources.oss-us-west-1.aliyuncs.com`
 
@@ -46,6 +49,8 @@ CLAUDE.md 说输出文件放 `$OUTPUTS_DIR`,但**实测该变量没导出到 she
 系统提示给的 `.../metabot-outputs-max/<chat_id>`。
 
 ## 要「照 B 图的样子改 A 图」但只能传 1 张参考图
+
+> 这条是线上单图版本下的绕法;`feature/aigc-dev` 放开到 4 张后,双图可以直接喂进去,不必再靠文字描述。
 
 - **约束**:driver 的 `refImages: { max: 1 }`,`/images/edits` 只吃一张图。想「把 A 图里的角色换成 B 图里的角色」时,两张图喂不进去。
 - **做法**:**传要改的那张(A)当参考图,把 B 的形态用文字写死在 prompt 里**。
