@@ -58,6 +58,11 @@ tags: [project, sitin-rn, luka, react-native]
 所以 Android 上那些崽**整块不挂载**，写布局时要保证「没有它排版也不动」。
 普通 MP4 装在有边界的卡里时，Android 必须 `surfaceType="textureView"`，否则圆角裁不到。
 
+**跟着素材走的常数必须随素材重算。** `profile-portrait.tsx` 的 `PET_DROP`（圆裁小崽的下沿探出量）
+由素材包围盒决定：`tilt-head-circle.mov` 并集包围盒 320×306、横向顶满、**底边空 14px** → `PET_DROP = 9`
+（模拟器上平切底边正好落在圆盘切点，爪子只探出约 2pt）。换素材只换 `source` 不重算这个数，
+**git 上看不出问题，只有实机 / 截屏能发现** —— 2026-09-11 就栽过一次（见 [[rn-simulator-pixel-measurement]]）。
+
 ## 已完成（合入 `feature/luka-ios`）
 
 | PR | 内容 |
@@ -70,6 +75,7 @@ tags: [project, sitin-rn, luka, react-native]
 | #488 | Profile（我的）页重做 + 仓鼠扒头像 |
 | #489 | 发帖页换皮 + 仓鼠从输入区右边探进来 |
 | #483 | People 两页重做（Connections 仓鼠页头 / Friends A–Z 索引）+ review 五条 |
+| #497 | 第二轮 UI 微调（10 笔）：People 页头放大、仓鼠卡正方形、`play-phone.mov` 不再被 Android 引用、发帖等后端再退、My feeds 换白卡 + 小崽引导行、Profile 头像换圆裁小崽、两颗心归位、`PET_DROP` 重算、骨架屏统一 `SkeletonBlock`、气泡投影加一档 |
 
 ## 未定 / 残留
 
@@ -85,11 +91,16 @@ tags: [project, sitin-rn, luka, react-native]
   都是僵尸代码，删不删未定。
 - Android `experimentalBlurMethod` 未定（关=没有真模糊，开=掉帧）。
 - 远端约 11 条已合并/已关闭的 luka 分支未清。
-- **全程没有在模拟器上逐项验证过**（本机无 booted 模拟器，实机在用户那边）：字母索引条
-  的拖动手感、SE 上倒推的行高、发帖页仓鼠探出屏幕的量、仓鼠视频底部那条硬边。
+- **这些还没在实机逐项验证过**（实机在用户那边）：字母索引条的拖动手感、SE 上倒推的行高、
+  发帖页仓鼠探出屏幕的量、仓鼠视频底部那条硬边、气泡投影的轻重、Android 的 `elevation`。
+  （#497 那批已在**模拟器截图**上逐项量过，手法见 [[rn-simulator-pixel-measurement]]。）
+- **`AGENTS.md` 规则 3 与本题实际做法冲突**：规则写「合入目标唯一是 `main`，⛔ 不再有
+  `feature/<App名>` 这类常驻集成分支」，而本 app 一直合入 `feature/luka-ios`。待裁决（给 luka
+  写明确例外，还是调整规则）。
 
 ## 相关沉淀
 
 - [[expo-router-protected-stack-leftovers]]、[[react-async-hook-loading-stuck]]、
   [[sitin-proto-request-missing-id]]、[[design-mock-measure-and-sample]]
 - [[rn-card-deck-recycling]]、[[mov-alpha-compression]]、[[rn-derived-app-theme-swap]]
+- [[rn-simulator-pixel-measurement]]（截屏量 UI 几何）、[[colna-fastembed-cache]]（模型缓存落在 cwd）
