@@ -86,7 +86,21 @@ tags: troubleshooting, colna-memo, git
 - **一次性彻底修**:`cargo build`(重编 debug 到 e5-base 768),或把包装脚本默认 profile 改成 release。
 - **教训**:embedder.rs 改了模型/维度后,**debug 与 release 两个二进制都要重编**,否则用哪个过期就哪个爆维度不一致。
 
+## `colna sync` 必须在知识库根目录跑,否则写错仓库 + 扔下 1.1 GB 缓存(2026-09-11)
+
+- **现象**:在**别的仓库**(如在 `sitin-rn/`)直接调 `"/Users/colna/WORK/colna-memo/colna" sync`,报
+  `Error: git ["add", "--", "memory"] 失败: fatal: pathspec 'memory' did not match any files`。
+- **根因**:包装脚本按**当前工作目录**拼 git 命令(`memory/` 相对路径)。cwd 不是 KB 根就找不到 `memory/`,
+  commit/push 整条流程中止。更隐蔽的是:embedder 也会把 fastembed 的模型缓存落到 cwd —— 一次误跑就在
+  `sitin-rn/` 根留下 **1.1 GB 的 `.fastembed_cache/`**(KB 自己那份 1.5 GB 在 `colna-memo/.fastembed_cache`),
+  而它**没被 gitignore**,`git add -A` 会连锅端。
+- **修法**:一律 `cd /Users/colna/WORK/colna-memo && ./colna sync`。`COLNA_PROFILE=release` 那条约定的前提也是
+  「站在 KB 根」。
+- **自查**:sync 报错后先 `pwd`;另可 `ls "$PWD/.fastembed_cache"`,非 KB 目录里出现它,就是误跑的痕迹(删之前先确认
+  KB 下已有一份)。
+
 ## E5 模型升级后的 state 版本迁移(2026-08-05)
+
 
 - **风险**:只升级 `embedder` 的模型/维度而不改变 `.colna/state.json` 格式时,旧 384 维索引的 state 仍可能通过文件 hash、chunk 数量校验,被误判为可增量使用。
 - **修法**:把 `IndexState::FORMAT_VERSION` 从 v2 升到 v3,旧 state 自动触发干净的全量重建;重建后再执行 `flush → optimize → stats` 校验。
