@@ -129,6 +129,40 @@ alpha 并集(x/y 各自是 `ffmpeg -vf alphaextract,scale=256:256 -f rawvideo` �
 
 `hevc_videotoolbox` **不吃 CRF**,走 `-q:v 0-100`(越大越清晰)。
 
+## 坑六:母版上那层"几乎透明的白"会变成一个灰方块
+
+2026-09-14,`play-mac.mov`(Luka edit profile 右上角那只抱 MacBook 的大仓鼠)第一次压完,
+模拟器上仓鼠背后**多了一个灰方块**:`#F3EFE4` 压在奶油底 `#FDF9EE` 上,差 10 个色阶,
+一眼就看得见。
+
+根因不在压缩,在**母版**:整块画布上带着一层 alpha 1–15 的软阴影 —— 占 43% 的像素。
+在 ProRes 里它看着是"几乎透明的白",但视频是个矩形,那层薄影压到别的底色上就把
+画布边界画了出来。`ffprobe` 与"透明占比 0.4"都发现不了它:透明占比只统计 alpha≈0。
+
+**修法:编码前把 alpha 低于阈值的像素直接抹成 0**(`scripts/compress-mov.sh` 的
+`--alpha-floor 24`)。抹掉之后剩下的都是角色自己的影子。
+
+### 附带的坑:`lut` 的 `val` 是**源位深**
+
+第一版写成 `alphaextract,lut='if(lt(val,24),0,val)',scale=...`,包围盒仍然顶到画面四边。
+ProRes 4444 的 alpha 是 10/12 位的,`val` 能到 1023 —— 拿 8 位的 24 去比等于没比。
+要先 `format=gray`(扫描时)/ `format=bgra`(编码时)落到 8 位再比。
+
+`lut=a=` 只能用在**真有 alpha 平面**的流上;`alphaextract` 之后 alpha 已经变成灰度平面,
+这时要写 `lut=`(不带 `a=`)—— 写错的话报错会指到 `alphaextract` 上
+(`Requested planes not available`),看不出来是 `lut` 的事。
+
+### 判定手法
+
+素材入库前先量一眼 alpha 的直方图,**别只看透明占比**:
+
+```sh
+ffmpeg -v error -i in.mov -vf alphaextract -f rawvideo -pix_fmt gray - \
+  | python3 -c "import sys,collections; d=sys.stdin.buffer.read(); print(collections.Counter(d).most_common(5))"
+```
+
+出现一大坨 4–15 的值,就是这种"灰洗"。
+
 ## 工具
 
 通用脚本:`/Users/max/Dev2/zhangzheng/tools/compress-mov.sh`
