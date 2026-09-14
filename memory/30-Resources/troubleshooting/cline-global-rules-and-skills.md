@@ -64,3 +64,18 @@ curl -sS -H 'X-Figma-Token: <token>' https://api.figma.com/v1/me   # → 200 + �
 - **「约定写在文档里」≠「机制生效」**（同类前科：`CLAUDE.md` 说靠 `includeIf` 统一 git 身份，实际没有）。要让某个 agent 守规则，先确认**它读哪个文件**，再确认**文件真被读到了**（新会话里让它复述规则，或看设置面板的开关）。
 - 全局规则会作用于**所有**工作区：写之前先想清楚会压掉哪些仓库自己的约定；冲突时以「先说明冲突、由用户裁决」为原则，别静默取一方。
 - 把一套规则从一个工作区搬到「全局」时，**路径要做适配**（本次：`/Users/user/Dev2/zhangzheng/` → `/Users/colna/WORK/`、`colna` 不在 PATH 要写绝对路径、去掉 `github-colna` 别名与 app id 硬编码）。原样照抄一份跨机器不可用的规则，比没有规则更危险。
+
+## 五、Claude Code 侧的全局规则：`~/.claude/CLAUDE.md`（2026-09-14 补）
+
+上文的「Cline 不读 `CLAUDE.md`」只对 Cline 成立 —— **Claude Code 读的就是它**，而且是**用户级全局**（所有工作区都会加载），所以同一份个人规则要落两处（Cline 那边见第一节）。
+
+2026-09-14 把工作区真源 `metabot-workspace/AGENTS.md` 适配成全局版写进 `~/.claude/CLAUDE.md`（355 行，旧文件备份 `CLAUDE.md.bak-2026-09-14`）。**适配点**（照本文「四、教训」做的）：
+
+1. **skills 路径**：工作区版写 `.claude/skills/`；全局语境下真源是 `~/.agents/skills/`（73 个），`~/.claude|.cursor|.codex|.cline/skills` 均是指向它的**相对软链**。全局版必须写真源，否则会诱导后来者往软链目录放实体副本（第二节的 `byteplus-query` 分叉就是这么来的）。
+2. **不在 PATH 的命令**：`colna` 不在 PATH，统一写成 `cd /Users/colna/WORK/colna-memo && ./colna ...`。
+3. **作用域切分**：只对某一类会话有意义的规则（MetaBot 的 `OUTPUTS_DIR`、`/reset`、`/stop`、飞书上线申请模板）收进文末「附」一节并注明「非飞书会话可忽略」，别让全局规则里混着一半用不上的东西。
+4. **补全差异**：工作区只有 43 个 skill，全局有 73 个 —— 全局版要补上 `lark-*` 一族、`byteplus-query`、`umi`、`html`、`rust-best-practices`、`obsidian-*`、`find-skills`、`code` 的触发条件，否则这些 skill 等于没有触发指引。
+5. **冲突声明**：全局规则会压到所有仓库，所以要在文件头部写明「工作区自带 `AGENTS.md` / `CLAUDE.md` 冲突时以工作区为准，且先说明冲突由用户裁决」。
+6. **通用规则的例外**：工作区规则说「不要改 `~/Documents`/`Downloads`」，但 Cline 的全局规则目录恰恰在 `~/Documents/Cline/Rules/` —— 搬到全局时必须显式写例外，否则规则自相矛盾。
+
+**待办 / 未证实**：`claude -p "复述规则"` 的生效验证被中断，尚未确认新会话真读到了这份文件（这正是「约定写在文档里 ≠ 机制生效」那条教训的检查动作，要补）。另发现 `metabot-workspace/CLAUDE.md`（旧 Obsidian 版，指向 `COLNA's wiki`）与 `~/.codex/AGENTS.md`（0 字节）两处漂移，未处理。
