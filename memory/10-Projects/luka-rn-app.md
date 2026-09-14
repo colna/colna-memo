@@ -20,6 +20,13 @@ tags: [project, sitin-rn, luka, react-native]
 - 绝不 `--no-verify`：`pre-commit` = lint，`pre-push` = boundaries + typecheck。
   **解冲突后的合并提交也走钩子，没有例外。**
 
+## 审核账号（App Store / Meta 开白）
+
+- 邮箱：`review@lukasoc.com`（商店）/ `metareview@lukasoc.com`（Meta 开白）—— 2026-09-14 从占位换成品牌域名，见 `docs/review-mode.md` §3.1。
+- 两号 × 两平台的四个钉死 deviceId 在 `src/lib/review-mode.ts`（`luka[_meta]_{iOS,Android}_deviceID`）。
+- ⚠️ 两个账号需在 Luka 后端真实存在且预置好资料，**后端稍后就绪**（尚未联调）。
+- `lib/legal.ts` 的客服邮箱 `support@luka.example.com` 仍是占位，未换。
+
 ## 设计语言
 
 - 暖色 token 在 `src/theme/colors.ts`（`background` #FDF9EE / `foreground` #3A2317 /
