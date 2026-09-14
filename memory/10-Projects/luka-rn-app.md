@@ -76,6 +76,7 @@ tags: [project, sitin-rn, luka, react-native]
 | #489 | 发帖页换皮 + 仓鼠从输入区右边探进来 |
 | #483 | People 两页重做（Connections 仓鼠页头 / Friends A–Z 索引）+ review 五条 |
 | #497 | 第二轮 UI 微调（10 笔）：People 页头放大、仓鼠卡正方形、`play-phone.mov` 不再被 Android 引用、发帖等后端再退、My feeds 换白卡 + 小崽引导行、Profile 头像换圆裁小崽、两颗心归位、`PET_DROP` 重算、骨架屏统一 `SkeletonBlock`、气泡投影加一档 |
+| #498 | Edit profile 前两屏：Name 照 `78 · Edit name` 重做（左缘探头 `hamster-peek`、尺寸按稿 214、标题写死断行、placeholder `Alex`、不画进度条）+ Age 换 `AgeRuler` 滑尺（撤掉数字输入框与 AI tip）；`OnboardingScaffold` 加 `mascotPeek` / `backFallback`，新增 `useGoBack` 修深链冷启动 GO_BACK；squash 合并 |
 
 ## 未定 / 残留
 
@@ -91,6 +92,9 @@ tags: [project, sitin-rn, luka, react-native]
   都是僵尸代码，删不删未定。
 - Android `experimentalBlurMethod` 未定（关=没有真模糊，开=掉帧）。
 - 远端约 11 条已合并/已关闭的 luka 分支未清。
+- **edit profile 还有 6 屏未做**（#498 只落了 Name / Age）：`height`(HeightRuler) / `occupation` / `bio`(UnderlinedInput) / `interests`(chips) 四屏 + hub（mockup `77`）+ `photos`（mockup `82`），统一走 `OnboardingScaffold` + `backFallback="/edit-profile"`。
+  未决：photos 是单图换头像还是多图相册、interests 平铺还是分组、hub 那颗 Save 的逻辑。稿子（Figma）是**扁平图片**，量不到样式值，只能按同屏同类量比比例 —— 见 [[design-mock-measure-and-sample]]。
+- **AI Code Review 在 sitin-rn 上是假绿**：#498 上 3 条 `401 Unauthorized 失败` 评论，而 check 与 workflow 都报 success（凭证失效或 workflow 吞了错误）。见 [[ai-code-review-triage]]。
 - **这些还没在实机逐项验证过**（实机在用户那边）：字母索引条的拖动手感、SE 上倒推的行高、
   发帖页仓鼠探出屏幕的量、仓鼠视频底部那条硬边、气泡投影的轻重、Android 的 `elevation`。
   （#497 那批已在**模拟器截图**上逐项量过，手法见 [[rn-simulator-pixel-measurement]]。）

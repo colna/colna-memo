@@ -155,3 +155,14 @@ if (!open) return null;      // ← 只是不渲染内容，组件实例【不�
 - **合 main 遇 `business-pwa-proto/proto` submodule 冲突**:用 `git merge-base --is-ancestor A B` 判祖先——谁包含对方取谁(本次 ours release/test ⊇ main);`src/gen` 是生成代码**不信 auto-merge**,`git checkout HEAD -- src/gen` 取超集侧,再 `pnpm --filter @heyhru/business-pwa-proto build` 重建 dist。
 - **给 PR「合基线」要合它的 base 分支,不是无脑合 main**:PR base=feat/sitin4.1 时误合 main,把 main 相对 base 的 152 文件全灌进 diff(44→194)。先 `gh api .../pulls/<n> --jq .base.ref` 看清 base。
 - **更新 test proto**:submodule `git fetch origin release/test && git checkout <sha>` → `bash scripts/generate.sh`(protoc 在 /opt/homebrew/bin)→ `pnpm --filter business-pwa-proto build` → app-pwa `tsc -b` 验证。
+
+## AI CR 凭证失效仍报 success：绿勾是假的（sitin-rn #498，2026-09-13/14）
+
+> 上面几节讲「评审意见质量」与「让 workflow 跑出评审」；这节是**门禁根本没跑，却显示通过**。
+
+- **现象**：PR #498 上 AI Code Review 留了 3 条 `❌ **AI Code Review 失败**  错误信息: API 请求失败: 401 Unauthorized`（UTC 2026-09-11 11:43 / 11:46、2026-09-13 15:44），而 `gh pr checks 498` 显示 `review  pass  15s`，对应那几跑在 `gh run list --workflow ai-code-review.yml` 里 **conclusion 全是 `success`**。
+- **根因**：workflow 把「调模型失败」这条路径 catch 住、只发一条评论，job 仍 exit 0 —— 必需检查随之变绿，而**这次 PR 实际一次 review 都没做**。401 是凭证问题（`AI_CR_API_KEY`），不是网络或超时（区别于上面 524 那节：那个至少请求成功过）。
+- **判据（别只看绿勾）**：check 为绿时补一步 `gh api repos/<owner>/<repo>/issues/<n>/comments --jq '.[] | "\(.created_at) \(.body[0:40])"'`，出现 `❌ **AI Code Review 失败**` 就说明它没干活；或 `gh run list --workflow ai-code-review.yml --limit 5` 看 conclusion。
+- **修法（未做，待用户定）**：失败路径改成 `core.setFailed()`（或把异常抛出去）别吞；同时确认仓库 secret `AI_CR_API_KEY` 是否有效。
+- **教训**：**「必需检查通过」只证明 workflow 退出码是 0，不证明它干了活。** 门禁类工作流要看它自己产出的评论/产物，而不是 check 的颜色。
+
