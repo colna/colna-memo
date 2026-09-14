@@ -33,6 +33,12 @@
 - **离线合成的前提是模型对**：把素材叠到目标几何上做预览很有用，但模型错了照样「看着像那么
   回事」。先用真实截屏核对一次再信它（见 [rn-offline-composite-for-overlap.md](rn-offline-composite-for-overlap.md)）。
 
+- **截图右上/右下那颗齿轮不是 App 的 UI**：是 `expo-dev-client` 的 Dev Menu 悬浮按钮（FAB），iOS 上**默认开启**（`node_modules/expo-dev-menu/ios/Modules/DevMenuPreferences.swift` 里 `fabDefault ?? true`）。它会挡住要量的区域，关法三种：
+  ① Dev Menu → **Tools button** 开关（UI 里点掉，持久化在 UserDefaults）；
+  ② 只针对本机模拟器：`xcrun simctl spawn booted defaults write <bundleId> EXDevMenuShowFloatingActionButton -bool false`，重启 App 生效（恢复：`defaults delete` 同一个键）；
+  ③ 项目级对所有人生效：`app.config.ts` 的 `ios.infoPlist.EXDevMenuShowFloatingActionButton: false`（要 prebuild / 改 `ios/<App>/Info.plist`）。
+  它还**可以拖动**，所以同一 App 两张截图里位置可能不同 —— 别当成布局变化。
+
 ## 到不了的那一屏 / 那一个分段怎么绕
 
 - 深链：`xcrun simctl openurl booted "<scheme>://<path>"`（例：`luka://me` 直达 Me tab）。
