@@ -65,3 +65,25 @@ Figma REST API **根本没有创建/修改节点的 endpoint**。全部 write sc
    永远超时。要用 `Map<id, job>` 保留到 `/result` 到达。
 8. `loadFontAsync` 要先收集整棵树用到的字体再一次性加载；`figma.loadFontAsync` 对
    "Nunito ExtraBold" 这类 `family + style` 组合可用（Figma 自带 Google Fonts）。
+
+## 2026-09-15 VECTOR 的 bbox / resize 语义（分层复刻时实测）
+
+写 50 · Bond 的圆环（整圈 + 75% 进度弧 + 18° 起点刻度，都靠 `stroke` 画）时探到的：
+
+1. **VECTOR 的节点 bbox = 路径几何边界，不含描边**。实测：24×24 的方 + `strokeWeight 18`，
+   创建时不传 `width/height`，`find` 回读是 **24×24**（不是 42×42）；小弧的回读值就等于弧的
+   几何外接盒（29.36×4.65）。
+2. **插件对 VECTOR 先写 paths/stroke 再 `node.resize(width, height)`，而 resize 会按几何 bbox
+   缩放**。所以「声明成整环尺寸、路径只是其中一小段弧」的写法，会把那一小段弧拉到整环大小
+   （`strokeWeight * scale` 只补描边粗细，补不回形状）。
+3. **修法**：每条描边矢量按**自己的几何 bbox** 声明 —— `width/height` = 该路径的几何外接盒，
+   `viewBoxSize` 取同值（`scale = width/viewBoxSize = 1`，描边粗细不被二次缩放），`x/y` = 该
+   bbox 相对上层的左上角。描边天然会画出 bbox 之外，不用把描边算进声明尺寸（算进去反而会被
+   缩一次）。实测这样建出来的三条矢量 bbox 与手算值逐个吻合。
+4. **路径数据里的坐标偏移会被归一化**：同一路径数据平移 0 / +100 / −50，声明 `x: 0` 后三个
+   节点的 bbox 都落在 0 —— Figma 以 bbox 定位节点，路径的内部偏移不影响落点（但会影响
+   `resize` 的目标 bbox，见第 3 条）。
+5. **探法**（可复用）：`create` 时故意不传 `width/height`，节点保留自然 bbox，再用 `find`
+   回读；scratch 造完立即 `delete`，不留在画面上。核心脚本在
+   `/var/folders/.../opencode/probe-bbox.mjs`（一次性）。
+
