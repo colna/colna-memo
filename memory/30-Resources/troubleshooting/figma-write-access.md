@@ -84,6 +84,5 @@ Figma REST API **根本没有创建/修改节点的 endpoint**。全部 write sc
    节点的 bbox 都落在 0 —— Figma 以 bbox 定位节点，路径的内部偏移不影响落点（但会影响
    `resize` 的目标 bbox，见第 3 条）。
 5. **探法**（可复用）：`create` 时故意不传 `width/height`，节点保留自然 bbox，再用 `find`
-   回读；scratch 造完立即 `delete`，不留在画面上。核心脚本在
-   `/var/folders/.../opencode/probe-bbox.mjs`（一次性）。
+   回读；一次性 scratch 节点造完立即 `delete`，不留在画面上。
 
