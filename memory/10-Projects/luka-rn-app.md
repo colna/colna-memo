@@ -86,6 +86,9 @@ tags: [project, sitin-rn, luka, react-native]
 | #497 | 第二轮 UI 微调（10 笔）：People 页头放大、仓鼠卡正方形、`play-phone.mov` 不再被 Android 引用、发帖等后端再退、My feeds 换白卡 + 小崽引导行、Profile 头像换圆裁小崽、两颗心归位、`PET_DROP` 重算、骨架屏统一 `SkeletonBlock`、气泡投影加一档 |
 | #506（分支 `feat/luka-edit-profile-ui`） | Edit profile hub 按 2026-09-14 的 Settings 版 mockup 重做：蜜色身份卡 + 右上角抱 MacBook 的大仓鼠（`play-mac.mov`，483 MB 母版 → 2.1 MB）+ 三张 ✦ 分组卡（八行一个不少，Age/Education 特意保留）+ Done 胶囊取代底部 Save；目录抽成 `lib/edit-profile-hub.ts` 并用测试钉住八行路由；大仓鼠右缘离屏幕 28pt（稿里被屏切掉像 bug，按反馈往左收了两轮）；PR #506 已开，base `feature/luka-ios` |
 | #498 | Edit profile 前两屏：Name 照 `78 · Edit name` 重做（左缘探头 `hamster-peek`、尺寸按稿 214、标题写死断行、placeholder `Alex`、不画进度条）+ Age 换 `AgeRuler` 滑尺（撤掉数字输入框与 AI tip）；`OnboardingScaffold` 加 `mascotPeek` / `backFallback`，新增 `useGoBack` 修深链冷启动 GO_BACK；squash 合并 |
+| `ef63a141` `1ebfc405` `0133747f` `d68f67a0` `13578314` | 09-14 第二批：pet 素材整理（`luka.mov` 按动作更名 `point-down.mov`，新增 like/clap）、恋爱铃横幅按稿重做 + Debug Tools 预览入口（小崽 88 / 下压 35 / 对准接听键 / 上层渲染，与发帖 FAB 同档）、Edit profile 六子页重做（bio / education / height / interests / location / occupation，探头小崽 + 浮起卡片）、Me 页 tab 横滑 + 头部随滚动收起、Settings 分组名加粉底 |
+| `eedeea12` | iOS 桌面小组件白屏修复：`rn-home-widget` 0.2.0 → 0.3.0，帧图改走 asset catalog（见 [[rn-home-widget-ios-blank]]） |
+| `d34b92bf` | Discover / Nearby 改瀑布流：`MasonryList`（两列 + 曝光 + 滑窗口）+ 浮起毛玻璃页头（`HeaderBlurFade`）+ 视觉统一到蜜色新稿（sparks / credits / onboarding / edit-profile）+ Debug Tools PAYMENTS 分组；见 [[rn-scroll-perf-and-blur-header]] |
 
 ## 未定 / 残留
 
@@ -101,8 +104,10 @@ tags: [project, sitin-rn, luka, react-native]
   都是僵尸代码，删不删未定。
 - Android `experimentalBlurMethod` 未定（关=没有真模糊，开=掉帧）。
 - 远端约 11 条已合并/已关闭的 luka 分支未清。
-- **edit profile 还有 4 屏未做**（#498 只落了 Name / Age，hub 已在 `feat/luka-edit-profile-ui` 重做）：`height`(HeightRuler) / `occupation` / `bio`(UnderlinedInput) / `interests`(chips) 四屏 + `photos`（mockup `82`，hub 上的入口现在是那张蜜色身份卡），统一走 `OnboardingScaffold` + `backFallback="/edit-profile"`。
+- **edit profile 只剩 `photos` 一屏**（mockup `82`，hub 上的入口现在是那张蜜色身份卡；其余六屏 09-14 已在 `0133747f` 落完）。
   未决：photos 是单图换头像还是多图相册、interests 平铺还是分组、hub 那颗 Save 的逻辑。稿子（Figma）是**扁平图片**，量不到样式值，只能按同屏同类量比比例 —— 见 [[design-mock-measure-and-sample]]。
+- **`appleTeamId` 临时值待还原**：`apps/luka/app.config.ts` 现为 Personal Team `PD2XGB735Y`（`56a821ba`，免费号真机调试绕过推送 / App Group / Apple 登录用），公司 Team 生效后换回真实 ID 并重新 prebuild。坑与完整流程见 [[ios-device-free-team-debug]]。
+- **Nearby 列表模式没有仓鼠**（w3 稿上有；只有卡组有）—— 要加说一声。
 - **AI Code Review 在 sitin-rn 上是假绿**：#498 上 3 条 `401 Unauthorized 失败` 评论，而 check 与 workflow 都报 success（凭证失效或 workflow 吞了错误）。见 [[ai-code-review-triage]]。
 - **这些还没在实机逐项验证过**（实机在用户那边）：字母索引条的拖动手感、SE 上倒推的行高、
   发帖页仓鼠探出屏幕的量、仓鼠视频底部那条硬边、气泡投影的轻重、Android 的 `elevation`。
@@ -117,3 +122,4 @@ tags: [project, sitin-rn, luka, react-native]
   [[sitin-proto-request-missing-id]]、[[design-mock-measure-and-sample]]
 - [[rn-card-deck-recycling]]、[[mov-alpha-compression]]（新增「坑六：母版的 alpha 1–15 灰洗」）、[[rn-derived-app-theme-swap]]
 - [[rn-simulator-pixel-measurement]]（截屏量 UI 几何）、[[colna-fastembed-cache]]（模型缓存落在 cwd）
+- [[ios-device-free-team-debug]]（免费 Personal Team + iOS 16 设备真机调试）、[[rn-scroll-perf-and-blur-header]]（滚动卡顿 + BlurView 页头）、[[rn-home-widget-ios-blank]]（小组件白屏）
