@@ -92,6 +92,7 @@ tags: [project, sitin-rn, luka, react-native]
 
 ## 未定 / 残留
 
+- **template-migrations 落后 26 条**：`.template-rename.json` 的 `appliedMigration` 停在 **0009**（09-09 派生），blueprint 已到 **0035**。09-15 已 merge `origin/feature/blueprint`（67 提交）并把共享包契约适配掉（rn-net 身份字段 / mock handlers / 测试期望），但**逐条迁移还没做** —— 支付三件（0015 收银台锁 / 0027 支付失败原话透传 / 0030 支付回跳不是屏）与 review-mode 新设计（0024 / 0026 邮箱由后端下发）是其中动到实现的几条。按 `template-migrate` skill 一次一条来。
 - **`tim.officialAccountId` 两档都不对**：非 production 那个是 Intro 测试环境的官号，
   production 是占位 `0000000`。要向后端要 Luka 自己的官号。**填错不报错**，表现是
   「系统消息那条会话永远是空的」。
@@ -123,3 +124,4 @@ tags: [project, sitin-rn, luka, react-native]
 - [[rn-card-deck-recycling]]、[[mov-alpha-compression]]（新增「坑六：母版的 alpha 1–15 灰洗」）、[[rn-derived-app-theme-swap]]
 - [[rn-simulator-pixel-measurement]]（截屏量 UI 几何）、[[colna-fastembed-cache]]（模型缓存落在 cwd）
 - [[ios-device-free-team-debug]]（免费 Personal Team + iOS 16 设备真机调试）、[[rn-scroll-perf-and-blur-header]]（滚动卡顿 + BlurView 页头）、[[rn-home-widget-ios-blank]]（小组件白屏）
+- [[clash-tun-blocks-github-ssh]]（Clash TUN 挡 git over SSH，改一次性 HTTPS URL）
