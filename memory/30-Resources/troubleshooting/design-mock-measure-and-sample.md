@@ -103,3 +103,24 @@ magick shot.png -crop ${W}x${H}+${X}+${Y} +repage -fuzz 6% -fill white -opaque "
 ```
 
 `rowscan.sh <img> <x> <y> <w> <h> <bg> <fuzz%>` 就是上面这段的封装（`/tmp` 里，重启即丢，重写 20 行）。
+
+## 没有截图时：用真字体量折行，别按字符数估
+
+`figma-write-bridge` 的 spec 把 RN 屏幕折成绝对坐标，标题/副标题**折几行**直接决定它下面
+所有内容的起点（Luka 的 scaffold：内容 = 副标底 + 30pt）。没有实机截图时，用 CoreText 拿
+仓库里真字体的 advance 宽度量 —— **RN on iOS 就是 CoreText 排版，能逐字对上**：
+
+- 字体在 `node_modules/@expo-google-fonts/nunito/<weight>/Nunito_<weight>.ttf`。注意
+  `theme/fonts.ts` 的映射：`sansMedium` = **SemiBold 600**、`sansSemibold` = **Bold 700**、
+  `headline` = **ExtraBold 800**（RN 按文件族名解析，写 `fontWeight` 不会自动换文件）。
+- 约 20 行 Swift 就能量：`CTFontManagerCreateFontDescriptorsFromURL` 建字体 →
+  `CTLineGetTypographicBounds` 量宽 → `CTTypesetterSuggestLineBreak` 在给定宽度下断行。
+  不必装 fontkit / fontTools。
+- **先校准再信**：拿一张实机截图里的已知折行验证脚本。Luka `07 · Name` 的副标题在 342pt
+  可用宽下断在 `…show up in / Chat.`，脚本量 358.7pt、两行、断点一致 → 之后才用它量别的屏。
+- 阈值附近（差 3~8pt）必须量：`This stays on your profile - pick what feels like you.`
+  15px SemiBold 量 349.4（> 342，两行），`No judgement - it just helps us find your people.`
+  量 329.0（一行）；30px ExtraBold 的 `What are you looking for?` 量 372.9 → 两行。字符数
+  估算在这里必错，且错一行的代价是整屏内容下移 22~41pt。
+- 折行结论落到 spec 里：**显式 `\n` + 两行的高度**（沿用 `25-edit-name.mjs` 的写法），
+  别只给一行高度靠 Figma 自己折。
