@@ -41,3 +41,20 @@ tags: troubleshooting, react-native, performance, expo, luka, sitin-rn
 `headerHeight` 让出顶部(deck 容器 `paddingTop`、masonry `paddingTop: topInset + 12`、
 信任横幅 `paddingTop: headerHeight + 8`)。**注意别让两次**:`discover.tsx` 的 feed 子页
 已经由横幅让过位,再传 `headerHeight` 会多出一整条 ≈120pt 的空白死区。
+
+## 五、浮起头部向上收起时,别让它盖住上面的导航栏
+
+luka Me 页(`app/(tabs)/me.tsx`,`d68f67a0`)把「头像 + 名字 + 分段控件」整块绝对定位盖在
+pager 上,由当前页 `scrollY` 驱动收起:`translateY = -min(scrollY, headerHeight)`。
+
+- **现象**:这屏的 `ProfileNavBar` 是同级的**前一个**子节点(先渲染),而头部所在的
+  `View className="flex-1"` **不裁剪**(RN 默认 `overflow: visible`)→ 往上滚时头部会画在
+  导航栏和状态栏**上面**:全收起时名字行停在 y=1..36、分段控件正好落在导航栏那 48pt 上
+  (56..102),把标题和齿轮盖掉。
+- **根因**:clamp 上限取的是**头部自己的高度**,只能保证「头部底边 = 容器顶边」,保证不了
+  「头部滚出可视区」;再叠上不裁剪,超出的部分照样画。
+- **修法**(二选一):给包住 pager + 头部的那层 `View className="flex-1"` 加
+  `overflow-hidden`(pager 本来就在这层边界内,不受影响);或把 clamp 上限改成
+  `headerHeight - 顶部留白`,让头部在压到导航栏之前就停住。
+- **判据**:凡是「同级浮层 + 滚动驱动 translateY」的组合,先问两件事:父容器裁不裁、
+  clamp 上限是谁的高度。
