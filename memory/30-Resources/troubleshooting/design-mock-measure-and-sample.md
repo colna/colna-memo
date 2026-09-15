@@ -124,3 +124,28 @@ magick shot.png -crop ${W}x${H}+${X}+${Y} +repage -fuzz 6% -fill white -opaque "
   估算在这里必错，且错一行的代价是整屏内容下移 22~41pt。
 - 折行结论落到 spec 里：**显式 `\n` + 两行的高度**（沿用 `25-edit-name.mjs` 的写法），
   别只给一行高度靠 Figma 自己折。
+
+## `numberOfLines={N}` 的截断：词边界折行 + 末行换省略号，spec 里要写死
+
+瀑布流卡片（Luka Feed / Nearby）的正文是 `numberOfLines={2}`。Figma 侧 bridge 插件给带
+`width` 的 TEXT 节点设 `textAutoResize='HEIGHT'` —— 整段会自己往下长、压到作者行上。
+截断必须在**写 spec 时**做掉，结论落成「显式 `\n` + 末行 `…`」。
+
+怎么截得跟屏幕一样（两条都实测过）：
+
+- **折行是词边界，末行才是字符级**：先把整段按可用宽（Feed 卡是 173pt）词级折行，取前
+  N 行；最后一行末尾换成 `…`（丢掉行尾空格）。下一行开头的词**不会被拉上来**填满，
+  所以结果是 `actually like out of the…`，不是 `actually like out of the kiln.…`。
+- **用 TextKit 复现**（AppKit，20 行）：`NSTextContainer(maximumNumberOfLines=N)` +
+  `NSLayoutManager`，段落样式用 **`byWordWrapping`**，再枚举 line fragments 取每行文本。
+  别用 `byTruncatingTail` 建段落样式 —— 那会让 framesetter 把整段压成**单行**再截，
+  量出来的折行全错（`CTFramesetterSuggestFrameSizeWithConstraints` 也一起错）。
+- 校准过：Luka 15px Bold / 173pt，`Finally pulled a glaze I actually like out of the kiln.`
+  → 两行 `Finally pulled a glaze I` / `actually like out of the…`。
+
+## `flex-wrap` 的临界值必须按真字宽量
+
+Nearby 卡的兴趣 chip 是 `flex-row flex-wrap gap-1.5`，可用宽 = 169 − 24 = 145。Naomi 的
+`Cooking` + `Ceramics` 真字宽 45.3 / 50.6，加两侧 11pt 内边距 = 67.3 + 73.6，**再加 6 的
+gap 是 146.9 > 145 → 换到第二行**（差 1.9pt 也是换行）。按字符数估会判成一行，卡里就少
+一行 chip、名字上移 32pt。量法同上一节（`CTLineGetTypographicBounds` + padding）。
