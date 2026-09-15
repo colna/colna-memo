@@ -46,6 +46,26 @@ F = (C - (1 - a) * BG) / max(a, 1e-6)
 换幕布色就换判据：绿幕用 `G - max(R,B)`，蓝幕用 `B - max(R,G)`。
 **先拿主体上最接近幕布色的那个部位算一遍 spill**（这次是粉鼻子），确认它是负的再动手。
 
+## 坑三：纯黑底 + 毛发 → flood fill 留下黑边，用软 alpha + unpremultiply 补
+
+2026-09-15 Luka Calls 空态把小组件那张黑底 JPEG（`widght4.jpeg`）用到奶油底页面上时发现：
+早先 flood fill 出的透明 PNG（`widgets/states/state-worried.png`）在浅底上有一圈**黑色噪点** ——
+抗锯齿像素是「毛发↔黑」的混色，flood fill 只做二值判断，把这些半黑像素留成了 alpha=255。
+
+黑底的好处是**混合公式已知**：`观测 C = α·F`（F 是真实颜色），于是
+
+- 软 alpha：把硬 mask 模糊一下就是抗锯齿边缘（`-blur 0x0.9 -level 5%,95%`）；
+- 去色（unpremultiply）：`F = C / max(α, ε)`，反解回毛发本色。
+
+```bash
+magick hard.png -blur 0x0.9 -level 5%,95% soft.png        # hard = 原 PNG 的 alpha 通道
+magick "$SRC" soft.png -fx "u/max(v,0.004)" -clamp -strip unpre.png   # u=源图, v=alpha
+magick unpre.png soft.png -alpha off -compose CopyOpacity -composite out.png
+```
+
+- 不要用 `-transparent black`：硬阈值，黑边照样留。也别靠 `-morphology Erode` 缩轮廓 —— 会削掉胡须/绒毛。
+- 验收：抽几个内部像素比对源图颜色（应完全一致），再叠到奶油/深色两个底上看边缘。
+
 ## 验收
 
 把结果分别叠到深色、奶油、饱和蓝三个底上看边缘，**不要只看棋盘格预览**——
