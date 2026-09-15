@@ -16,6 +16,25 @@ tags: troubleshooting, image-generation, muskapi, gpt-image-2, relay
 | `400 model ... image pricing is missing or invalid for 1K/medium` | 计费表没配这个「尺寸/质量」档位 | 换档位（如 high）；`-4k` / `-adobe` 需要对应尺寸 |
 | `404 Request for model ID ... not found` | 模型不走这个端点 | Gemini 图像模型走 `/chat/completions`，不是 `/images/*` |
 | `403 Chat Completions API is not enabled for this group` | key 分组没开 chat 端点 | gpt-image-2 走 `/images/generations` 或 `/images/edits` |
+| `403 GROUP_NOT_ALLOWED` +「根据您所在区域的法律条款…」 | **按出口 IP 的地域拦截**，不是 key / 模型 / 分组的问题 | 开代理即可（见下） |
+
+## 403 GROUP_NOT_ALLOWED（地域拦截，2026-09-15 实测）
+
+判断口径：**首页 `GET https://api.muskapi.cc/` 返回 200，但 `/v1/models` 与 `/v1/images/*` 全 403** ——
+说明站点可达、拦截只落在 API 上，换模型（`gpt-image-2.5` 等）同样 403，别在 key 上找原因。
+
+修法（本机）：`open -a "Clash Verge"`。本机 Clash Verge 配置里
+`enable_system_proxy: true` + `enable_tun_mode: true`，**启动即自动开系统代理**（mixed-port 7897），
+无需再点「系统代理」开关。判断已生效：
+
+```sh
+scutil --proxy | grep -E "HTTPEnable|HTTPPort"   # HTTPEnable : 1 / HTTPPort : 7897
+curl -s -o /dev/null -w "%{http_code}" https://api.muskapi.cc/v1/models -H "Authorization: Bearer $KEY"  # 200
+```
+
+Python `urllib`（gen_image.py 走的库）默认读 `HTTP_PROXY` / `HTTPS_PROXY` 环境变量；
+但本机 TUN 模式会直接接管路由，**不开代理时 curl 也能通**，两种路径都实测过。
+出完图若用户不想要代理，记得别自作主张关掉它 —— 那是用户自己的网络设置。
 
 ## 端点分工（实测）
 
