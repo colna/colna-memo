@@ -106,7 +106,7 @@ tags: [project, sitin-rn, luka, react-native]
 - 远端约 11 条已合并/已关闭的 luka 分支未清。
 - **edit profile 只剩 `photos` 一屏**（mockup `82`，hub 上的入口现在是那张蜜色身份卡；其余六屏 09-14 已在 `0133747f` 落完）。
   未决：photos 是单图换头像还是多图相册、interests 平铺还是分组、hub 那颗 Save 的逻辑。稿子（Figma）是**扁平图片**，量不到样式值，只能按同屏同类量比比例 —— 见 [[design-mock-measure-and-sample]]。
-- **`appleTeamId` 临时值待还原**：`apps/luka/app.config.ts` 现为 Personal Team `PD2XGB735Y`（`56a821ba`，免费号真机调试绕过推送 / App Group / Apple 登录用），公司 Team 生效后换回真实 ID 并重新 prebuild。坑与完整流程见 [[ios-device-free-team-debug]]。
+- **`appleTeamId` 09-15 已还原**：公司 Team（AI FANTASY，`39CFYH6W55`）生效，`apps/luka/app.config.ts` 换回真实 ID、`usesAppleSignIn` 一并恢复、entitlements 复原（**改动未提交**）。免费号绕过的坑与完整流程见 [[ios-device-free-team-debug]]。
 - **Nearby 列表模式没有仓鼠**（w3 稿上有；只有卡组有）—— 要加说一声。
 - **AI Code Review 在 sitin-rn 上是假绿**：#498 上 3 条 `401 Unauthorized 失败` 评论，而 check 与 workflow 都报 success（凭证失效或 workflow 吞了错误）。见 [[ai-code-review-triage]]。
 - **这些还没在实机逐项验证过**（实机在用户那边）：字母索引条的拖动手感、SE 上倒推的行高、

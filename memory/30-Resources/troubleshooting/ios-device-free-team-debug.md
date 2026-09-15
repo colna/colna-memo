@@ -95,3 +95,23 @@ entitlement 由 **autolink 的 config plugin** 注入,**即使包不在 `plugins
 9. 起 Metro(`pnpm <app>:start`),手机打开 App。
 10. **之后不要跑 `<app>:ios:device`** —— 它会 `prebuild --clean`,冲掉第 6 步并把
     entitlements 写回,还会重新全量编译。
+
+## 公司 Team 生效后怎么恢复（2026-09-15 实测）
+
+加入公司 Team 后 Xcode 的 Accounts 里会多一行(如 `AI FANTASY, INC`);若 Team 详情页的
+「Certificates, Identifiers, & Profiles」报**红叉**,多半是**开发者协议待同意** ——
+去 https://developer.apple.com/account 登录同意,回来转绿。
+
+1. 选中公司 Team → Manage Certificates 创建 Apple Development。**Team ID 从证书的 OU 读**:
+   ```bash
+   security find-certificate -c "Apple Development" -p | openssl x509 -noout -subject
+   # OU=39CFYH6W55 就是 Team ID（sitin-rn 的开发 Team，iris/lumi/koda 同款）
+   ```
+2. `app.config.ts` 换回真实 `appleTeamId`;之前为免费号注释掉的 `usesAppleSignIn` 等
+   capability 一并恢复(先确认代码里真的在用 —— luka 的 `login.tsx` 有 Apple 登录)。
+3. `npx expo prebuild -p ios --clean` → 三个 entitlement 自动复原,不用手工加。
+4. 重新构建(`npx expo run:ios --no-bundler`,或真机 `pnpm --filter <app> ios:device`)。
+   `-allowProvisioningUpdates` 会自动为公司 Team 注册 App ID + 生成描述文件;
+   App Group 也会随 entitlements 自动关联。
+5. 验证:模拟器构建 `Build Succeeded` 且 App 能连上 Metro(登录态保留)即算通;
+   推送 / 小组件 / Apple 登录要真机验。
