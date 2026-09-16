@@ -58,3 +58,10 @@ pager 上,由当前页 `scrollY` 驱动收起:`translateY = -min(scrollY, header
   `headerHeight - 顶部留白`,让头部在压到导航栏之前就停住。
 - **判据**:凡是「同级浮层 + 滚动驱动 translateY」的组合,先问两件事:父容器裁不裁、
   clamp 上限是谁的高度。
+
+## 六、宠物视频随 tab 显隐：隐藏时别回第 0 帧
+
+- **现象**：Feed ↔ Nearby 切换，**第一次**切回 Nearby 时顿一下，之后来回都顺。
+- **根因**：FAB 那只仓鼠随 `tab` 显隐，隐藏走 `PetAnimation` 的 `pause()` + `currentTime = 0`。从播放中回到第 0 帧是一次**真 seek**；第二次回来它已经停在 0、再打断就是空操作 —— 于是成本只出现一次，且正好落在切换的那一帧（切回时 `visible` 翻 false）。
+- **修法**：`PetAnimation` 加 `rewindOnPause`（默认 `true`，保住拖拽那种「每次从第一拍」的语义），循环装饰类的调用方传 `false`，换回一个干净的 `pause()`。
+- **判据**：任何「隐藏时重置状态」的组件，先问这个重置是不是只在第一次才有成本、以及它落在哪个用户交互上。
