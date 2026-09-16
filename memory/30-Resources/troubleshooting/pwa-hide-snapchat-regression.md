@@ -66,3 +66,25 @@ tags: [pwa, snapchat, 回归测试, savvy]
 - **结论**:`LiveAction.canGoLiveNatively = (isHavenPwa || isSavvyAndroid) && hasNativeMethod("startHostLiveStream")` 在 savvy_android 上两道门都过不了,走的是「老端未实现开播能力 → 不出入口」的兜底,属预期行为而非 bug。
 - **若要在 savvy Android 放开入口**,需端侧二选一/都对:① 在 UA 追加 app 名,或 PWA 改按 `?app_name=` 识别;② 实现 `startHostLiveStream` bridge 方法(或 PWA 侧改判 `startLiveNative` 并对齐参数契约)。
 - **教训**:「UA 追加 app 名」只是 haven 端的实现(`... ${NetworkConf.appName}`),不能外推到同产线其它 App;写 app 识别分支前先要真机 UA 原文。
+
+## 九、2026-09-16 复核补充:savvy develop 已支持 + 各环境 PWA 部署矩阵(第八节仅对 master 成立)
+
+第八节结论基于 `savvy-android` 默认分支 **master(release/2.2 线)**,只看它不完整。**develop(下一版,2026-09-16 tip `a89de1c2`)两个门都已具备**:
+
+- **UA**:`PwaWebConfig.USER_AGENT` 末尾追加 `savvy_android` —— commit `3ed7cd5 fix: add Savvy identifier to WebView user agent`(2026-08-25);
+- **端能力**:`PwaNativeInterface.kt:805 @JavascriptInterface startHostLiveStream`(走 `com.savvy.livekit.bridge.LiveWebBridge`,随 `58bab0a` 于 2026-09-15 从 GraceChat beauty-live 1:1 迁移,`tuilivekit`/`livekit-biz` 模块一并引入);另有 `isSupportFeature("hostLive")=true`(注释写明「Web 按此决定是否展示 Go Live 入口」)。
+- **master/release 2.2(线上版本)两者都没有** —— 所以现网 savvy 包不可能出该入口,分支改动只对 develop 之后的新包生效。
+
+### 各环境 PWA 部署实测(2026-09-16 17:03,直接拉线上 bundle 验证)
+
+| 域名 | 用途 | LiveAction 门控(压缩后) | 是否含分支 `1d0fdd86b` |
+|---|---|---|---|
+| app-test.sitin.ai | savvy debug 默认(GlobalConf TEST_A) | `(isHavenPwa\|\|isSavvyAndroid) && hasNativeMethod(...)` | ✅ 已部署(~14:57) |
+| app-test2.sitin.ai | DebugActivity 可切 | `isHavenPwa && ...` | ❌ 旧包 |
+| app-pre.sitin.ai | 预发 | `isHavenPwa && ...` | ❌ 旧包 |
+| app.sitin.ai | release 包默认(生产) | `isHavenPwa && ...` | ❌ 旧包 |
+
+> 验证方法:拉 `service-worker.js` 的 precache 列表 → 找含 `startHostLiveStream` 的 `index-*.js` → grep 门控表达式;main bundle 的 `__vite__mapDeps` 可核对 Live chunk hash。
+
+- **排查结论**:若在 app-test2 / app-pre / app.sitin.ai(或新包之前的缓存 bundle)测试,卡片必不显示,与客户端能力无关。app-test + develop 新包则应满足两道门;再不出就查第三道后端 `LiveCanGoLive.canShow`(主播资格)与 Live 页是否处于 Action 态。
+- **客户端缓存因素**:savvy 有 PWA 预热 + `LOAD_CACHE_ELSE_NETWORK` 策略,旧 bundle 可能被缓存复用 —— 验证时冷启动/清缓存。
