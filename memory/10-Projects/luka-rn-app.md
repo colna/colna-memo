@@ -149,7 +149,7 @@ typecheck + 706 tests 全过。**未做**：24 个多组件文件拆分（对方
 ## 性能待办（2026-09-16 三路静态审计，P0 已修）
 
 P0 已修（4 commit 在 `fix/luka-code-review`：chat handlers identity / Chats 行 memo + badge identity / discovery 缓存节流+上限 / vector-icons 与 protoMap 子路径）。
-**P1 待排**：每条入站消息 3 个 RPC（`chat/[id].tsx:1019` chemistry.refresh + `(tabs)/index.tsx:361` intimacy 批量）与 3–6 次 SecureStore（`lib/chat-rounds`）→ 去抖 + focus 门控 + 内存 hydrate；chat store 消息缓存无界（`stores/chat.ts:504`）→ 会话 LRU；BlurView 6/8 层常驻（`header-blur-fade` / `bottom-blur-fade`）→ 压到 1–2 层；图片预取管线错配（`use-discovery-feed.ts:393` RN Image.prefetch vs expo-image 卡片）→ `prefetchImages`；启动侧：3 个零引用字重（`_layout.tsx:17,18,27`）、Splash 固定 1400ms（`splash.tsx:16`）、`bootstrapAfterLogin` 串行 await（`bootstrap.ts:150`）、heroui-native 改 `provider` 子路径、Android R8 未开。
+**P1 待排**：每条入站消息 3 个 RPC（`chat/[id].tsx:1019` chemistry.refresh + `(tabs)/index.tsx:361` intimacy 批量）与 3–6 次 SecureStore（`lib/chat-rounds`）→ 去抖 + focus 门控 + 内存 hydrate；chat store 消息缓存无界（`stores/chat.ts:504`）→ 会话 LRU；BlurView 6/8 层常驻（`header-blur-fade` / `bottom-blur-fade`）→ 压到 1–2 层（**视觉取舍，需真机过目**）；~~图片预取管线错配~~ **已修（09-16 晚，`prefetchImages`）**；启动侧：3 个零引用字重（`_layout.tsx:17,18,27`）、Splash 固定 1400ms（`splash.tsx:16`）、`bootstrapAfterLogin` 串行 await（`bootstrap.ts:150`）、heroui-native 改 `provider` 子路径、Android R8 未开。
 **P2 待排**：整屏被无关状态拖重渲一批（`contact/inbox` 整店订阅、scene/waves presence 表、notifications rows/sections、into-you quietIds、`profile/[id]` conversations selector、`my-feed-post-card` 未 memo）；无界缓存（`senderProfileCache`、`peerBasicInfoCache`、voice-transcript 内存、narrative 全量加密写）；credits/history 非虚拟化；card-stack 每帧 runOnJS；hero-carousel 失焦不停；Android 后台 5s Alive 心跳；`use-into-you-badge` 30s 轮询 + 全量访客拉取；Sentry 占位 DSN；OTA 未配置。
 审计方法：静态证据 + file:line，未做真机 profiling；量化前建议先用 Instruments/Profiler 打一枪。
 
@@ -160,7 +160,8 @@ P0 已修（4 commit 在 `fix/luka-code-review`：chat handlers identity / Chats
 - feed 每页 40 → **60**；触发线从「距底一半」改成「露过 2/3 的卡」（按张数、视口底沿历史水位判，快速甩动不漏判）；底部文字 → `ActivityIndicator`。
 - nearby 列表**滑窗换人（10 人窗 / 换 5）改追加式**：每批 20 人、池上限 120、到顶与空页都停；滑过的人不再从共享 feed 移除（切回卡片模式会再遇到）——用户拍板的行为变化。
 - 卡片全部 `memo` + 回调改「把 item 作为参数传入」；`useSceneFeed` 内存上限语义修正为「到顶即停」（原 `slice` 会把新页整页丢掉、游标继续走）。
-- 验证：biome 0 error / luka typecheck 0 / 122 文件 703 tests；见 [[rn-infinite-scroll-pagination]]。
+- **性能收尾（09-16 晚）**：曝光回调里的写盘合并成 trailing debounce（O(n²) IO → O(1)，追加式放大了这条债）；图片预取统一走 `prefetchImages`（原 RN `Image.prefetch` 与卡片渲染是两套缓存，同一张图下两遍）；2/3 触发线改预计算阈值（滚动每帧 O(1) 比较）。
+- 验证：biome 0 error / luka typecheck 0 / 121 文件 701 tests（`good-review` 测试因并行会话的 TEMP 改动暂时挂，与本次无关）；见 [[rn-infinite-scroll-pagination]]。
 
 ## 相关沉淀
 

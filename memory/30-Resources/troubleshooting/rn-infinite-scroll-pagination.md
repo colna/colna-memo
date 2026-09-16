@@ -11,7 +11,7 @@ tags: [react-native, list, pagination, memo, troubleshooting]
 ## 坑一：滚动驱动的触发线别用「逐帧此刻可见」
 
 - **现象**：想做「露过 2/3 张卡就预取下一页」，把「这次滚动事件里可见的卡」记入 seen 集合 —— 快速甩动时触发线可能永远到不了：`scrollEventThrottle=16` 的事件本身够密，但**曝光判定通常被节流**（每 200ms 才处理一次），两次采样之间整屏整屏穿过去的卡一张都没记上；用户甩到底，2/3 还差得远，列表就「停了」。
-- **修法**：维护**视口底沿的历史最高水位**（`revealBottom = max(revealBottom, y + viewportHeight)`，在 `onScroll` 每帧更新），判「卡片顶边 < 水位」即「露过面」。水位单调、不受采样影响，回头滚也不重复触发。纯逻辑抽成 `revealedFractionReached(columns, total, revealBottom, fraction)` 放 `src/lib` 做单测。
+- **修法**：维护**视口底沿的历史最高水位**（`revealBottom = max(revealBottom, y + viewportHeight)`，在 `onScroll` 每帧更新），判「卡片顶边 < 水位」即「露过面」。水位单调、不受采样影响，回头滚也不重复触发。纯逻辑抽成 `revealThresholdY(columns, fraction)` 放 `src/lib` 做单测 —— 阈值在装箱时算一次（取第 k 张卡的 y，k = `ceil(n × fraction)`，O(n log n)），滚动每帧只做一次比较（O(1)），不必逐帧数卡。
 - **配套**：`onLayout` 里也要把水位初始化成 `scrollY + height`（首屏的卡要算露过）；短列表（第一页没铺满、根本滚不动）在「列布局变化」的 effect 里补判一次，否则没有滚动事件可等。
 
 ## 坑二：分页内存护栏要「到顶即停」，不要 `slice`
@@ -25,3 +25,14 @@ tags: [react-native, list, pagination, memo, troubleshooting]
 - memo 要生效，props 必须稳定：把「调用处包箭头」的回调（`onLongPress={() => onMore(post)}`）改成**回调收 item 参数**（`onMore(post)` 由卡片内部调），父组件传 `useCallback` 出来的函数 —— 老卡的 props 引用不变，memo 才拦得住。
 - 分页数组 append 时要保留旧元素引用（`[...before, ...page]` 后按 id 去重、**不重建对象**），`post` / `candidate` 引用才不变。
 - 瀑布流装箱（每张进当前更矮的列）是确定性的，append 不会挪动已有卡的位置 —— 这是「直接跟在后面渲染」不跳位的布局前提。
+
+## 坑四：曝光回调里的副作用要能合并 —— 写盘尤其
+
+- 列表追加模式下「每露出一张卡」都会走到曝光回调。若回调里做「缓存未看尾部」这类**全量序列化写盘**（`JSON.stringify` + 文件写），一次滚动就是 O(n²) 的 IO，正好打在滚动最重的 JS 线程上。固定 10 张卡的滑窗看不出问题，改成追加式后能滑过上百张，必须合并。
+- **修法**：写盘合并成 trailing debounce（停止曝光 N ms 后写最后一次起点指向的尾部），卸载时补一次（fire-and-forget）。语义不变（缓存要的本来就是「最新未看尾部」），IO 从 O(n²) 变 O(1)。
+- **判据**：曝光 / 滚动回调里只放「记录」与「上报」；任何 IO / 网络 / 全量计算，先问能不能合并。
+
+## 坑五：预取要走卡片渲染用的那套缓存
+
+- RN 自带 `Image.prefetch` 与 expo-image（`@heyhru/rn-image`）用的是**两套缓存**：同一张图预热一套、卡片渲染再下另一套 —— 双重网络 + 双重解码，滚动时正好叠在一起。
+- **修法**：统一用 `prefetchImages`（同一个 expo-image 管线；自带去重、本地文件过滤与并发上限，永不 reject），删掉手动 `isLocalSource` 过滤。
