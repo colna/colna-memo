@@ -55,3 +55,14 @@ tags: [pwa, snapchat, 回归测试, savvy]
 - **直播注意**:UA 放开后仍靠端能力 `startHostLiveStream` 存在性兜底,老 Android 端(未实现)不会出入口,不担心点了开不了。
 - **新增回归点**:① savvy_android 三处 Snapchat 入口正常显示、可授权/登录/完成任务;② Live 页 savvy_android 出 EarnModule(端已实现能力时);③ 老 Android 端不出 Live 入口;④ savvy iOS / H5 / 其它 app 维持原隐藏行为。
 - **落地**:2026-09-16 已合入 `release/test-pwa`(merge `aa9df14fc`,随该线 proto 升级到 release/test 最新 `21c01821`)。
+
+## 八、2026-09-16 复核:savvy_android 直播卡片不显示的原因(真机 UA 无 token)
+
+排查「savvy_android 直播卡片不显示」时,拉了 `presence-io/savvy-android`(女端 APP,default `master`)源码核对,**UA 判定在 savvy 端永远为 false**:
+
+- **UA 无 app 后缀**:savvy 端 WebView UA 是写死的纯 Chrome UA —— `app/src/main/java/com/savvy/app/web/PwaWebConfig.kt` `USER_AGENT`,从不追加 app 名(宿主 `PWAWebViewFragment.kt:350` 与预热 `PwaPreheater.kt:156` 共用)。端标识另走 URL `?app_name=savvy`(`PWAWebViewFragment.kt:707`、`PwaPreheater.kt:165`,值来自 `BuildConfig.APP_NAME="savvy"`,app/build.gradle.kts:42)与 `app_name` 网络头;
+- 所以 `parseUA()` 拿不到 `savvy_android` 这个 token —— 该 token 只在需求里出现过,真机 UA 从无(历史 `getApkName` 在 savvy 返空同源);
+- **端能力名也不匹配**:savvy 的 `app/src/main/java/com/savvy/app/bridge/PwaNativeInterface.kt` 只有 `startLiveNative`(腾讯 LiveActivity 原生直播,`PwaNativeInterface.kt:533`)与 `syncLiveState`(:518),**没有 `startHostLiveStream`** → `hasNativeMethod("startHostLiveStream")` 恒 false。
+- **结论**:`LiveAction.canGoLiveNatively = (isHavenPwa || isSavvyAndroid) && hasNativeMethod("startHostLiveStream")` 在 savvy_android 上两道门都过不了,走的是「老端未实现开播能力 → 不出入口」的兜底,属预期行为而非 bug。
+- **若要在 savvy Android 放开入口**,需端侧二选一/都对:① 在 UA 追加 app 名,或 PWA 改按 `?app_name=` 识别;② 实现 `startHostLiveStream` bridge 方法(或 PWA 侧改判 `startLiveNative` 并对齐参数契约)。
+- **教训**:「UA 追加 app 名」只是 haven 端的实现(`... ${NetworkConf.appName}`),不能外推到同产线其它 App;写 app 识别分支前先要真机 UA 原文。
