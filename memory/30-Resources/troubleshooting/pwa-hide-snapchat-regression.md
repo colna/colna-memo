@@ -54,3 +54,4 @@ tags: [pwa, snapchat, 回归测试, savvy]
 - **实现**:`useUA().isSavvyAndroid`(UA token `savvy_android`);Snapchat 门控拆成 `hideSnapchat = !isHavenPwa && !isSavvyAndroid`(4 文件);`LiveAction.canGoLiveNatively = (isHavenPwa || isSavvyAndroid) && hasNativeMethod("startHostLiveStream")`。
 - **直播注意**:UA 放开后仍靠端能力 `startHostLiveStream` 存在性兜底,老 Android 端(未实现)不会出入口,不担心点了开不了。
 - **新增回归点**:① savvy_android 三处 Snapchat 入口正常显示、可授权/登录/完成任务;② Live 页 savvy_android 出 EarnModule(端已实现能力时);③ 老 Android 端不出 Live 入口;④ savvy iOS / H5 / 其它 app 维持原隐藏行为。
+- **落地**:2026-09-16 已合入 `release/test-pwa`(merge `aa9df14fc`,随该线 proto 升级到 release/test 最新 `21c01821`)。

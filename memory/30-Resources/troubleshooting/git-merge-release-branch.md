@@ -45,6 +45,15 @@ worktree `ln -s 主clone/node_modules` 后,`@heyhru/business-pwa-proto` 解析�
 
 `release/test-pwa2` 未受保护(`gh api .../branches/... --jq .protected`=false),colna push=true 即可 `--force-with-lease` 把它指到源分支 commit → 完全一致(同 SHA)。**坑**:force-push 后 `merge-to-release-test.yml` 之类 CI 可能自动再推提交、打破「完全一致」。核对用 `git ls-remote origin refs/heads/<branch>`(权威、单行),别信复合命令里的瞬时输出。
 
+## 双线分叉合并:用 blob 历史 + `--find-object` 判断该取哪侧(2026-09-16)
+
+**场景**:`feat/pwa-open-snapchat-live-savvy-android`(feature/pwa + 1)合 `release/test-pwa`。真分叉:feature 领先 74 / release 独有 91(`git cherry` 全是 `+`,patch-id 不等价,但内容多为同源 cherry-pick 的旧状态)。24 处冲突(6 app-pwa + proto 子模块 + 5 gen)。
+
+- **取侧判据(免逐 hunk 读)**:对冲突文件取 release 侧 blob `git rev-parse :2:<path>`,再 `git log --find-object=<blob> origin/feature/pwa` —— **blob 出现在 feature 历史里 = release 侧只是 feature 线的旧状态**,直接 `git checkout --theirs` 取 feature 新实现。6 个文件里 5 个命中;剩下 1 个(Earning/utils)`git diff :2: :3:` 只差 4 行纯新增,同样取 theirs。
+- **proto 子模块**:两边 commit 互不为祖先(release/test 侧 84889a60 缺 feature 端代码要的 `CallOrderSource`)。取 **proto `origin/release/test` 最新 tip**(它是 84889a60 的后代,`git grep` 验证 feature 端所需符号全在),`bash scripts/generate.sh` 重生成,不手解 gen。
+- **本地陈旧的 release/test-pwa**(7-29,与远端 fork 1217/555)不 `reset --hard`:先 `git branch -m release/test-pwa release/test-pwa-stale-<日期>` 留底,再从 `origin/release/test-pwa` 新建同名分支,无损可回溯。
+- **验证链**:`tsc -b`(先重建 proto dist)+ eslint + pre-commit(lint/circular)+ pre-push(test/build --affected)全过再 push。
+
 ## gh 身份漂移:每次 gh 写操作前必查(2026-08-27)
 
 本机 gh keyring 同时有 colna 和 buchuan1023,active 账号会被别处(lark 扫码等)切走。**只在会话开头查一次不够**——某次 `gh pr create` 用了 buchuan1023 身份建 PR(#1039,commit 身份仍 colna 正确)。GitHub 不能改已建 PR 作者 → 只能 `gh auth switch --user colna` + 关 PR + 重开(#1040)。**规矩:每次 gh pr create / 任何 gh 写前都 `gh api user -q .login` 确认 colna**。见 [lark-cli-auth-and-perms](lark-cli-auth-and-perms.md) / [global-flag-ownership-drift](global-flag-ownership-drift.md)。
