@@ -89,7 +89,8 @@ tags: [project, sitin-rn, luka, react-native]
 | `ef63a141` `1ebfc405` `0133747f` `d68f67a0` `13578314` | 09-14 第二批：pet 素材整理（`luka.mov` 按动作更名 `point-down.mov`，新增 like/clap）、恋爱铃横幅按稿重做 + Debug Tools 预览入口（小崽 88 / 下压 35 / 对准接听键 / 上层渲染，与发帖 FAB 同档）、Edit profile 六子页重做（bio / education / height / interests / location / occupation，探头小崽 + 浮起卡片）、Me 页 tab 横滑 + 头部随滚动收起、Settings 分组名加粉底 |
 | `eedeea12` | iOS 桌面小组件白屏修复：`rn-home-widget` 0.2.0 → 0.3.0，帧图改走 asset catalog（见 [[rn-home-widget-ios-blank]]） |
 | `d34b92bf` | Discover / Nearby 改瀑布流：`MasonryList`（两列 + 曝光 + 滑窗口）+ 浮起毛玻璃页头（`HeaderBlurFade`）+ 视觉统一到蜜色新稿（sparks / credits / onboarding / edit-profile）+ Debug Tools PAYMENTS 分组；见 [[rn-scroll-perf-and-blur-header]] |
-| （未提交 · 09-15） | 通话充值面板重做：Luka 自建原生模块 `apps/luka/modules/luka-call-recharge`（iOS Swift + Android Kotlin，`configureCallRechargePresenter("LukaCallRechargePresenter")` 指过去）——奶油底 + 可可胶囊 CTA + 蜜色选中的套餐卡 + `hamster-lean` 扒弹窗上沿；去掉双头像；主题多 `selection`/`selectionSurface` 两槽位；素材走 pod `resource_bundles`（iOS）/ `drawable-xxhdpi`（Android）；Dev Tools PAYMENTS 加预览入口。见 `apps/luka/docs/call-recharge.md` |
+| `51b8029a` `2fdbcc88` `b19d4d8e` `66c2149d` `3d300cfb` | 09-15 大批量（三个会话同推）：Chats 列表按新稿重做（白卡 + 小崽招呼行置顶 + video match 条 + 爪印分割）、聊天页 B 版（蜜色发出气泡 + 毛玻璃动作浮层 + 小崽活动范围收进消息区、拖拽切 `fly.mov`）、Calls 页重做（独立白卡行 + 页头 point-down 小崽 + 加密页脚）、通知双 tab B 版 + Visitor 付费页 social-proof 版、Bond 契约三屏、全局 toast 重做、桌面组件 0.4.0 states 模式（数据驱动四态 + Debug 预览 + 冷启动误报修复）、Hellos You Sent 重设计、`eat.mov` 压缩入库（474MB→1.4MB） |
+| `2fdbcc88` | 通话充值面板重做：Luka 自建原生模块 `apps/luka/modules/luka-call-recharge`（iOS Swift + Android Kotlin，`configureCallRechargePresenter("LukaCallRechargePresenter")` 指过去）——奶油底 + 可可胶囊 CTA + 蜜色选中的套餐卡 + `hamster-lean` 扒弹窗上沿；去掉双头像；主题多 `selection`/`selectionSurface` 两槽位；素材走 pod `resource_bundles`（iOS）/ `drawable-xxhdpi`（Android）；Dev Tools PAYMENTS 加预览入口。见 `apps/luka/docs/call-recharge.md` |
 
 ## 未定 / 残留
 
