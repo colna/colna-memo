@@ -88,3 +88,15 @@ tags: [pwa, snapchat, 回归测试, savvy]
 
 - **排查结论**:若在 app-test2 / app-pre / app.sitin.ai(或新包之前的缓存 bundle)测试,卡片必不显示,与客户端能力无关。app-test + develop 新包则应满足两道门;再不出就查第三道后端 `LiveCanGoLive.canShow`(主播资格)与 Live 页是否处于 Action 态。
 - **客户端缓存因素**:savvy 有 PWA 预热 + `LOAD_CACHE_ELSE_NETWORK` 策略,旧 bundle 可能被缓存复用 —— 验证时冷启动/清缓存。
+
+## 十、2026-09-16 app-test.sitin.ai bundle 复核(用户实测环境)
+
+用户确认在 app-test.sitin.ai 测 savvy_android 直播卡片。直接拉线上文件核对(17:03–17:08):
+
+- `app-test.sitin.ai` 线上 index → `main-CQtZVLWJ.js`(main 内 parseUA 已含 `savvy_android`,`__vite__mapDeps` 指向 Live chunk `index-Btt5Ky_m.js`);
+- Live chunk 门控实测(压缩后):`{isHavenPwa:n,isSavvyAndroid:r}=K(),i=t.useMemo(()=>(n||r)&&S("startHostLiveStream"),[n,r])`,`S` = `Gb(e){const t=window.pwaBridge;return"function"==typeof t?.[e]}` → **分支已上线,环境侧没问题**。
+- 时间:main last-modified 09-16 06:57 UTC(北京 14:57),index 07:42 UTC(15:42)。
+- 对照:app-test2 / app-pre / app.sitin.ai 的 Live chunk 仍是 `isHavenPwa && ...`(旧包)。
+
+**剩下能挡住卡片的**(按概率):① 端包不是 develop 构建 —— `savvy_android` UA 是 savvy develop `3ed7cd5`(8-25)加的,`startHostLiveStream` 是 `58bab0a`(9-15)加的;master/release 2.2/旧 `pwa` 分支都没有;② 浏览器里测(即使 UA 伪装,savvy 无 `window.pwaBridge` → hasNativeMethod 恒 false,设计如此);③ 后端 `LiveCanGoLive` `canShow=false`(主播资格);④ 不在 Live 页 Action(live lounge)态。⑤ 预热/SW 旧 bundle 缓存(app-test 当天 14:57 才部署)。
+**真机自检**:`navigator.userAgent`(含 `savvy_android`?)+ `typeof window.pwaBridge.startHostLiveStream`("function"?)。
