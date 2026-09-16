@@ -164,6 +164,17 @@ P0 已修（4 commit 在 `fix/luka-code-review`：chat handlers identity / Chats
 - **首次切换卡（09-16 晚）**：定位到 PagerView 8（SwiftUI `TabView(.page)` → UICollectionView）**cell 首次可见才建** + 瀑布流 `onLayout` 后才挂卡起图 → 首帧成本全落在第一次切换上。修法：`MasonryList.renderLimit` 首帧只挂 16 张（约 3 屏），首次切到 Feed、翻页动画结束后放开；装箱与 2/3 触发线不受影响。待真机确认；若 Feed→Nearby 仍卡，候选：暂停离屏 nearby 宠物视频 / nearby 同法窗口化。
 - 验证：biome 0 error / luka typecheck 0 / 121 文件 701 tests（`good-review` 测试因并行会话的 TEMP 改动暂时挂，与本次无关）；见 [[rn-infinite-scroll-pagination]]。
 
+## 亲密度主页重做（2026-09-16 晚，未提交）
+
+用户要求「使用 luka 的形象 + image2 出背景图」，拍板：整屏通栏场景 / 温馨房间角落 / 默认 `stay-all.mov` 且三个按钮各播一段动作。
+
+- **场景**：`assets/pet/room-bg.jpg`（image2 `gpt-image-2` 1024×1536 一次过，参考图 = 站立仓鼠、prompt 声明 REFERENCE ONLY；sips 转 JPEG q85，2.16MB → 359KB）。`cover` 裁切下重要物件都在中间竖带；小崽 **270pt** 时脚正好踩在地毯上（先用 ffmpeg 合成 1:1 模拟图量的，见当日日记）。
+- **动作映射**（`components/pet/pet-action-clip.ts`，加动作缺键编译不过）：待机 `stay-all.mov`；feed → `eat.mov`（新增 `PET_EAT_SOURCE` 导出，此前这段素材没接线）、play → `play-phone.mov`、hug → `heard.mov`；Android 退 `hamster-happy` / `hamster-waving` / `hamster-heart` 静态图（1.6s 回站立）。
+- **播放**：`pet-stage.ios.tsx` 两播放器常驻 + 按按钮 `replaceAsync` + `playToEnd` 交叉淡回待机（各段 10~11s，不能用定时器）；`pet-stage.tsx`（Android 转发）/`pet-stage-poster.tsx`（静态图版）。
+- **删煎蛋**（用户拍板，此后已无人引用）：`pet.mov` / `pet-flat.mp4` / `pet-flat.json` / `source-color+matte.mp4` / `PetFlatVideo` / `pet-flat-background.test.ts`；`PetVisual` 的 `animationSource` 改必填。`render-pet-flat` 脚本与 blueprint 那套不动。
+- **验证**：biome 0 error（仅既存 `use-swipe-actions` warning）/ typecheck 0 / boundaries OK / 702 tests passed（`good-review` 挂 = 并行会话 TEMP 改动）。
+- **待办**：真机确认三段动作播完回待机、连按同一按钮重播、Android 静态图换姿势；模拟器 app 停在未登录 onboarding，deeplink 到不了 `/pet`。本页 `BottomBlurFade` 8 层 BlurView，与「BlurView 压到 1–2 层」的 P1 债同向，嫌重可改纯渐变。
+
 ## 相关沉淀
 
 - [[expo-router-protected-stack-leftovers]]、[[react-async-hook-loading-stuck]]、

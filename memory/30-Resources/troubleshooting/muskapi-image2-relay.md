@@ -14,6 +14,11 @@ tags: troubleshooting, image-generation, muskapi, gpt-image-2, relay
 | `503 No available compatible accounts` | 模型在该 key 分组里可用，但上游账号池暂时没号 | **等几分钟重试**；generations / edits 会一起波动 |
 | `400 当前模型在所选系统分组中不可用` | 本次路由到的分组没有此模型 | 配合 `quality=high` 重试；或换模型 |
 | `400 model ... image pricing is missing or invalid for 1K/medium` | 计费表没配这个「尺寸/质量」档位 | 换档位（如 high）；`-4k` / `-adobe` 需要对应尺寸 |
+
+> `-4k` 实测（2026-09-16）：`gpt-image-2-4k` + `1024x1536` 在 **medium 与 high 都被 400**
+> （`pricing is missing or invalid for 2K/medium` / `2K/high`）—— 它要的是 4K 档尺寸，
+> 而 `gen_image.py` 的尺寸表里没有 → 想靠换 4K 模型提清晰度这条路目前走不通，用默认
+> `gpt-image-2` 出图即可（1024 宽在 3x 屏上是 1.7× 放大，软景别能接受）。
 | `404 Request for model ID ... not found` | 模型不走这个端点 | Gemini 图像模型走 `/chat/completions`，不是 `/images/*` |
 | `403 Chat Completions API is not enabled for this group` | key 分组没开 chat 端点 | gpt-image-2 走 `/images/generations` 或 `/images/edits` |
 | `403 GROUP_NOT_ALLOWED` +「根据您所在区域的法律条款…」 | **按出口 IP 的地域拦截**，不是 key / 模型 / 分组的问题 | 开代理即可（见下） |
