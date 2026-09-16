@@ -146,6 +146,13 @@ tags: [project, sitin-rn, luka, react-native]
 typecheck + 706 tests 全过。**未做**：24 个多组件文件拆分（对方已拆 dev 页那批）、review-mode 0020
 （Meta 开白拆墙）迁移、template-migrations 其余条目。
 
+## 性能待办（2026-09-16 三路静态审计，P0 已修）
+
+P0 已修（4 commit 在 `fix/luka-code-review`：chat handlers identity / Chats 行 memo + badge identity / discovery 缓存节流+上限 / vector-icons 与 protoMap 子路径）。
+**P1 待排**：每条入站消息 3 个 RPC（`chat/[id].tsx:1019` chemistry.refresh + `(tabs)/index.tsx:361` intimacy 批量）与 3–6 次 SecureStore（`lib/chat-rounds`）→ 去抖 + focus 门控 + 内存 hydrate；chat store 消息缓存无界（`stores/chat.ts:504`）→ 会话 LRU；BlurView 6/8 层常驻（`header-blur-fade` / `bottom-blur-fade`）→ 压到 1–2 层；图片预取管线错配（`use-discovery-feed.ts:393` RN Image.prefetch vs expo-image 卡片）→ `prefetchImages`；启动侧：3 个零引用字重（`_layout.tsx:17,18,27`）、Splash 固定 1400ms（`splash.tsx:16`）、`bootstrapAfterLogin` 串行 await（`bootstrap.ts:150`）、heroui-native 改 `provider` 子路径、Android R8 未开。
+**P2 待排**：整屏被无关状态拖重渲一批（`contact/inbox` 整店订阅、scene/waves presence 表、notifications rows/sections、into-you quietIds、`profile/[id]` conversations selector、`my-feed-post-card` 未 memo）；无界缓存（`senderProfileCache`、`peerBasicInfoCache`、voice-transcript 内存、narrative 全量加密写）；credits/history 非虚拟化；card-stack 每帧 runOnJS；hero-carousel 失焦不停；Android 后台 5s Alive 心跳；`use-into-you-badge` 30s 轮询 + 全量访客拉取；Sentry 占位 DSN；OTA 未配置。
+审计方法：静态证据 + file:line，未做真机 profiling；量化前建议先用 Instruments/Profiler 打一枪。
+
 ## 相关沉淀
 
 - [[expo-router-protected-stack-leftovers]]、[[react-async-hook-loading-stuck]]、
