@@ -139,10 +139,11 @@ tags: [project, sitin-rn, luka, react-native]
 
 17:15 完成上面 1–8 的代码修复 + 死代码清理 + 9 的文档记录（`apps/luka/docs/security-hardening.md`）；
 死代码删除 71 文件（45 个零引用组件 + 6 个 test-only 遗产模块 + 其测试）。验证：typecheck 0、
-121 文件 / 703 tests、biome 1 既存 warning、boundaries OK。**等用户发话 commit/PR**（base
-`feature/luka-ios`）。合流注意：另一会话的 App Store 提审修复动了同两个文件
-（`app/_layout.tsx`、`dev/index.tsx`），预期有冲突。**未做**：24 个多组件文件拆分、
-review-mode 0020（Meta 开白拆墙）迁移、template-migrations 其余条目。
+121 文件 / 703 tests、biome 1 既存 warning、boundaries OK。已拆 **10 个提交**（`7e413bca`..`84b2f568`）
+在 `fix/luka-code-review`。**落 `feature/luka-ios` 受阻**：另一会话的 App Store 提审修复还有 49 个
+未提交文件（含 `app/dev/_layout.tsx`、`lib/dev-gate.ts`，与本批重叠），等它提交后合并解冲突。合流
+预期冲突：`app/_layout.tsx`、`app/dev/_layout.tsx`、`dev/index.tsx`、`lib/dev-gate.ts`。**未做**：
+24 个多组件文件拆分、review-mode 0020（Meta 开白拆墙）迁移、template-migrations 其余条目。
 
 ## 相关沉淀
 
