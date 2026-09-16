@@ -190,3 +190,15 @@ catch 加日志拿到 error.name → 定案
 > 验法是把兜底常量临时改成**哨兵值** + **冷启动**，显示真值才算过。详见
 > [`rn-oneshot-seeded-widget-stale-hydration.md`](rn-oneshot-seeded-widget-stale-hydration.md)。
 
+
+### ⭐ 8. 「事件不送达」是结论，不是症状——没等到日志就据此改了架构
+
+（2026-09-16）Luka Discover 分段胶囊和页面切换「不同步」。历史里 18:00 起连续三次改架构（RN Animated 原生驱动 → Reanimated 事件驱动 → 纯 tab 状态驱动），
+依据都是一个**从未被日志证实**的判断：「react-native-pager-view 的 `onPageScroll` 在 Fabric iOS 不送达」。19:19 已经加好诊断日志，19:32 被要求「重构吧」时**日志还没读过就删掉了**。
+
+事后读库源码（`PagerScrollDelegate.swift`：每次 `scrollViewDidScroll` 都发事件，另有 NotificationCenter 兜底给原生驱动）＋ 本仓库 Me / Into-you 页同款写法的先例，
+事件其实一直是好的；所谓「冻住」是热刷残留的原生动画状态。改用事件驱动的实时位置后，动画在物理上不可能再不同步。
+
+> **动作**：**症状（「没动」）不能直接当根因（「事件没来」）**。让失败自己说话的最短路径是探针 + 一次真实运行；探针已经加好时，
+> 先跑、先读，再决定改不改。若确实要凭推断改架构，在代码注释里写明「此结论未经日志/实测证实」，下次的人才知道该验证什么。
+
