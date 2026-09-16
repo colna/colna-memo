@@ -135,6 +135,15 @@ tags: [project, sitin-rn, luka, react-native]
 
 完整报告见 2026-09-16 Daily 工作日志；路由门禁机制沉淀进 [[expo-router-protected-stack-leftovers]]。
 
+### 修复批（分支 `fix/luka-code-review`，独立 worktree，未提交）
+
+17:15 完成上面 1–8 的代码修复 + 死代码清理 + 9 的文档记录（`apps/luka/docs/security-hardening.md`）；
+死代码删除 71 文件（45 个零引用组件 + 6 个 test-only 遗产模块 + 其测试）。验证：typecheck 0、
+121 文件 / 703 tests、biome 1 既存 warning、boundaries OK。**等用户发话 commit/PR**（base
+`feature/luka-ios`）。合流注意：另一会话的 App Store 提审修复动了同两个文件
+（`app/_layout.tsx`、`dev/index.tsx`），预期有冲突。**未做**：24 个多组件文件拆分、
+review-mode 0020（Meta 开白拆墙）迁移、template-migrations 其余条目。
+
 ## 相关沉淀
 
 - [[expo-router-protected-stack-leftovers]]、[[react-async-hook-loading-stuck]]、

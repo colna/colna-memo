@@ -28,4 +28,10 @@ tags: [sitin-rn, ci, git, monorepo, 排错]
 **自查**:`pnpm boundaries` 本地随时能跑(约 1s、不联网)。它和 `pnpm typecheck` 都在 **pre-push** 而不在
 pre-commit —— 也就是说,写了一段「别的 app 怎么怎么样」的注释,只有到最后一次 push 才会炸,先手动开一枪。
 
+**再犯（2026-09-16）**:全 app 审查修复批里给 `chat-billing.ts` 写「iris/lumi guard the same way」
+（想表达兄弟包也这么判），再次被拦（`mentions "iris"`）。这次连 `apps/iris` 路径都不安全——同文件里
+既有的 `apps/iris 的注释里记着…` 没被报是运气（匹配看词边界，`apps/iris` 带路径前缀），**别赌**。
+替代写法：`the sibling apps' billing guards the same way` 或「兄弟包的扣费判定相同」——不出现任何
+app 名字面量。注意 AIGC 生成的「参考 iris 的写法」类注释是高发区，写完先 `pnpm boundaries`。
+
 **相关**:[sitin-rn 双 clone 跑错目录](sitin-rn-multi-clone-wrong-app.md)(另一类本地门禁的误报/误判)。
