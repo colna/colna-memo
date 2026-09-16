@@ -139,11 +139,12 @@ tags: [project, sitin-rn, luka, react-native]
 
 17:15 完成上面 1–8 的代码修复 + 死代码清理 + 9 的文档记录（`apps/luka/docs/security-hardening.md`）；
 死代码删除 71 文件（45 个零引用组件 + 6 个 test-only 遗产模块 + 其测试）。验证：typecheck 0、
-121 文件 / 703 tests、biome 1 既存 warning、boundaries OK。已拆 **10 个提交**（`7e413bca`..`84b2f568`）
-在 `fix/luka-code-review`。**落 `feature/luka-ios` 受阻**：另一会话的 App Store 提审修复还有 49 个
-未提交文件（含 `app/dev/_layout.tsx`、`lib/dev-gate.ts`，与本批重叠），等它提交后合并解冲突。合流
-预期冲突：`app/_layout.tsx`、`app/dev/_layout.tsx`、`dev/index.tsx`、`lib/dev-gate.ts`。**未做**：
-24 个多组件文件拆分、review-mode 0020（Meta 开白拆墙）迁移、template-migrations 其余条目。
+122 文件 / 706 tests、biome 1 既存 warning、boundaries OK。已拆 10 个提交（`7e413bca`..`84b2f568`）
+在 `fix/luka-code-review`，**17:38 已合入 `feature/luka-ios` @ `f79a069d`（快进，未 push）**：先
+`merge 726237eb` 解 4 处冲突（路由守卫/rate 删除、dev 三层+阶段化 Redirect、devFlag 双闸、contacts
+接受删除），再把另一会话 9 个在途文件以快照 patch 纳入（`6f7cac53`）。合并态在主工作区复跑
+typecheck + 706 tests 全过。**未做**：24 个多组件文件拆分（对方已拆 dev 页那批）、review-mode 0020
+（Meta 开白拆墙）迁移、template-migrations 其余条目。
 
 ## 相关沉淀
 
