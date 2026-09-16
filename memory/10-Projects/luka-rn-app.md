@@ -161,6 +161,7 @@ P0 已修（4 commit 在 `fix/luka-code-review`：chat handlers identity / Chats
 - nearby 列表**滑窗换人（10 人窗 / 换 5）改追加式**：每批 20 人、池上限 120、到顶与空页都停；滑过的人不再从共享 feed 移除（切回卡片模式会再遇到）——用户拍板的行为变化。
 - 卡片全部 `memo` + 回调改「把 item 作为参数传入」；`useSceneFeed` 内存上限语义修正为「到顶即停」（原 `slice` 会把新页整页丢掉、游标继续走）。
 - **性能收尾（09-16 晚）**：曝光回调里的写盘合并成 trailing debounce（O(n²) IO → O(1)，追加式放大了这条债）；图片预取统一走 `prefetchImages`（原 RN `Image.prefetch` 与卡片渲染是两套缓存，同一张图下两遍）；2/3 触发线改预计算阈值（滚动每帧 O(1) 比较）。
+- **首次切换卡（09-16 晚）**：定位到 PagerView 8（SwiftUI `TabView(.page)` → UICollectionView）**cell 首次可见才建** + 瀑布流 `onLayout` 后才挂卡起图 → 首帧成本全落在第一次切换上。修法：`MasonryList.renderLimit` 首帧只挂 16 张（约 3 屏），首次切到 Feed、翻页动画结束后放开；装箱与 2/3 触发线不受影响。待真机确认；若 Feed→Nearby 仍卡，候选：暂停离屏 nearby 宠物视频 / nearby 同法窗口化。
 - 验证：biome 0 error / luka typecheck 0 / 121 文件 701 tests（`good-review` 测试因并行会话的 TEMP 改动暂时挂，与本次无关）；见 [[rn-infinite-scroll-pagination]]。
 
 ## 相关沉淀

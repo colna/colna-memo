@@ -36,3 +36,11 @@ tags: [react-native, list, pagination, memo, troubleshooting]
 
 - RN 自带 `Image.prefetch` 与 expo-image（`@heyhru/rn-image`）用的是**两套缓存**：同一张图预热一套、卡片渲染再下另一套 —— 双重网络 + 双重解码，滚动时正好叠在一起。
 - **修法**：统一用 `prefetchImages`（同一个 expo-image 管线；自带去重、本地文件过滤与并发上限，永不 reject），删掉手动 `isLocalSource` 过滤。
+
+## 坑六：分页容器里「第一次切换卡、之后不卡」= 目的地页的首帧成本
+
+- **现象**：Nearby/Feed 两页放 PagerView 里，第一次切到某页明显卡，之后来回切都顺。
+- **根因**（`react-native-pager-view@8` iOS）：它是 SwiftUI `TabView(.page)` → UICollectionView，**cell 首次可见才建**；而自绘瀑布流要等 `onLayout` 量出列宽才 `packMasonry` → 挂卡 → 起图。这一整套一次性落在第一次切换的几帧上；之后 cell 复用，什么都不用重建。
+- **修法（首帧窗口化）**：`MasonryList` 加 `renderLimit`，首帧只**挂载**前 N 张（16 ≈ 3 屏）；**装箱与触发线照旧按整份 items 算**（同一列里后面的卡总在前面的卡下面，放开窗口不会挪动已渲染的卡，也不影响 2/3 的计算）。页面第一次成为当前页、等翻页动画（约 350ms + 余量）结束后再放开窗口 —— 补挂的卡都在首屏之下，用户看不到。
+- **判据**：凡是「懒建 cell 的容器 + 首帧才量尺寸/才挂大量子视图」的组合，先问能不能把首帧规模压到一屏上下，剩下的等动画结束再补。
+- **泛化**：同一个思路适用于任何进入才发现「重」的 tab/页面；先挂骨架级的内容，稳定后再放量。
