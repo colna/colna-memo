@@ -100,3 +100,9 @@ tags: [pwa, snapchat, 回归测试, savvy]
 
 **剩下能挡住卡片的**(按概率):① 端包不是 develop 构建 —— `savvy_android` UA 是 savvy develop `3ed7cd5`(8-25)加的,`startHostLiveStream` 是 `58bab0a`(9-15)加的;master/release 2.2/旧 `pwa` 分支都没有;② 浏览器里测(即使 UA 伪装,savvy 无 `window.pwaBridge` → hasNativeMethod 恒 false,设计如此);③ 后端 `LiveCanGoLive` `canShow=false`(主播资格);④ 不在 Live 页 Action(live lounge)态。⑤ 预热/SW 旧 bundle 缓存(app-test 当天 14:57 才部署)。
 **真机自检**:`navigator.userAgent`(含 `savvy_android`?)+ `typeof window.pwaBridge.startHostLiveStream`("function"?)。
+
+### 十(bis)、2026-09-16 真机复核:两道端门均通过,卡片只差后端 canShow
+
+真机(dev 构建,UA `...savvy_android`;`typeof window.pwaBridge.startHostLiveStream === "function"`)在 Live 页 Action 态下**仍不出 EarnModule** → `canGoLiveNatively=true` 已成立,剩下唯一门是 `canShowEarnCard()` 的后端 8000 `LiveCanGoLive.canShow`(响应还有 `reason`,PWA 未消费)。
+- 本地 dev(`localhost:3000`)的 API = `api-dev.swapnumber.com`(`packages/app-pwa/.env.development:1`);`httpClient.ts:146` 的 `getAppName()` 硬编码 `"haven_pwa"`(所有端一致)。
+- 诊断姿势(dev server 可用源码动态 import):`const {canShowEarnCard}=await import('/src/http/liveApi.ts'); await canShowEarnCard()`;或在 Network 过滤 `canGoLive` 看 `canShow`/`reason`;控制台过滤 `LiveCanGoLive` / `[API Error]`。
