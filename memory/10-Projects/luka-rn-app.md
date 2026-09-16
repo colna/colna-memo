@@ -119,6 +119,22 @@ tags: [project, sitin-rn, luka, react-native]
   `feature/<App名>` 这类常驻集成分支」，而本 app 一直合入 `feature/luka-ios`。待裁决（给 luka
   写明确例外，还是调整规则）。
 
+## 2026-09-16 全 app 代码审查（只读，未修）
+
+基线全绿（biome 1 warning / typecheck 0 / 710 测试过 / boundaries OK），但发现按优先级：
+
+1. **`/dev` 路由未门控**：`dev/_layout` 不查 gate、未进 `Stack.Protected`，`devFlags` 生产可用 → 深链可开 unlimitedChat/Swipes/Boosts（客户端跳扣费），同页可真删号。修复：布局内 Redirect + 进守卫组 + `__DEV__` 双条件。
+2. **路由守卫缺口**：`Stack.Protected` 只覆盖 6 组 ~14 屏，其余 ~60 条深链可绕阶段门（settings/chat/profile/paywall/credits/dev…）。
+3. **审核账号可冒用**：`sign-in` 手输邮箱即作 `googleEmail` 送 FastLogin，`review@`/`metareview@` 硬编码可触发（meta 登录前删号）；需后端校验或改走真实 Google 授权。
+4. **DTC**：`purchasing` 锁可卡死且跨登出；成功路径无 orderId 去重、`order===null` 也 `recordPurchase` → 回跳深链可重放刷次数并上行。
+5. **通话**：`onError` 不在 per-call 终态订阅（计费/心跳不停）；扣费超时重试无幂等键。
+6. **跨账号状态**：discovery 缓存（明文真人资料）、`chat.matchedPeers`（URL 参数永久解锁）、chat-rounds 等不在登出清理、无 userId 前缀。
+7. **`storage.ts` userInfo 解析无容错** → 脏数据冷启动永久黑屏。
+8. 其余 Medium：swipe 计数覆盖、entitlements 并发、`deductForCall` 缺 `isFree`、feed 非虚拟化、PII 日志、gift 成功码、pay-times 重试、死代码/多组件文件/测试缺口。
+9. 发布就绪：pre-submit 4 处身份重复（AppsFlyer/BytePlus 占位同 blueprint）、缺 Android release signing、4 项未配置。
+
+完整报告见 2026-09-16 Daily 工作日志；路由门禁机制沉淀进 [[expo-router-protected-stack-leftovers]]。
+
 ## 相关沉淀
 
 - [[expo-router-protected-stack-leftovers]]、[[react-async-hook-loading-stuck]]、

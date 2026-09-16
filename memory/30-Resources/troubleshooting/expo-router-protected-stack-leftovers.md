@@ -60,6 +60,24 @@ export function popToSessionRoot(): void {
 **只修一个都看不出效果** —— onboarding 只有在删除真的成功、拿回 pending 新账号时才会
 出现。排查时先把两条因果链拆开，否则会误判第一处没修好。
 
+## 追加（2026-09-16，全 app 代码审查）：未声明的屏不止「残留」，还能被深链直达
+
+同一个机制还有安全面：**不在任何 `Stack.Protected` 里的文件路由，任何时候都能被深链
+打开**，与登录态 / onboarding / 删除冷静期无关。luka 里 `/dev`（Debug Tools）正是这种：
+`settings/index.tsx` 只在入口手势处查 `isDevGateOpen()`，`app/dev/_layout.tsx` 自己不查，
+根 Stack 也没把它放进守卫组 → `luka://dev` 生产包应可直达（待真机 `npx uri-scheme open
+luka://dev --ios` 验证）。而 `stores/dev-flags.ts` 明说「flags work in production builds
+too，保护就是入口门禁」——路由一旦可达，`unlimitedChat` 会直接短路 `DeductCoinMsg`
+（`services/chat-billing.ts:59`），等于客户端免费 + 女方照常计收入。
+
+修复顺序：① `dev/_layout.tsx` 渲染时 `isDevGateOpen()` 不成立就 `<Redirect>`；② 把
+`dev/*` 也声明进 `Stack.Protected`（guard 用可订阅的 armed store）；③ 业务侧 devFlag 再加
+`__DEV__` 双条件。同类要盘点的还有 `settings/*`、`chat/[id]`、`paywall/*`、`credits/*`
+等 60 余条未声明路由——它们同样能绕开「未登录 / 未完成 onboarding / 删除冷静期」的阶段门。
+
+教训：**`Stack.Protected` 不是全局路由守卫，只是「列进组的屏才受控」**。涉及权限/调试
+开关的屏，不能只靠入口点门禁，必须屏内自查或进守卫组。
+
 ## 相关
 
 - [expo-router：深链冷启动进二级页，返回键报 GO_BACK](expo-router-deeplink-back-empty-stack.md)
