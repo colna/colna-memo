@@ -47,3 +47,10 @@ tags: [pwa, snapchat, 回归测试, savvy]
   - Task 一次性授权任务(authorizeOrLogin):同上 ✓
   - Home Social Connect 卡(openSocialProxyWebView):本次加 H5 判断,非 APK 弹 `showApkDownloadModal("social_connect_card")`(原直调 bridge 在 H5 静默无反应)
 - **回归点**:H5 用 `?app_name=savvy` 打开 → Snapchat 仍显示(不隐藏);点 IG/Snapchat 授权(抽屉/任务/Social Connect 卡)都弹下载 App 弹窗,不再静默无反应。
+
+## 七、2026-09-16 放开 savvy_android(分支 feat/pwa-open-snapchat-live-savvy-android)
+
+- **新状态**:白名单扩为 `haven_pwa + savvy_android` —— UA `savvy_android` 的 Snapchat 四处门控 + Live 开播入口(EarnModule)全部放开;**savvy iOS 仍隐藏**,H5 / 其它 app 不变。
+- **实现**:`useUA().isSavvyAndroid`(UA token `savvy_android`);Snapchat 门控拆成 `hideSnapchat = !isHavenPwa && !isSavvyAndroid`(4 文件);`LiveAction.canGoLiveNatively = (isHavenPwa || isSavvyAndroid) && hasNativeMethod("startHostLiveStream")`。
+- **直播注意**:UA 放开后仍靠端能力 `startHostLiveStream` 存在性兜底,老 Android 端(未实现)不会出入口,不担心点了开不了。
+- **新增回归点**:① savvy_android 三处 Snapchat 入口正常显示、可授权/登录/完成任务;② Live 页 savvy_android 出 EarnModule(端已实现能力时);③ 老 Android 端不出 Live 入口;④ savvy iOS / H5 / 其它 app 维持原隐藏行为。
