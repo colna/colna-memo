@@ -28,3 +28,14 @@ tags: [troubleshooting, luka, react-native, tailwind, figma-write-bridge]
   → `mt-3 text-[22px] text-foreground`（`text-base` 消失）。
 
 用于 57 屏（亲密度主页）的竖向解算：名字 22/30、天数 14/19、按钮标签 13/18。
+
+## 补充（2026-09-17 15:xx，58/59 Debug Tools 屏实测）
+
+从**真机截图逐像素反解**（1206×2622 = 402×874 @3x）出一层更硬的规律：无 `leading-` 时 RN 会把字体自然行高**对齐到物理像素栅格**，不是简单按 1.364×N 取整。
+
+- Nunito Bold 17：CoreText 自然行高 23.188（ascent 17.187 + descent 6.001）→ 3x 下 69.56px → 行盒 **23.333**（70px）。
+  判据：`DebugSwitchRow`（`py-3` 12×2 + 标题 + `mt-0.5` 2 + 13/17 副标题）的行距在截图里是**连续 3 段精确 199px** = 66.333pt，且五颗 `Toggle` 的中心逐一对上；用 23.19 会出 198.6px。
+  带副标题的行：一行 66.33 / 两行 83.33（`12 + 23.33 + 2 + 17×n + 12`）。
+- 等宽标签同理按 3x 取整：Space Mono 11 → 16.33（49px，`DebugInlineRow` 46 行里垂直居中实测吻合）；Space Mono 13 → 19.33（58px）；Space Mono 10 → 15（45px，`DebugValueRow` 行高 = 12+15+2+18×行数+12，一行 59 实测 ✓）。
+- 显式 `leading-[Npx]` 的照它取，不受影响（13/17、13/18、14/20）。
+- 反解工具（临时目录，未入库）：CoreText `CTLineGetTypographicBounds` + `CTTypesetterSuggestLineBreak` 量折行，再拿截图 `probe.swift` 扫色带核对；三处独立锚点（卡片标签、行首图标列、`Toggle` 中心）都能对上 0.3pt 内。
