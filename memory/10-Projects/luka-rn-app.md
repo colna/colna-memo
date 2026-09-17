@@ -175,6 +175,12 @@ P0 已修（4 commit 在 `fix/luka-code-review`：chat handlers identity / Chats
 - **验证**：biome 0 error（仅既存 `use-swipe-actions` warning）/ typecheck 0 / boundaries OK / 702 tests passed（`good-review` 挂 = 并行会话 TEMP 改动）。
 - **待办**：真机确认三段动作播完回待机、连按同一按钮重播、Android 静态图换姿势；模拟器 app 停在未登录 onboarding，deeplink 到不了 `/pet`。本页 `BottomBlurFade` 8 层 BlurView，与「BlurView 压到 1–2 层」的 P1 债同向，嫌重可改纯渐变。
 
+## 聊天键盘跟随 & Chats 两条小修（2026-09-16 晚）
+
+- **聊天输入条「不跟手」**（`087d00e3`，已 push）：消息区 + 输入条放进同一个 `KeyboardStickyView` **整块 transform 平移**（UI 线程、零逐帧重排），删掉 iOS 的 `KeyboardAvoidingView` 逐帧 `paddingBottom` 与 Android 的 `keyboardDidShow` 一次性 inset；输入条不再收起 resting inset（多余部分藏到键盘后，只留 8pt），消息区 `bottomPadding` 变常数。模拟器 120fps 逐帧量过：上升期输入条与键盘同步（无滞后尖峰）。用户原问「要不要原生实现」——不需要，原问题是动的是布局属性。详见 [[mobile-keyboard-and-viewport]] §11 与 [[ios-simulator-keyboard-and-taps]]。
+- **Chats 白卡底部被标签栏遮挡**（未提交）：`(tabs)/index.tsx` 原写 `insets.bottom + 8`（误以为 iOS 26 的 bottom 含系统标签栏），Luka 标签栏是 JS 自绘浮层 —— 改用 `useTabBarClearance()`。
+- **爪印分割线**（未提交）：`chat-row-divider.tsx` 容器 `ml-[76px] mr-4` → `mx-4`，线铺到头像下方、爪印回屏幕中线。
+
 ## 相关沉淀
 
 - [[expo-router-protected-stack-leftovers]]、[[react-async-hook-loading-stuck]]、
