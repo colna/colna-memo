@@ -89,6 +89,31 @@ kill -INT <pid>                                     # 停止
 4. 别用 h264 里的**颜色阈值**直接认色：窄列受 chroma 子采样+压缩污染（cocoa 104,68,49 变 165,157,139），
    用轮廓/亮度或改用无损截图标定阈值。
 
+## 5. 多设备 / 窗口标定 / 点击（2026-09-17 补充）
+
+**多设备时不要用 `booted`**：两台以上设备 booted 时 `xcrun simctl io booted screenshot` 会选错设备，
+一律显式传 UDID。
+
+**在临时设备上验证「登录前页面」**（已登录设备的 `Stack.Protected` 会把 `/sign-in` 拦掉）：
+
+- 从任一台已装 dev 包的模拟器 `xcrun simctl install <新设备> <Luka.app>` 即可复用同一 dev build；
+- ⚠️ **卸载重装不清 Keychain**：`simctl uninstall` 后重装仍是「已登录」（退出登录才走得到的屏依旧
+  不可达），只有 `simctl erase <设备>` 是真正的全新状态；erase 会清设备偏好，`HardwareKeyboardLastSeen`
+  等要重新写。
+
+**软键盘偏好会被改回去**：`defaults write … HardwareKeyboardLastSeen -bool false` 之后设备一重启就可能
+被 Simulator 重写成 1（实测）。**验证「键盘弹起时的布局」不要依赖软键盘链**：临时把屏幕里的状态钉死
+（如 `const keyboardVisible = true; // TEMP`）→ Fast Refresh 截图 → 还原。不用跟焦点/软键盘较劲。
+
+**点击前的窗口标定**（System Events 的窗口 `position` 会漂、不可信）：
+
+1. `CGWindowListCopyWindowInfo` 拿 window id + bounds（`owner == "Simulator"`）；
+2. `screencapture -x -l<id> win.png` 截单窗口（含阴影，2x 每边几十像素，扫描确定）；
+3. 在窗口图里按**内容特征色**扫设备屏边界（如奶油底 #FDF9EE：横竖各扫一行/列取 min/max）；
+4. 映射：`MacX = winX + (imgX − shadow)/2`，`scale = 内容宽(px) / 设备宽(px)`；
+5. 点击前 `activate Simulator` + `AXRaise` 目标窗口 —— 多个 Simulator 窗口默认会互相重叠，
+   落在别的窗口上的点击会静默作用到那台设备上。
+
 ## 关联
 
 - [[rn-simulator-pixel-measurement]]（截屏量几何、deeplink 绕屏、Dev Menu FAB 关闭）
