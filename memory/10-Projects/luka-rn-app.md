@@ -187,6 +187,23 @@ P0 已修（4 commit 在 `fix/luka-code-review`：chat handlers identity / Chats
 - **Chats 白卡底部被标签栏遮挡**（未提交）：`(tabs)/index.tsx` 原写 `insets.bottom + 8`（误以为 iOS 26 的 bottom 含系统标签栏），Luka 标签栏是 JS 自绘浮层 —— 改用 `useTabBarClearance()`。
 - **爪印分割线**（未提交）：`chat-row-divider.tsx` 容器 `ml-[76px] mr-4` → `mx-4`，线铺到头像下方、爪印回屏幕中线。
 
+## 会话页进场延迟（2026-09-17，真机专测）
+
+用户报「真机点会话行 1–2s 才进聊天页」（模拟器复现不出）。真机账单（iPhone X + Metro dev 包；五点埋点 + 触摸原生时间戳，方法见 [[rn-device-perf-measurement-via-metro-logs]]）：
+
+| 段 | 改前 | 改后 |
+|---|---|---|
+| 手指 → push（JS 处理） | 3–139ms（不忙，排除排队） | 同 |
+| push → 首屏 commit | 87–338ms | 同 |
+| commit → 消息进 store | 291–486ms（等 `getMessageList`） | **10–15ms** |
+| 合计（按下 → transitionEnd） | 1.05–1.7s | ~0.8–1.0s |
+
+改法（`b8d68623`，已 push `feature/luka-ios`）：① **消息预取** —— Chats 空闲时给前 10 个会话 `loadMessages`（`lib/chat-prefetch` 纯函数 + `hooks/use-chat-prefetch`，失焦即停、500/300ms 一笔）；② **本地快照直渲** —— `loading` 不再只认本轮 `page[id]`，`messages[id]` 有快照即视为已就绪；③ **首屏减负** —— FlatList `6 / 6 / 11` + 悬浮小崽（两段 alpha-HEVC 播放器）挪到 `settled` 后。`pnpm luka:test` 716 passed（新增 6 条单测）。
+
+**试过无效**：仓鼠 perch 视频 A/B（去掉无变化，非瓶颈）；`animation: "none"` 页面瞬现（用户体感仍慢，已按用户要求还原）。
+**残留**：余下 ~0.8–1.0s 是 iPhone X + dev 包本身（React dev 模式 / 未压缩 / 每条网络日志走 WS 到 Metro）；**luka 没有 nightly**（`apps.json` `nightly:false`），要验 release 体感需手动发 EAS preview 包。
+**顺带**：P1 里「消息缓存无界」等未动；本次只做进场路径。
+
 ## 相关沉淀
 
 - [[expo-router-protected-stack-leftovers]]、[[react-async-hook-loading-stuck]]、
