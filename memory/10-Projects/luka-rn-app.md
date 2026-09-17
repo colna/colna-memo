@@ -246,16 +246,29 @@ POPULAR 都是整圆（稿子：image2 B 版 `20260917-luka-lowsparks-b.png`）�
 ## My feeds 空态迁移（2026-09-17，未提交）
 
 `components/my-feed/my-feed-status.tsx`：旧的 3px 直角白方块 + 蓝灰 inbox 图标换成
-**白卡（24 圆角 + hairline）+ 抱相机的小崽**（`hamster-camera.png`，168×216）+ 标题/说明；
-卡内不放 CTA（Me 页那段头顶就是 composer）。同文件的出错态一并换新语言（`pill-outline`）。
-`shape-language` 白名单与 `assets/README.md` 同步。验证：typecheck 0 / 748 tests / biome clean；
+**不套卡、直接画在背景上**：抱相机的小崽（`hamster-camera.png`，132×170）+ 标题/说明，
+**不铺白底、整体比整屏空态小一号**（用户口径：不要白背景；白卡版被他否了）。卡内不放 CTA
+（Me 页那段头顶就是 composer）。同文件的出错态一并换新语言（`pill-outline`）。
+`shape-language` 白名单与 `assets/README.md` 同步。验证：typecheck 0 / 全量测试 / biome clean；
 iPad 模拟器（feed 为空的账号）深链 `/my-feed` 实拍确认。
+
+## Me 页标题栏固定 + 「漏底」修复（2026-09-17，未提交）
+
+- **标题被内容盖住**：`components/me/profile-nav-bar.tsx` 加 `bg-background` + `zIndex: 20`
+  —— 收起中的页头（绝对定位、后画的兄弟）原本会把「Profile」整条盖掉。
+- **漏底**（用户「漏底了」+ 截图）：页头在裁剪层缺 `overflow-hidden` 时整幅漏出，头像那条图
+  涌进标题栏**上方**的状态栏带；那条带子比标题栏还高、`zIndex` 盖不到。两步修：
+  ① `app/(tabs)/me.tsx` 的裁剪层补 `overflow-hidden`（页头在标题栏下沿被平切）；
+  ② `ProfileNavBar` 往上贴一块 `insets.top` 高的同色底（absolute、不参与布局、不吃触摸）兜底。
+- **验证**：iPhone 17 模拟器「拖动进行中」连拍：页头在标题栏下沿平切、状态栏带全奶油、at-rest 无变化；
+  typecheck 0 / 126 files · 746 tests / biome clean。iPad（窗口化）上 Me 页内容不够长（滚不动也不回弹），
+  「收起中」那一帧复现不了 —— 复现要靠可滚动页面（iPhone / My feeds 有帖时）。
 
 ## 相关沉淀
 
 - [[expo-router-protected-stack-leftovers]]、[[react-async-hook-loading-stuck]]、
   [[sitin-proto-request-missing-id]]、[[design-mock-measure-and-sample]]
 - [[rn-card-deck-recycling]]、[[mov-alpha-compression]]（新增「坑六：母版的 alpha 1–15 灰洗」）、[[rn-derived-app-theme-swap]]
-- [[rn-simulator-pixel-measurement]]（截屏量 UI 几何）、[[colna-fastembed-cache]]（模型缓存落在 cwd）
+- [[rn-simulator-pixel-measurement]]（截屏量 UI 几何）、[[colna-fastembed-cache]]（模型缓存落在 cwd）、[[simulator-fresh-device-signed-in]]（新建模拟器拷 keychain/data 拿已登录会话）
 - [[ios-device-free-team-debug]]（免费 Personal Team + iOS 16 设备真机调试）、[[rn-scroll-perf-and-blur-header]]（滚动卡顿 + BlurView 页头）、[[rn-home-widget-ios-blank]]（小组件白屏）
 - [[clash-tun-blocks-github-ssh]]（Clash TUN 挡 git over SSH，改一次性 HTTPS URL）
