@@ -234,7 +234,7 @@ POPULAR 都是整圆（稿子：image2 B 版 `20260917-luka-lowsparks-b.png`）�
   **「首次」不落盘**：onboarding 一生只走一次，`profileComplete` 就是闸门；中途杀进程不补播。
 - **口径**：登录页的静态 hero 与 `Poo` 的替换都写在这个 app 自己的组件里，派生包改 `copy/brand.ts`
   的 `BRAND` 即可跟着变。
-- **预加载 + 立刻弹起（用户追加要求）**：`onboarding/_layout.tsx` 一进来就
+- **预加载 + 立刻弹起（用户追加要求，`c76b8e98`）**：`onboarding/_layout.tsx` 一进来就
   `preloadIntroVideo()`（`components/intro/intro-video-preload.ts`，复用 `pet-video-source` 的落盘）；
   `intro-video` 路由待在**独立的 `authed && !pendingDeletion` 组**（横跨 onboarding → 产品两阶段），
   `summary.tsx` **先 `replace("/intro-video")`、再 `await setUserInfo(snapshot)`** ——
@@ -243,7 +243,7 @@ POPULAR 都是整圆（稿子：image2 B 版 `20260917-luka-lowsparks-b.png`）�
 - **验证**：biome / typecheck / 728 tests / boundaries 全过；新建临时模拟器截图核对（与稿偏差 ≤ 屏高
   多出的 30pt 的均分）。`/intro-video` 的实际播放入口未在模拟器复现（要走完 onboarding + 真后端）。
 
-## My feeds 空态迁移（2026-09-17，未提交）
+## My feeds 空态迁移（2026-09-17，随 `9072a06b` 入库）
 
 `components/my-feed/my-feed-status.tsx`：旧的 3px 直角白方块 + 蓝灰 inbox 图标换成
 **不套卡、直接画在背景上**：抱相机的小崽（`hamster-camera.png`，132×170）+ 标题/说明，
@@ -252,7 +252,7 @@ POPULAR 都是整圆（稿子：image2 B 版 `20260917-luka-lowsparks-b.png`）�
 `shape-language` 白名单与 `assets/README.md` 同步。验证：typecheck 0 / 全量测试 / biome clean；
 iPad 模拟器（feed 为空的账号）深链 `/my-feed` 实拍确认。
 
-## Me 页标题栏固定 + 「漏底」修复（2026-09-17，未提交）
+## Me 页标题栏固定 + 「漏底」修复（2026-09-17，`549778be`）
 
 - **标题被内容盖住**：`components/me/profile-nav-bar.tsx` 加 `bg-background` + `zIndex: 20`
   —— 收起中的页头（绝对定位、后画的兄弟）原本会把「Profile」整条盖掉。
