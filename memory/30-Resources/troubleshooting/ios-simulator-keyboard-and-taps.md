@@ -114,6 +114,28 @@ kill -INT <pid>                                     # 停止
 5. 点击前 `activate Simulator` + `AXRaise` 目标窗口 —— 多个 Simulator 窗口默认会互相重叠，
    落在别的窗口上的点击会静默作用到那台设备上。
 
+## 6. 点按「全落空」＝坐标系过期；时机敏感的交互要临时放宽（2026-09-17 补充）
+
+**症状**：CGEvent 注入（`tap.swift`）连点 6 个洞位，App 里 0 命中；`System Events` 查
+frontmost 是 Simulator、脚本也没报错 —— 很容易误判成「App 的 Pressable 有问题」。
+
+**根因（两条叠在一起）**：
+1. **窗口几何一变，手算的映射就全错**：本次还在用上一轮标定的常量
+   `origin(190.5, 92)、scale(0.5196, 0.5277)`，而窗口已被移动/缩放过
+   （现在 `(537,59) 622×856`）—— 旧坐标全部静默偏移，点在哪都不对。
+2. **`swift /tmp/tap.swift` 每次调用要现场编译**，单次 1–3s —— 想连点 6 次要 10s+，
+   而验证对象（打地鼠冒头）只停留 0.5–1.5s，等于每次都点空。
+
+**修法**：
+- 每次会话先**重新标定**：`System Events` 取窗口 `{position,size}` → 设备屏高宽比算内容高
+  （`contentH = width * deviceH/deviceW`，余下即标题栏）→ `scale = width / deviceW_pt`
+  → `MacX = winX + scale * x_pt`、`MacY = winY + titleBar + scale * y_pt`。**再用一个大目标
+  验证一次**（如底部的 Next 按钮：点完看能不能换轮），别直接用坐标做实验。
+- **`swiftc -O /tmp/tap.swift -o /tmp/tap` 编成二进制**，之后每次点按 ~0.1s，才谈得上连点。
+- **时机敏感的交互（短停留、动画窗口）先临时放宽做验证**：把常量改成 `[6000,9000]` →
+  Fast Refresh → 连点 → 截图确认机制（飞出/托盘/盖章）→ **立刻改回** `[500,1500]`。
+  验证的是机制，不是时长；不要在静止截图里猜时长。
+
 ## 关联
 
 - [[rn-simulator-pixel-measurement]]（截屏量几何、deeplink 绕屏、Dev Menu FAB 关闭）
