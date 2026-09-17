@@ -175,6 +175,7 @@ P0 已修（4 commit 在 `fix/luka-code-review`：chat handlers identity / Chats
 - **播放**：`pet-stage.ios.tsx` 两播放器常驻 + 按按钮 `replaceAsync` + `playToEnd` 交叉淡回待机（各段 10~11s，不能用定时器）；`pet-stage.tsx`（Android 转发）/`pet-stage-poster.tsx`（静态图版）。
 - **按钮无额度**（09-17 用户拍板「点完还能一直点，不要点完就置灰」）：`stores/pet.ts` 的 `interact` 直接记录、返回 void；store 里两个 `usePetInteraction*` hook 删除；每日 3 次 / 60s 冷却仍在 `@heyhru/business-pet`（blueprint 用）。
 - **摇一摇**（09-17）：`hooks/use-shake.ts`（`expo-sensors` 加速度计，> 2.2G + 1.2s 冷却，聚焦时订阅）+ `pickPetAction`（避开上一次那段，可注入 random，有单测）。`expo-sensors ~57.0.2` 进 catalog；**旧基包缺该原生模块 → 运行时 require + try/catch 兜底，重出基包后才生效**。
+- **六颗按钮 / 六段动作**（09-17）：新增 `daydream`（boring.mov）/ `jump` / `run` 三段素材，**只播动画、不写数据**（`isPetInteraction` 分界）；按钮改 `PET_ACTION_ROWS` 两排三颗（上排 feed/play/hug）。三段母版（ProRes 4444，604/104/207 MB）压成 320² HEVC-with-alpha（1.4/0.9/1.2 MB），boring 必须 `--alpha-floor 24`；**母版移出仓库** → `/Users/colna/WORK/luka-pet-masters/*-master.mov`。Android 三段用近似静图（curious / pointing / coach）。摇一摇池变 6 段。
 - **删煎蛋**（用户拍板，此后已无人引用）：`pet.mov` / `pet-flat.mp4` / `pet-flat.json` / `source-color+matte.mp4` / `PetFlatVideo` / `pet-flat-background.test.ts`；`PetVisual` 的 `animationSource` 改必填。`render-pet-flat` 脚本与 blueprint 那套不动。
 - **验证**：biome 0 error（仅既存 `use-swipe-actions` warning）/ typecheck 0 / boundaries OK / 702 tests passed（`good-review` 挂 = 并行会话 TEMP 改动）。
 - **待办**：真机确认三段动作播完回待机、连按同一按钮重播、Android 静态图换姿势；模拟器 app 停在未登录 onboarding，deeplink 到不了 `/pet`。本页 `BottomBlurFade` 8 层 BlurView，与「BlurView 压到 1–2 层」的 P1 债同向，嫌重可改纯渐变。
