@@ -206,6 +206,17 @@ P0 已修（4 commit 在 `fix/luka-code-review`：chat handlers identity / Chats
 **残留**：余下 ~0.8–1.0s 是 iPhone X + dev 包本身（React dev 模式 / 未压缩 / 每条网络日志走 WS 到 Metro）；**luka 没有 nightly**（`apps.json` `nightly:false`），要验 release 体感需手动发 EAS preview 包。
 **顺带**：P1 里「消息缓存无界」等未动；本次只做进场路径。
 
+## 低余额充值抽屉（low-sparks）重设计（2026-09-17，未提交）
+
+聊天里余额不足时升起的充值抽屉，从 blueprint 继承的 3px 直角语言迁到 Luka 语言：
+白面板 28 圆角 + 抓手、标题组居中、选中包卡换焦糖描边 + 奶油底 + 对勾、CTA 与
+POPULAR 都是整圆（稿子：image2 B 版 `20260917-luka-lowsparks-b.png`）。
+
+抽屉本体改用 app 通用 `components/ui/bottom-sheet`（HeroUI/gorhom）。两个实测坑见
+[[rn-heroui-bottom-sheet-clipping-and-mount-open]]：① 面板外内容被裁，稿子里「小崽
+扒上沿探头」做不到 → 换成面板内的抱心小崽；② 挂载即 `visible=true` 不展开，debug
+预览要走点击。Debug Tools 的 PREVIEWS 卡新增「Low sparks sheet」预览行（`previewOnly`）。
+
 ## 相关沉淀
 
 - [[expo-router-protected-stack-leftovers]]、[[react-async-hook-loading-stuck]]、
