@@ -105,3 +105,10 @@ tags: troubleshooting, colna-memo, git
 - **风险**:只升级 `embedder` 的模型/维度而不改变 `.colna/state.json` 格式时,旧 384 维索引的 state 仍可能通过文件 hash、chunk 数量校验,被误判为可增量使用。
 - **修法**:把 `IndexState::FORMAT_VERSION` 从 v2 升到 v3,旧 state 自动触发干净的全量重建;重建后再执行 `flush → optimize → stats` 校验。
 - **教训**:索引 state 不只是文件增量缓存,还要视为 embedding 模型与 chunking 规则的兼容性指纹;模型或嵌入输入契约变更必须 bump 版本并配回归测试。
+
+## 半途 kill 会留下孤儿 index 进程（2026-09-17 实测）
+
+- **现象**：`colna sync` 在前台被超时/中断（例如 agent 工具 180s 超时、Ctrl-C）后，同步进程本身被杀，但它拉起的 `colna index` 子进程**没有一起走**（实测 `ps` 里同时有 300%+ CPU 的 `colna index` 与 `colna sync` 两个进程）。
+- **后果**：两个进程抢同一个 `.colna/index.zvec` 库 —— 重建日志里出现 `Index file ... already exists (possible crash residue); cleaning and overwriting`，进度退化到约 **1 batch / 分钟**（16 块一批，183 批要 ~3 小时；单进程全量重建本来只要几分钟）。
+- **修法**：`pgrep -fl "colna (sync|index)"` 查有没有孤儿；有就 `kill` 掉，只留一个进程重跑。下次前台超时就别等，先查进程再重跑。
+- **判据一句话**：sync 的耗时以「单进程全量重建几分钟」为基准，明显超出就是有并发进程在打架。
