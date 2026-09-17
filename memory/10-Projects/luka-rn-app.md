@@ -217,6 +217,26 @@ POPULAR 都是整圆（稿子：image2 B 版 `20260917-luka-lowsparks-b.png`）�
 扒上沿探头」做不到 → 换成面板内的抱心小崽；② 挂载即 `visible=true` 不展开，debug
 预览要走点击。Debug Tools 的 PREVIEWS 卡新增「Low sparks sheet」预览行（`previewOnly`）。
 
+## 欢迎页换静态 hero & 开场片挪到注册成功后（2026-09-17，未提交）
+
+用户口径：登录页不再播视频，改用 Figma「ios 新包规范 / 03 · Pet hatch」（节点 `321:899`）的图与文案
+（`Poo` → `Luka`），其余入口保持现状；开场片改为**首次注册成功后**播放、可跳过。
+
+- **欢迎页**：`components/login/welcome-hero.tsx`（标题 `Say hi to {BRAND}.` + 仓鼠 + 两行说明）。
+  仓鼠图 = 节点 `321:911` 的 `@3x` 导出，按 alpha 收紧成 `assets/mascot/hamster-hello.png`
+  （718×911，808 KB）。稿里的 `Name him` 主按钮不采用 —— 本屏的动作是登录。
+  三个零件为奶油底换了色（白 → `foreground` / `muted` / `tintColor: inkSoft`）；
+  Apple 官方白按钮与 Android Google 胶囊保持不动（前者是 `guest-path.test.ts` 钉死的）。
+  旧视频底板 `welcome-video-backdrop.tsx` 删除。
+- **开场片**：抽 `components/intro/intro-film.tsx`（片 + 跳过键 + AUTO PLAYING），
+  `how-it-works`（游客 / 审核员）与新增 `app/intro-video.tsx`（注册成功后）共用；
+  结果页落库后 `replace("/intro-video")`，出口仍是 sign-in → Into You / 其余 → 首页。
+  **「首次」不落盘**：onboarding 一生只走一次，`profileComplete` 就是闸门；中途杀进程不补播。
+- **口径**：登录页的静态 hero 与 `Poo` 的替换都写在这个 app 自己的组件里，派生包改 `copy/brand.ts`
+  的 `BRAND` 即可跟着变。
+- **验证**：biome / typecheck / 728 tests / boundaries 全过；新建临时模拟器截图核对（与稿偏差 ≤ 屏高
+  多出的 30pt 的均分）。`/intro-video` 的实际播放入口未在模拟器复现（要走完 onboarding + 真后端）。
+
 ## 相关沉淀
 
 - [[expo-router-protected-stack-leftovers]]、[[react-async-hook-loading-stuck]]、

@@ -39,6 +39,9 @@
   ③ 项目级对所有人生效：`app.config.ts` 的 `ios.infoPlist.EXDevMenuShowFloatingActionButton: false`（要 prebuild / 改 `ios/<App>/Info.plist`）。
   它还**可以拖动**，所以同一 App 两张截图里位置可能不同 —— 别当成布局变化。
 
+- **盖住整屏的是 Dev Menu 的引导弹窗**（首次装 dev 包 / 每次未确认前启动都会有），比 FAB 更挡事：它自己带一个 Continue 按钮，而模拟器上的点击注入常常打不进去（见 [[ios-simulator-keyboard-and-taps]]）。**绕法是不点它，直接写偏好**：
+  `xcrun simctl spawn <UDID> defaults write <bundleId> EXDevMenuIsOnboardingFinished -bool YES` → `simctl terminate/launch`，弹窗不再出现（键名出自 `node_modules/expo-dev-menu/ios/Modules/DevMenuPreferences.swift`）。
+
 ## 到不了的那一屏 / 那一个分段怎么绕
 
 - 深链：`xcrun simctl openurl booted "<scheme>://<path>"`（例：`luka://me` 直达 Me tab）。
