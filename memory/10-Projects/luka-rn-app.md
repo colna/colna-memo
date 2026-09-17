@@ -243,6 +243,14 @@ POPULAR 都是整圆（稿子：image2 B 版 `20260917-luka-lowsparks-b.png`）�
 - **验证**：biome / typecheck / 728 tests / boundaries 全过；新建临时模拟器截图核对（与稿偏差 ≤ 屏高
   多出的 30pt 的均分）。`/intro-video` 的实际播放入口未在模拟器复现（要走完 onboarding + 真后端）。
 
+## My feeds 空态迁移（2026-09-17，未提交）
+
+`components/my-feed/my-feed-status.tsx`：旧的 3px 直角白方块 + 蓝灰 inbox 图标换成
+**白卡（24 圆角 + hairline）+ 抱相机的小崽**（`hamster-camera.png`，168×216）+ 标题/说明；
+卡内不放 CTA（Me 页那段头顶就是 composer）。同文件的出错态一并换新语言（`pill-outline`）。
+`shape-language` 白名单与 `assets/README.md` 同步。验证：typecheck 0 / 748 tests / biome clean；
+iPad 模拟器（feed 为空的账号）深链 `/my-feed` 实拍确认。
+
 ## 相关沉淀
 
 - [[expo-router-protected-stack-leftovers]]、[[react-async-hook-loading-stuck]]、
