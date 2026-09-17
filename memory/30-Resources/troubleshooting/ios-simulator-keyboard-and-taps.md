@@ -136,6 +136,23 @@ frontmost 是 Simulator、脚本也没报错 —— 很容易误判成「App 的
   Fast Refresh → 连点 → 截图确认机制（飞出/托盘/盖章）→ **立刻改回** `[500,1500]`。
   验证的是机制，不是时长；不要在静止截图里猜时长。
 
+## 7. 多设备并行时：点按要 AXRaise + 截图要指名 UDID（2026-09-17 补充）
+
+**症状**：CGEvent 点按「POSTED」成功、frontmost 也是 Simulator，App 毫无反应；下一轮盲点
+甚至**误触了 App 的返回键**（弹出 dev 的 GO_BACK 错误层）。
+
+**根因**：Simulator 里同时开着**两台设备窗口**（iPad Air 13 + iPhone 17，两个会话各用一台）。
+`System Events` 的 frontmost 只保证「Simulator 这个 app」在最前，**不保证是哪一扇窗口** ——
+点按落在另一台设备的窗口上，甚至落在目标 App 的别的控件上。
+
+**修法**：
+- 点按前把目标窗口抬起来：
+  `tell application "System Events" to tell process "Simulator" to perform action "AXRaise" of window "iPad Air 13-inch (M4) – iOS 26.5"`
+  （窗口名 = 设备名 + ` – ` + 系统版本，`screencapture -l`/`System Events` 都能拿到）。
+- 截图/装包/深链一律**指名 UDID**，别用 `booted`（`xcrun simctl list devices booted` 看全）。
+- 看不清点了哪里时先截一张看状态，别连续盲点（这次盲点顺手把 dev 错误层点出来了；清掉的办法
+  是 `simctl terminate` + `launch`，比找 Dismiss 按钮的坐标快）。
+
 ## 关联
 
 - [[rn-simulator-pixel-measurement]]（截屏量几何、deeplink 绕屏、Dev Menu FAB 关闭）
