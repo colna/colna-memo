@@ -81,3 +81,16 @@ done
 - 根治路径(未实测):等免费 profile 过期(7 天)后 App ID 是否释放,或把个人账号升为付费
   后在门户删除旧 ID。**09-21 之后再试改回原 ID** 并记录结果。
 - 公司 Team 的证书首次装真机后,手机上要「设置 → 通用 → VPN与设备管理 → 信任」。
+
+## 追加(2026-09-18):preview / Ad Hoc 出包走同一绕法
+
+- 本机出 preview IPA(`scripts/build-ipa.sh luka test preview`,ad-hoc 导出)再次撞到
+  `.dev` 不可注册。沿用本文「改生成物 pbxproj」的绕法(6 处 → `.devx` 系列),
+  **archive + export 全过**,产物 `com.lukasoc.luka.devx`。
+- 这次网络可达,Xcode 自动**新建了 Ad Hoc 描述文件**
+  `iOS Team Ad Hoc Provisioning Profile: com.lukasoc.luka.devx`(2027-08-30 到期)——
+  此前只有 Development profile。即 ad-hoc 路径不需要手工在门户建 profile。
+- ⚠️ 新 Ad Hoc profile 里只有 **1 台注册设备**;给测试同学装包前,必须先把他们的
+  UDID 注册进公司 Team,否则装不上。
+- `apps/luka/ios/` 现在就是 `.devx` + `39CFYH6W55` 状态;下次 `expo prebuild --clean`
+  会还原成 `.dev`,冲突复现。
