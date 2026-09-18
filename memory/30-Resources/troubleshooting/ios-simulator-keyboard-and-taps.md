@@ -157,3 +157,32 @@ frontmost 是 Simulator、脚本也没报错 —— 很容易误判成「App 的
 
 - [[rn-simulator-pixel-measurement]]（截屏量几何、deeplink 绕屏、Dev Menu FAB 关闭）
 - [[mobile-keyboard-and-viewport]]（PWA 侧键盘让位：transform vs 压矮）
+
+## 8. 拖拽/滑动手势：用 JXA 直接调 CGEvent，不必编译 Swift（2026-09-18 补充）
+
+**需求**：验证 Luka Discover 刮刮乐的「按下 → 连续移动 → 抬起」与卡组上滑的仲裁，
+不是单次 tap。本机 `cliclick` 没装、`python3` 无 pyobjc，但 **osascript 的 JXA 可以直接
+`ObjC.import("CoreGraphics")`**，免编译、免安装：
+
+```js
+// /tmp/drag.js，`osascript -l JavaScript /tmp/drag.js`（先 activate Simulator）
+ObjC.import("CoreGraphics");
+function post(type, x, y) {
+  $.CGEventPost($.kCGHIDEventTap, $.CGEventCreateMouseEvent($(), type, $.CGPointMake(x, y), $.kCGMouseButtonLeft));
+}
+const origin = $.CGEventGetLocation($.CGEventCreate($())); // 结束移回原位
+post($.kCGEventLeftMouseDown, x0, y0);
+for (let i = 1; i <= 24; i += 1) {
+  post($.kCGEventLeftMouseDragged, x0 + ((x1 - x0) * i) / 24, y0 + ((y1 - y0) * i) / 24);
+  delay(0.012);
+}
+post($.kCGEventLeftMouseUp, x1, y1);
+delay(0.3);
+post($.kCGEventMouseMoved, origin.x, origin.y);
+```
+
+- 每步 `delay(0.01~0.015)`：太快 Pan 手势收不到完整轨迹（同第 2 节 tap 要 30ms 的道理）。
+- 坐标映射用「窗口 `{position,size}` + 截图像素 / 3 的比例」直接换算即可打到卡片这种大目标；
+  小目标仍按第 5 节标定。窗口会被移动/缩放，**每次会话重新取**。
+- 验证有业务副作用的动作（向上滑 = pass 扣额度）要谨慎：改拖**反方向**（向下/水平）验证
+  「不误触划卡」与仲裁，不拿真数据做实验。
