@@ -49,3 +49,13 @@ tags: [troubleshooting, luka, react-native, tailwind, figma-write-bridge]
 - **判据**：luka 里**单行 TextInput 必须自己钉行盒** —— `height`（`sign-in-field` 的 `height: 24, padding: 0`、`edit-profile/*` 的 `FIELD_HEIGHT`、dev 屏的 `h-[46px]`）或 `leading-[Npx]`（`delete-confirm-field` 16/22、`chat-input-bar` height + lineHeight）二者至少其一。全 `apps/luka` 扫一遍，没钉的就这一处抽屉搜索框（另有 `leave-link-dialog-host`、`location-picker` 两处待观察，都是「无 height 无 leading」）。
 - **修法**：`className="... h-full ... leading-[21px]"`；`h-full` 取父行内容高，行高将来变不用再改。`Text` 上 Tailwind 的 `text-[Npx]` 不给 lineHeight（见上一条 twMerge 的坑），`TextInput` 同理。
 - **注意**：`pnpm --filter luka typecheck` / `biome check` 都拦不住这类问题，只能肉眼在模拟器里看；模拟器复核前别当已验证。
+
+## 补充（2026-09-20，sign-in 邮箱框 —— 原生 placeholder 被 iOS 自己挪位）
+
+同日第二处「文案被裁」，在 `sign-in` 页 EMAIL 框（用户反馈「文案展示不全」）。**机制与上面那条不同**：这一处输入框的行盒是钉住的（`height: 24, padding: 0`），裁掉字头的是 **iOS 自己摆的那个 placeholder label**。
+
+- **症状**：EMAIL 框的 `Enter your email` 只露下半截，密码框完好 —— 它是没被点过的那个。
+- **根因**（`apps/blueprint/src/components/auth/field-placeholder.tsx` 早已记录）：iOS 在字段成为 first responder 的那一刻会重摆一次 placeholder label；这一屏键盘弹起时整张表单跟着 `KeyboardAvoidingView` 位移，把那个瞬间的 frame 递给了 UIKit，label 留在错位处、被输入框裁掉一半。光标和真正的文字从 line fragment 画，不受影响 —— 所以这坑难按需复现，**只有先点的那只框中招**。
+- **修法**：照蓝图的解法 —— `apps/luka/src/components/login/sign-in-field-placeholder.tsx` 在 JS 层画占位（`absolute inset-0 justify-center px-4` + `font-sans text-[16px] leading-[20px]` + `pointerEvents="none"` + 对读屏隐藏），输入框不再传原生 `placeholder`（改 `leading-[20px]` 钉行盒、高度给满整行 56、`textAlignVertical: "center"` 兜 Android），`accessibilityLabel` 补住读屏；`{placeholder && !value}` 控制显隐。
+- **验证**：iPhone X / iOS 26.5 模拟器，焦点停在 EMAIL 框（光标可见）时占位文案完整、与光标同一行；截图标尺复核 `leading-[20px]` 不裁 Nunito 16 的降部。回归测试 `apps/luka/tests/design/guest-path.test.ts` 钉住「不走原生 placeholder」。
+- **判据**：凡是「原生 placeholder + 键盘弹起会位移表单」的屏，都该换成 JS 画；蓝图 `FieldPlaceholder` 是现成参照。
