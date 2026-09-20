@@ -24,10 +24,16 @@ const messageStyle = useAnimatedStyle(() => ({ opacity: withTiming(progress.valu
 `withTiming` 只在**驱动值那一侧**做：
 
 ```tsx
-// ✓ 对的
-const idleStyle    = useAnimatedStyle(() => ({ opacity: 1 - progress.value }));
-const messageStyle = useAnimatedStyle(() => ({ opacity: progress.value }));
+// ✓ 对的：直接插值；再进一步用 2× 斜率的「顺序型」——上层先升满 1，下层才开始退，
+//    任何时刻都有一层全透明当盖板（真机上淡出那层起帧慢一拍也只是被盖住，不会露底色）
+const idleStyle    = useAnimatedStyle(() => ({ opacity: Math.min(1, 2 * (1 - progress.value)) }));
+const messageStyle = useAnimatedStyle(() => ({ opacity: Math.min(1, 2 * progress.value) }));
 ```
+
+1:1 的线性交叉（`1 - p` / `p`）在模拟器上也够，但中点会有 ~25% 底色从两层中间渗出来
+（小崽发白一瞬）；顺序型连这个也没有。**用户报「还是闪」时先确认设备拿没拿到新 bundle**：
+真机 dev build 不会自己刷新，杀掉重开 + 与 Metro 同网才拿得到 —— 我在模拟器录屏里逐帧
+复核（std<3 的消失帧 0 个、过渡 ±0.4s 均值/方差全平），别急着再改代码。
 
 顺带的好处：不再每帧重建一个 `withTiming`，注入的 `reducedMotion ? 0 : 160` 也不必带进
 `useAnimatedStyle`。
