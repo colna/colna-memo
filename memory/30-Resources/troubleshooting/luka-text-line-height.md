@@ -39,3 +39,13 @@ tags: [troubleshooting, luka, react-native, tailwind, figma-write-bridge]
 - 等宽标签同理按 3x 取整：Space Mono 11 → 16.33（49px，`DebugInlineRow` 46 行里垂直居中实测吻合）；Space Mono 13 → 19.33（58px）；Space Mono 10 → 15（45px，`DebugValueRow` 行高 = 12+15+2+18×行数+12，一行 59 实测 ✓）。
 - 显式 `leading-[Npx]` 的照它取，不受影响（13/17、13/18、14/20）。
 - 反解工具（临时目录，未入库）：CoreText `CTLineGetTypographicBounds` + `CTTypesetterSuggestLineBreak` 量折行，再拿截图 `probe.swift` 扫色带核对；三处独立锚点（卡片标签、行首图标列、`Toggle` 中心）都能对上 0.3pt 内。
+
+## 补充（2026-09-20，All chats 搜索框 —— 单行 TextInput 同样吃行盒）
+
+第三条规律，从 `apps/luka/src/components/chats-play/all-chats-drawer.tsx` 的搜索框反解出来：
+
+- **症状**：抽屉里 48pt 高的搜索行内，`TextInput`（`flex-1 font-sans text-[16px]`，无 height / 无 `leading-`）的 placeholder 只露上半截；iOS 光标却是完整行高（22pt ≈ Nunito 16 的自然行高），光标底 ≈ 字形被裁的那条线。
+- **逐像素反解**（820×1706 的缩放截图，1.79 px/pt）：输入框内高 83px ≈ 46pt（= 48 − 双 1px 描边）；光标 578..617 = 40px ≈ 22pt；字形 cap 顶在 608、基线约 628，即**基线落在框底之下约 6pt**，剩下的部分被框裁掉。所以问题不是字号小，而是基线相对盒子下移。
+- **判据**：luka 里**单行 TextInput 必须自己钉行盒** —— `height`（`sign-in-field` 的 `height: 24, padding: 0`、`edit-profile/*` 的 `FIELD_HEIGHT`、dev 屏的 `h-[46px]`）或 `leading-[Npx]`（`delete-confirm-field` 16/22、`chat-input-bar` height + lineHeight）二者至少其一。全 `apps/luka` 扫一遍，没钉的就这一处抽屉搜索框（另有 `leave-link-dialog-host`、`location-picker` 两处待观察，都是「无 height 无 leading」）。
+- **修法**：`className="... h-full ... leading-[21px]"`；`h-full` 取父行内容高，行高将来变不用再改。`Text` 上 Tailwind 的 `text-[Npx]` 不给 lineHeight（见上一条 twMerge 的坑），`TextInput` 同理。
+- **注意**：`pnpm --filter luka typecheck` / `biome check` 都拦不住这类问题，只能肉眼在模拟器里看；模拟器复核前别当已验证。
