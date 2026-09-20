@@ -96,6 +96,36 @@ entitlement 由 **autolink 的 config plugin** 注入,**即使包不在 `plugins
 10. **之后不要跑 `<app>:ios:device`** —— 它会 `prebuild --clean`,冲掉第 6 步并把
     entitlements 写回,还会重新全量编译。
 
+## 2026-09-20 追加：Xcode 27 下 iOS 16 真机怎么走
+
+升级到 Xcode 27.0（iPhoneOS 27 SDK）后重装 luka，实测：
+
+1. **Xcode 27 不再把 iOS 16 设备列为构建目标**：`xcodebuild -showdestinations` 里没有
+   设备；`-destination "id=<40位UDID>"` 与 CoreDevice UUID（`B436BC46-…`）两种写法都报
+   `Unable to find a device matching the provided destination specifier`。devicectl 依旧
+   不支持 iOS 16（`pairingState: unsupported`、capabilities 里没有 Install Application）。
+   `~/Library/Developer/Xcode/iOS DeviceSupport/` 里倒是有 `iPhone10,3 16.7.16` 的符号。
+2. **传统通道仍然可用**（当前唯一可行路径）：
+   ```bash
+   cd apps/luka/ios
+   # 只换真机 pod；工程若已是 .devx + 39CFYH6W55（未 prebuild）就不需要再改 pbxproj
+   HEYHRU_BYTEPLUS_NATIVE=1 EXPO_USE_PRECOMPILED_MODULES=0 pod install
+   xcodebuild -workspace Luka.xcworkspace -scheme Luka -configuration Debug \
+     -destination 'generic/platform=iOS' \
+     -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
+     -derivedDataPath build \
+     DEVELOPMENT_TEAM=39CFYH6W55 CODE_SIGN_STYLE=Automatic build
+   ios-deploy --bundle build/Build/Products/Debug-iphoneos/Luka.app \
+     --id <40位UDID> --no-wifi
+   ```
+   关键点：**`-destination 'generic/platform=iOS'` 不要求 Xcode 认识设备**，只要描述文件
+   里已有该设备 UDID 就能自动签名（公司 Team 的 Development / Ad Hoc profile 都含
+   iPhone X）。构建 + `[100%] InstallComplete` 均已验证。
+3. 真机 pod 装完后，**模拟器侧下次 `pnpm <app>:ios` 会由 `ensure-simulator-pods.sh`
+   自动摘掉 RangersAppLog**（Podfile.lock 里出现它即触发），不用手动处理。
+4. 仍然**不要跑 `pnpm <app>:ios:device`**：它的 `prebuild --clean` 会把 bundle ID 还原成
+   `.dev`（公司 Team 注册不了），还会全量重编。
+
 ## 公司 Team 生效后怎么恢复（2026-09-15 实测）
 
 加入公司 Team 后 Xcode 的 Accounts 里会多一行(如 `AI FANTASY, INC`);若 Team 详情页的
