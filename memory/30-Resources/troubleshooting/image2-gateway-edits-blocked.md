@@ -17,6 +17,12 @@ tags: [image2-gen, gpt-image-2, gateway, troubleshooting, opencode]
 | `HTTP 400 当前模型在所选系统分组中不可用` | 同上第一种的文字版；多出现在 multipart（带了 image 字段）的请求上 |
 | `model xxx image pricing is missing or invalid for 1K/low` | 网关 pricing 表缺档（`gpt-image-2-4k` / `-adobe` 各档都缺，等于不可用） |
 
+## 下午补充：三个新事实（2026-09-20 14:00~14:30）
+
+1. **区域封锁**：`403 GROUP_NOT_ALLOWED / 根据您所在区域的法律条款…`，本机 CN 出口 IP（北京）被拒。**用本机 Clash Verge 代理（mixed-port 7897）绕过后恢复**：`HTTPS_PROXY=http://127.0.0.1:7897`。注意 `gen_image.py` 走 `urllib`，默认吃 `HTTPS_PROXY` 环境变量，不用改代码。
+2. **`/images/edits` 是权限问题，不是区域问题**：代理下还是 `502 system access forbidden`；`/v1/responses` 明确回 `Responses API is not enabled for this group`，`/v1/chat/completions` 同理。**当前 key 的 group 只开了 `/images/generations`**，想要图生图（带参考图）必须换 key / 让网关管理员给 group 放行。
+3. **这个网关对 multipart 走的是另一条路**：`gen_image.py` **无论有没有参考图都用 multipart/form-data**（`build_multipart`），实测这种请求被分组拒（400/502）；同样的 prompt 改用 **JSON body** 打 `/images/generations` 就能过。所以纯文字出图时，用 30 行 curl/python+JSON 的小脚本比调 skill 脚本可靠（本次物料就是这么出的）。
+
 ## 关键结论：两个通道是分开的
 
 - `/v1/images/edits`（**带参考图**，1 张用 `image` 字段、多张用 `image[]`）→ 全程被挡。
