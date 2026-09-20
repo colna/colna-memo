@@ -125,6 +125,14 @@ entitlement 由 **autolink 的 config plugin** 注入,**即使包不在 `plugins
    自动摘掉 RangersAppLog**（Podfile.lock 里出现它即触发），不用手动处理。
 4. 仍然**不要跑 `pnpm <app>:ios:device`**：它的 `prebuild --clean` 会把 bundle ID 还原成
    `.dev`（公司 Team 注册不了），还会全量重编。
+5. **安装可自动化，启动不能**：ios-deploy 没有 `--launch` 参数（传了会打印 usage）；
+   `--justlaunch` / `-m --justlaunch` 在 Xcode 27 下报
+   `Unable to locate DeviceSupport directory with suffix 'DeveloperDiskImage.dmg'`（Xcode 27
+   的 `~/Library/Developer/Xcode/iOS DeviceSupport/iPhone10,3 16.7.16` 里只有 `Symbols` +
+   `Info.plist`，没有 DDI）—— 原文即 `you will need to launch the app manually`。
+   `xcrun devicectl device process launch` 同样不行（error 1014 usage assertion，iOS 16 不支持）。
+   所以 `[100%] InstallComplete` 之后**让用户手动点手机上 Luka 图标**，再靠 Metro 的
+   `apps/<app>/.expo/dev/logs/start.log` 与 `netstat | grep 8081` 里的 169.254 连接确认已连上。
 
 ## 公司 Team 生效后怎么恢复（2026-09-15 实测）
 
