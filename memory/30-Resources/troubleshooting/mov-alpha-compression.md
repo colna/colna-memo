@@ -171,3 +171,48 @@ ffmpeg -v error -i in.mov -vf alphaextract -f rawvideo -pix_fmt gray - \
 
 仓库里专用的那份是 `sitin-rn/scripts/optimize-pet-mov.mjs`,只吃带 alpha 的母版、
 写死缩到 320×320,不带 alpha 的源直接抛错。
+
+## 坑七:转 webm 要走母版,不能拿 HEVC 成品当 alpha 源(2026-09-20)
+
+Luka 小窝的收消息短片要出三份:iOS 的 HEVC-with-alpha MOV、Android 的 VP9 alpha WEBM。
+**把 webm 直接从压好的 HEVC MOV 转是错的** —— ffmpeg 读不出 Apple 的辅助 alpha 层
+(本机 ffmpeg 7.1.1 实测,与坑二同一件事),转出来是不透明/带黑底的一份,而且不报错。
+正确路径:**从 ProRes 母版**按同一套 crop/scale 重编一份 webm,尺寸与 mov 一致:
+
+```bash
+ffmpeg -i <ProRes 母版>.mov -vf "crop=1080:1652:0:0,scale=320:-2:flags=lanczos" \
+  -c:v libvpx-vp9 -pix_fmt yuva420p -auto-alt-ref 0 -b:v 0 -crf 30 -row-mt 1 -an \
+  -metadata:s:v:0 alpha_mode=1 out.webm
+```
+
+**复核 webm 的 alpha 要两个条件一起满足**,否则会读到"全不透明"而误判:
+
+```bash
+# 必须显式指定解码器；而且不能带 -ss（seek 会丢掉 alpha plane，我在这上面白查了一轮）
+ffmpeg -v error -c:v libvpx-vp9 -i out.webm -frames:v 1 -vf format=rgba \
+  -f rawvideo -pix_fmt rgba - | python3 -c '
+import sys; d=sys.stdin.buffer.read(); a=d[3::4]
+print(a[0], a[-4], sum(1 for v in a if v<8)/len(a))'   # 角上 alpha 应为 0
+```
+
+`ffprobe` 对这类文件只报 `pix_fmt=yuv420p + TAG:ALPHA_MODE=1`（alpha 与颜色同流），
+**文件结构本身就是判据**，别被 `yuv420p` 骗了。
+
+## 坑八:换一段素材 = 换了一套画布,显示尺寸与落点要重量(2026-09-20)
+
+`--crop-alpha` 的**画布 = 全部帧 alpha 的并集包围盒**。所以只要新素材多一个"举高/跃起"
+的动作，画布就被撑大，同一个方框里角色反而变小、脚也落不到原来的线 —— 这跟 `--alpha-floor`
+是两回事，类型检查和肉眼都看不出来。
+
+2026-09-20 Luka 换两段（Quick Pick 无关，是 pet / Chats 小窝）：
+
+| | 旧 | 新 | 连带改动 |
+|-|-|-|-|
+| `pet/stay-all.mov` | 320²、√面积 0.888 | 320²、0.864 | `PET_CLIP_LAYOUTS` 里其余六段的 `scale` 全部按新基准重算（1.06→1.03 等） |
+| 收消息片 | 320×436、√面积 0.857 | 320×**490**（新片要「把信举过头顶」，并集大了）、0.715 | 方框 `0.45/184`→`0.51/209` 补回小崽在屏上的大小；`top-[37%]`→`top-[30%]` 把脚放回原来那条地毯线；待机层 `IDLE_SCALE 1.25`→`1.03` |
+
+**流程**：`pnpm compress-mov` 压完 → `swiftc -O scripts/measure-pet-alpha.swift -o /tmp/m &&
+/tmp/m <各段>.mov` → 按「待机为基准」重算每段 `scale`（= 待机√面积 ÷ 该段√面积）与
+`bottom`（并集底边）→ 再看消费方那些方框比例 / 落点常数是否需要跟着换算。
+**验收**：把新素材按代码里的 pt 值合成一张房间底图上的对照图（PIL 即可），脚有没有落在
+地毯上、和旧尺寸差多少一眼就看得出来。
