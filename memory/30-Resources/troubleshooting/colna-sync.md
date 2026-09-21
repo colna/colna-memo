@@ -112,3 +112,13 @@ tags: troubleshooting, colna-memo, git
 - **后果**：两个进程抢同一个 `.colna/index.zvec` 库 —— 重建日志里出现 `Index file ... already exists (possible crash residue); cleaning and overwriting`，进度退化到约 **1 batch / 分钟**（16 块一批，183 批要 ~3 小时；单进程全量重建本来只要几分钟）。
 - **修法**：`pgrep -fl "colna (sync|index)"` 查有没有孤儿；有就 `kill` 掉，只留一个进程重跑。下次前台超时就别等，先查进程再重跑。
 - **判据一句话**：sync 的耗时以「单进程全量重建几分钟」为基准，明显超出就是有并发进程在打架。
+
+## 并发 sync 持锁时新进程会静默等待(2026-09-21 实测)
+
+- **现象**:`./colna index`(或 `sync`)长时间**零输出**,像卡死;`pgrep -fl colna` 只有一个正常进程,且它**在健康推进**(`/tmp/colna-sync.log` 里 `batch N/202` 约 5 秒一批,202 批 ~17 分钟)。
+- **根因**:zvec 库有排他锁(`.colna/index.zvec/LOCK`、`idmap.0/LOCK`、`fts.1.rocksdb/LOCK`)。本工作区常有并行会话同时在 sync,后启动的进程在锁上**静默阻塞**:不报错、不输出进度,看起来与死锁一样。
+- **判据 / 修法**:先 `pgrep -fl "colna"` + `lsof -p <pid> | grep LOCK` 分清两种情况 ——
+  - 持锁者**健康重建**(有输出、batch 在涨、CPU 在跑):**等它**,不要 kill 也不要重跑(会重演上一条的抢占退化)。
+  - 持锁者**僵尸/孤儿**(CPU 空转、batch 不动):按上一条 kill 后单进程重跑。
+- **另一条实用结论**:`colna sync` 的顺序是 `add+commit → pull → reindex → push`。reindex 是全流程最长的一步,agent 工具超时 kill 后,**commit 已经产生但 push 还没发** —— 表现为「本地 ahead 若干个 `colna sync` 提交」。补推只需在 KB 根 `git push origin main`(已实测 7 个积压提交一次推完)。
+- **教训**:判断 `colna` 死活看**输出速率**而不是「有没有输出」;看到 ahead 一堆 `colna sync` 提交,八成是历次 sync 都死在 reindex 上。
