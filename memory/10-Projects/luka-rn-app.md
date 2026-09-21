@@ -30,7 +30,7 @@ tags: [project, sitin-rn, luka, react-native]
 
 来源：飞书表格《赛跑包物料分配》（wiki `MsHDw25LvifYddkOJUgc2PvOnJc`，Luka 行 15:38 由用户更新）。
 
-- **整套域名 `lukasoc.com` → `lukasap.com`**（旧域名废弃）：API `api-{dev,prod}.lukasap.com`、CDN `file.lukasap.com`、Alive `{dev,prod}-tcp.lukasap.com:8000`；**后端 `appName` 同时由 `luka` 换 `lukasap` / `lukasap_android`**（两者必须一起动，只改域名不改 appName 会静默失败）。
+- **整套域名 `lukasoc.com` → `lukasap.com`**（旧域名废弃）：API `api-{dev,prod}.lukasap.com`、CDN `file.lukasap.com`、Alive `{dev,prod}-tcp.lukasap.com:8000`；**后端 `appName` 不变，仍是 `luka` / `luka_android`**（2026-09-21 19:43 用户确认表格里写的 `lukasap` 已过时 —— 后端在 `lukasap.com` 上注册的仍是 `luka`；仓库已由 `lukasap` 回改为 `luka`，未提交）。
 - **商店身份跟着换**（用户拍板「都改了」）：bundle id / Android package `com.lukasoc.luka` → **`com.lukasap.luka`**；App Group `group.com.lukasoc.luka` → **`group.com.lukasap.luka`**（HomeWidget 与两个扩展的 id 由 bundle id 派生，自动跟着变）；本地 native module `luka-call-recharge` 的 gradle `group` 同步换。
   - ⚠️ **Apple 侧要重建**：Developer 后台的 App ID / App Group / 描述文件，以及 App Store Connect 应用记录（旧 `com.lukasoc.luka` 记录作废，需按新 id 新建）；本机 Ad Hoc / App Store 描述文件也要重签。
 - 仓库侧已替换（**未提交**）：`app.config.ts`、`README.md`、`legal.ts`、测试 4 个文件（config contract / payment-environment / iap-verify / fake-payment guard）、`docs/app-store-checklist-review.md`、`docs/app-store-review-findings.md`（审核邮箱）。
