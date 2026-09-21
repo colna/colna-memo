@@ -22,20 +22,21 @@ tags: [project, sitin-rn, luka, react-native]
 
 ## 审核账号（App Store / Meta 开白）
 
-- 邮箱：`review@lukasoc.com`（商店）/ `metareview@lukasoc.com`（Meta 开白）—— 2026-09-14 从占位换成品牌域名，见 `docs/review-mode.md` §3.1。⚠️ 2026-09-21 整套域名迁到 `lukasap.com` 后，这两个审核邮箱是否随迁**待确认**（见下节）。
+- 邮箱：`review@lukasap.com`（商店）/ `metareview@lukasap.com`（Meta 开白）—— 2026-09-14 从占位换成品牌域名（原 `@lukasoc.com`），**2026-09-21 随整套域名迁到 `@lukasap.com`**（用户拍板）。⚠️ 后端审核名单要同步建这两个新邮箱。
 - 两号 × 两平台的四个钉死 deviceId 在 `src/lib/review-mode.ts`（`luka[_meta]_{iOS,Android}_deviceID`）。
+- ⚠️ 两个账号需在 Luka 后端真实存在且预置好资料（尚未联调）。
 
-## 后端域名 / 反馈邮箱 / 远端机（2026-09-21）
+## 后端域名 / 反馈邮箱 / 远端机 / 商店身份（2026-09-21）
 
 来源：飞书表格《赛跑包物料分配》（wiki `MsHDw25LvifYddkOJUgc2PvOnJc`，Luka 行 15:38 由用户更新）。
 
-- **整套域名 `lukasoc.com` → `lukasap.com`**（旧域名废弃）：API `api-{dev,prod}.lukasap.com`、CDN `file.lukasap.com`、Alive `{dev,prod}-tcp.lukasap.com:8000`；**后端 `appName` 同时由 `luka` 换 `lukasap` / `lukasap_android`**（两者必须一起动）。
-- 仓库侧已替换（**未提交**）：`apps/luka/app.config.ts`、`README.md`、`src/lib/legal.ts`、`docs/app-store-checklist-review.md`。
+- **整套域名 `lukasoc.com` → `lukasap.com`**（旧域名废弃）：API `api-{dev,prod}.lukasap.com`、CDN `file.lukasap.com`、Alive `{dev,prod}-tcp.lukasap.com:8000`；**后端 `appName` 同时由 `luka` 换 `lukasap` / `lukasap_android`**（两者必须一起动，只改域名不改 appName 会静默失败）。
+- **商店身份跟着换**（用户拍板「都改了」）：bundle id / Android package `com.lukasoc.luka` → **`com.lukasap.luka`**；App Group `group.com.lukasoc.luka` → **`group.com.lukasap.luka`**（HomeWidget 与两个扩展的 id 由 bundle id 派生，自动跟着变）；本地 native module `luka-call-recharge` 的 gradle `group` 同步换。
+  - ⚠️ **Apple 侧要重建**：Developer 后台的 App ID / App Group / 描述文件，以及 App Store Connect 应用记录（旧 `com.lukasoc.luka` 记录作废，需按新 id 新建）；本机 Ad Hoc / App Store 描述文件也要重签。
+- 仓库侧已替换（**未提交**）：`app.config.ts`、`README.md`、`legal.ts`、测试 4 个文件（config contract / payment-environment / iap-verify / fake-payment guard）、`docs/app-store-checklist-review.md`、`docs/app-store-review-findings.md`（审核邮箱）。
 - **用户反馈邮箱**：`lukaiosfeedback@lukasap.com` → 已写进 `src/lib/legal.ts` 的 `SUPPORT_EMAIL`（替换 `support@luka.example.com` 占位）。
 - **远端机**（出正式包用）：`EU745.macincloud.com:6000` / `user303982` / IP `92.63.141.145`；密码在表格里，不入库。
-- **刻意没动**：bundle id / App Group 仍是 `com.lukasoc.luka`、`group.com.lukasoc.luka`（商店身份，与后端域名解耦，参照 koda `com.kodasoc.koda`）；`.template-rename.json` 是派生映射，不动。
-- ⚠️ 两个账号需在 Luka 后端真实存在且预置好资料，**后端稍后就绪**（尚未联调）。
-- `lib/legal.ts` 的客服邮箱 `support@luka.example.com` 仍是占位，未换。
+- **刻意没动**：`.template-rename.json` —— 它是派生当时的重命名记录，不是「当前取值」，改了反而会误导 `template-migrate`。
 
 ## 设计语言
 
