@@ -1,10 +1,10 @@
 ---
-title: Uniwind dev 端新加的任意值 class 不生效（CSS 表没跟着 fast refresh 更新）
+title: Uniwind dev 端新加的 class 不生效（CSS 表没跟着 fast refresh 更新）
 date: 2026-09-14
 tags: [uniwind, tailwind, metro, fast-refresh, react-native, 静默失败]
 ---
 
-# Uniwind dev 端新加的任意值 class 不生效
+# Uniwind dev 端新加的 class 不生效
 
 ## 症状
 
@@ -38,6 +38,35 @@ fast refresh，**CSS 表没有重新编译**，于是新类名在表里没有对
 
 `apps/luka/src/components/edit-profile/photos-card.tsx` 的 mtime 是 11:44（合并检出），
 两次截屏之间没被改过 —— 排除了「有人改了代码」。
+
+## 证据（luka，2026-09-21：不只是任意值，核心工具类 `left-full` 同样中招）
+
+**症状**：通知页 Activity / Visitors 分段徽标（`components/notifications/notifications-tabs.tsx`
+的 `absolute -top-1 left-full ml-1`）本该贴在 label 右上，实机却压在文字左上
+（用户截图 20:13，红点盖住 "Vi"）。同文件 `absolute` / `-top-1` / `ml-1` 和徽标尺寸
+类都正常 —— **只有 `left-full` 失效**，正是「只有新类坏」的签名。
+
+**排查链（结论：代码没错，是运行中的表旧了）**：
+
+1. 抓 Metro 当前整包 bundle（29.8 MB）：表里有 `"left-full"` →
+   `left: function(){ return "100%" }`，`min-w-[18px]` 也在。
+2. 把这份表喂给 Uniwind 运行时（stub 掉 `react-native` 后直接 `UniwindStore.getStyles`）：
+   `"absolute -top-1 left-full ml-1"` 解析为
+   `{position:"absolute", top:-4, left:"100%", marginLeft:4}` ✓
+3. Yoga 侧验证（temp 里 `yoga-layout` 复刻同构树）：absolute 子节点 `left:100% + ml 4`
+   得到 `left = 文本宽 + 4` ✓；RN Fabric 的 `conversions.h` 也把 `"100%"` 转成
+   `StyleLength::percent(1)` ✓。
+4. 所以 app 进程里的表是旧的：它的 JS 是 fast refresh 来的（新徽标代码可见），CSS 表
+   还停在徽标文件存在之前（旧类都在 → 徽标画得出来，只是没有 left）。
+
+**修法**：整包 reload（Dev Menu → Reload / 杀掉重开）。生产构建不受影响。
+
+**核对手法（可复用）**：
+- 从 bundle 里抠当前表：找 `Uniwind.__reinit(rt => ` 到 `, ['light'` 之间的表达式；
+- 在 Node 里用 `--import` loader 把 `react-native` 映射到 stub（`Dimensions/Platform/
+  Appearance/I18nManager/PixelRatio/StyleSheet`），调 `UniwindStore.reinit(gen, themes)`
+  再 `getStyles(classes, {}, undefined, {scopedTheme:null, rtl:null})`；
+- Yoga 面用 `pnpm add yoga-layout` 在临时目录复刻树验证百分比 inset 的落点。
 
 ## 同一类的坑
 
