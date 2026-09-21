@@ -98,10 +98,18 @@ resp GetSubscriptionsV3Request  POST https://api-dev.lukasoc.com protoId=4538
 另注意 `luka_vip_yweekly` 疑为 `weekly` 的拼写错误（`yearly` / `monthly` 都是正常词），
 要先跟后端确认，再决定解析器怎么写。
 
-**修法（二选一，需裁决）**：① 后端把 ID 改成含 `luka_membership` / `luka_visitor` / `luka_credits`
-且后缀为 `_year`/`_month`/`_week`（App Store 商品 ID 一旦创建不可改，成本高）；
-② 客户端把关键字与 `periodFromProductId` 对齐到现在的 ID（改 app 配置 + 共享包解析器，
-`yearly$`/`weekly$` 也要认，`yweekly` 需后端确认）。
+**修法（已采用 ②，2026-09-21）**：App Store 商品 ID 一旦创建不可改，所以是客户端对齐后端：
+
+- `apps/luka/app.config.ts` `iapSkus` → `luka_vip` / `luka_guest` / `luka_bronze`。
+- `packages/business-payments/src/subscriptions.ts` 的 `periodFromProductId` 加认无分隔符的
+  word 后缀 `weekly$` / `yearly$`（保留 `_week`/`_w`/`_year`/`_y`），因为 `luka_vip_yweekly`
+  的 `y` 不是分隔符。
+- 测试：`packages/business-payments/tests/subscriptions.test.ts` 补真实 ID 用例。
+- 验证：6 个真实 ID 的 period/label/kind 全对；luka typecheck 0、business-payments
+  typecheck 0、biome 0、boundaries OK；luka 911 passed（4 红为既有 shape-language 等）。
+
+教训：**共享包里的「商品 ID 解析」和 app 里的「关键字」是一对，任何一边改名字都要同步改另一边**，
+且两边都不报错 —— 症状是静默的（不发货 / 不解锁 / 标签错）。后端换商品目录时优先确认这两处。
 
 # 相关
 
