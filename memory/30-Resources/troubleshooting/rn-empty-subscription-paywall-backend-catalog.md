@@ -67,6 +67,42 @@ resp GetSubscriptionsV3Request  POST https://api-dev.lukasoc.com protoId=4538
 让 UI 落到 error/empty 分支而不是一个灰 CTA。这是共享包行为，动它会影响所有消费方，
 与后端补商品是两件事，不要混在一个 PR 里。
 
+# 后续（2026-09-21 下午）：后端补了目录，但商品 ID 与客户端关键字不一致
+
+后端补完后，直接对 `api-dev.lukasoc.com` 做带鉴权调用核实（`FastLogin` 拿 token →
+`GetSubscriptionsV3`），目录已非空：
+
+- 会员：`luka_vip_yearly` / `luka_vip_monthly` / `luka_vip_yweekly`
+- 访客：`luka_guest_yearly` / `luka_guest_monthly` / `luka_guest_weekly`
+- 币：`luka_bronze_1..7`
+
+**新问题**：这些 ID 与包内配置/解析全对不上 ——
+
+| 位置 | 期望 | 后端实际 |
+| --- | --- | --- |
+| `apps/luka/app.config.ts` `iapSkus.membershipKeyword` | `luka_membership` | `luka_vip_*` |
+| `iapSkus.visitorKeyword` | `luka_visitor` | `luka_guest_*` |
+| `iapSkus.coinsKeyword` | `luka_credits` | `luka_bronze_*` |
+| `periodFromProductId` | 后缀 `_w`/`_week`/`_y`/`_year` | 后缀 `weekly`/`monthly`/`yearly` |
+
+后果（都是静默的）：
+
+- `iapKindForSku()` 对全部 SKU 返回 `unknown` → `iap-verifier.ts:54` 直接 `return false`，
+  **真实 IAP 永远不发货**；`use-subscription-purchase.ts:138` / `use-coin-purchase.ts:76`
+  的购买结果监听也会把它过滤掉。
+- `periodFromProductId()` 对 `yearly`/`weekly` 都落到默认 `monthly` → 套餐卡标题全部显示
+  `1 month`，DTC/埋点的 `billingPeriod` 也错。
+- `entitlements.ts` 的 `visitorActive()` 用 `productId.includes(visitorSkuKeyword)`，访客订阅
+  `luka_guest_*` 不包含 `luka_visitor` → **买了也读成未解锁**。
+
+另注意 `luka_vip_yweekly` 疑为 `weekly` 的拼写错误（`yearly` / `monthly` 都是正常词），
+要先跟后端确认，再决定解析器怎么写。
+
+**修法（二选一，需裁决）**：① 后端把 ID 改成含 `luka_membership` / `luka_visitor` / `luka_credits`
+且后缀为 `_year`/`_month`/`_week`（App Store 商品 ID 一旦创建不可改，成本高）；
+② 客户端把关键字与 `periodFromProductId` 对齐到现在的 ID（改 app 配置 + 共享包解析器，
+`yearly$`/`weekly$` 也要认，`yweekly` 需后端确认）。
+
 # 相关
 
 - `docs/payments.md`《App 身份与发布门禁》——「每个 App 发布前必须拥有独立的 StoreKit / Play 商品」。
