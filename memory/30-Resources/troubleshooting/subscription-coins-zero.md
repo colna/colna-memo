@@ -31,6 +31,16 @@ luka paywall 的权益格原先把赠币写死成 `750/1,500/3,500 Coins instant
 bug。已改成读 `GetSubscriptionsV3` 的 `subCoins`（映射成 `Plan.credits`），一个档都没配
 就不显示那一行。
 
+## 复核补充（2026-09-21 20:50）
+
+- 截图（`T0061.png`，Sparks history 9/21）：15:36 `Subscription coins +0`，余额 5 = 15:28 `+3`
+  与 11:37 `+2` 两次签到 —— 订阅本身生效、只差发币。
+- 设备日志（旧域名 `api-dev.lukasoc.com`，账号 2100067621）里 `GetSubscriptionsV3` **三次
+  都返回 `normalSubscriptions: []`**：该租户当时的订阅目录是空的，值得后端一起查
+  （目录为空时 paywall 的档位与 `subCoins` 都无从谈起）。
+- 客户端确认没有可领币的 RPC：proto 里没有 claim subscription coins 类接口，发币只能在
+  后端验单 / 三方激活路径完成。
+
 ## 后端对账清单（客户端已确认无能为力的部分）
 
 1. `GetSubscriptionsV3` 返回的 `normalSubscriptions[].subCoins` 是否为非 0（三个档
