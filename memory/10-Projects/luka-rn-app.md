@@ -34,7 +34,7 @@ tags: [project, sitin-rn, luka, react-native]
 - **商店身份跟着换**（用户拍板「都改了」）：bundle id / Android package `com.lukasoc.luka` → **`com.lukasap.luka`**；App Group `group.com.lukasoc.luka` → **`group.com.lukasap.luka`**（HomeWidget 与两个扩展的 id 由 bundle id 派生，自动跟着变）；本地 native module `luka-call-recharge` 的 gradle `group` 同步换。
   - ⚠️ **Apple 侧要重建**：Developer 后台的 App ID / App Group / 描述文件，以及 App Store Connect 应用记录（旧 `com.lukasoc.luka` 记录作废，需按新 id 新建）；本机 Ad Hoc / App Store 描述文件也要重签。
 - 仓库侧已替换（**未提交**）：`app.config.ts`、`README.md`、`legal.ts`、测试 4 个文件（config contract / payment-environment / iap-verify / fake-payment guard）、`docs/app-store-checklist-review.md`、`docs/app-store-review-findings.md`（审核邮箱）。
-- **用户反馈邮箱**：`lukaiosfeedback@lukasap.com` → 已写进 `src/lib/legal.ts` 的 `SUPPORT_EMAIL`（替换 `support@luka.example.com` 占位）。
+- **Contact Email / 客服邮箱**：**`apple@lukasap.com`**（2026-09-21 17:07 定，取自飞书 wiki《Luka-上架文案包（IOS）》「应用基本信息」表；覆盖同日《赛跑包物料分配》的 `lukaiosfeedback@lukasap.com`）→ 已写进 `src/lib/legal.ts` 的 `SUPPORT_EMAIL`，管 Help 屏 / 忘记密码 / 商店列表三处；提交 `d820db478`。
 - **远端机**（出正式包用）：`EU745.macincloud.com:6000` / `user303982` / IP `92.63.141.145`；密码在表格里，不入库。
 - **刻意没动**：`.template-rename.json` —— 它是派生当时的重命名记录，不是「当前取值」，改了反而会误导 `template-migrate`。
 
