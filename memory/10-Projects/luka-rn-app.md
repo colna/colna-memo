@@ -22,8 +22,18 @@ tags: [project, sitin-rn, luka, react-native]
 
 ## 审核账号（App Store / Meta 开白）
 
-- 邮箱：`review@lukasoc.com`（商店）/ `metareview@lukasoc.com`（Meta 开白）—— 2026-09-14 从占位换成品牌域名，见 `docs/review-mode.md` §3.1。
+- 邮箱：`review@lukasoc.com`（商店）/ `metareview@lukasoc.com`（Meta 开白）—— 2026-09-14 从占位换成品牌域名，见 `docs/review-mode.md` §3.1。⚠️ 2026-09-21 整套域名迁到 `lukasap.com` 后，这两个审核邮箱是否随迁**待确认**（见下节）。
 - 两号 × 两平台的四个钉死 deviceId 在 `src/lib/review-mode.ts`（`luka[_meta]_{iOS,Android}_deviceID`）。
+
+## 后端域名 / 反馈邮箱 / 远端机（2026-09-21）
+
+来源：飞书表格《赛跑包物料分配》（wiki `MsHDw25LvifYddkOJUgc2PvOnJc`，Luka 行 15:38 由用户更新）。
+
+- **整套域名 `lukasoc.com` → `lukasap.com`**（旧域名废弃）：API `api-{dev,prod}.lukasap.com`、CDN `file.lukasap.com`、Alive `{dev,prod}-tcp.lukasap.com:8000`；**后端 `appName` 同时由 `luka` 换 `lukasap` / `lukasap_android`**（两者必须一起动）。
+- 仓库侧已替换（**未提交**）：`apps/luka/app.config.ts`、`README.md`、`src/lib/legal.ts`、`docs/app-store-checklist-review.md`。
+- **用户反馈邮箱**：`lukaiosfeedback@lukasap.com` → 已写进 `src/lib/legal.ts` 的 `SUPPORT_EMAIL`（替换 `support@luka.example.com` 占位）。
+- **远端机**（出正式包用）：`EU745.macincloud.com:6000` / `user303982` / IP `92.63.141.145`；密码在表格里，不入库。
+- **刻意没动**：bundle id / App Group 仍是 `com.lukasoc.luka`、`group.com.lukasoc.luka`（商店身份，与后端域名解耦，参照 koda `com.kodasoc.koda`）；`.template-rename.json` 是派生映射，不动。
 - ⚠️ 两个账号需在 Luka 后端真实存在且预置好资料，**后端稍后就绪**（尚未联调）。
 - `lib/legal.ts` 的客服邮箱 `support@luka.example.com` 仍是占位，未换。
 
