@@ -279,10 +279,26 @@ iPad 模拟器（feed 为空的账号）深链 `/my-feed` 实拍确认。
   typecheck 0 / 126 files · 746 tests / biome clean。iPad（窗口化）上 Me 页内容不够长（滚不动也不回弹），
   「收起中」那一帧复现不了 —— 复现要靠可滚动页面（iPhone / My feeds 有帖时）。
 
+## 飞书 Buglist 五条（2026-09-21，均已提交推送）
+
+`feature/luka-ios` 上按「T0057 → T0054 → T0058 → T0061 → T0052」推进，逐条单提交：
+
+| 单 | 提交 | 内容 |
+| --- | --- | --- |
+| T0057 | `c9cd2a1c2` | 蓝图 **0032** 落进 luka：`bottom-inset-guard`（键盘高度漏进 `insets.bottom` 一律当 0，接 `useBottomInset`/`clearance*`/`tab-bar`）、`keyboard-exit`（收完键盘再等两帧才返回，接 compose 两条退出 + scaffold 返回 + edit-profile 六页）、`usePagerRelayout`（四处 pager 全接、页面改吃 `pageStyle`）；3 个测试文件 20 条 + `docs/keyboard-and-insets.md`。⚠️ `.template-rename.json` 的 `appliedMigration` 仍停在 0009（0010–0035 里只做了 0032，不能直接跳号）。 |
+| T0054 | `7ec47e35a` `b08f5a7a8` | fix worktree 的 `0f7afa6b5` 等价移植（四页 + scaffold 改 `KeyboardStickyView`；**sign-in 未应用**，那份基线缺本分支的 B 版稿重做）；再把「转场帧里新建仓鼠播放器」用 `useAfterInteractions` 推迟（`PeekingHamster` 静态图顶替、`ComposePet` 转场后再挂）。 |
+| T0058 | `e7aeff2fa` | Feed 下线打招呼与评论（产品口径，nearby 划卡 Say hi 保留）：feed 卡白气泡、详情页 Say hi 胶囊、评论底栏与三件 UI、My feeds 评论入口；删 `use-feed-buzz`/`services/feed-buzz`/`lib/scene-author`（含单测）。详情页 `/post/[id]` 保留大图 + 点赞（底栏只剩点赞，`useBottomInset`）。 |
+| T0061 | `2b7738e2d` | paywall 赠币行改读后端 `subCoins`（没配就不显示）、去掉「7 Feed Greetings」；`business-payments` 0.7.2：`periodFromPlan(name, productId)` 周期优先目录 `name`，目录侧记住周期供 `VerifyIOS`/`FakeVerifyIOS` 用。**赠币发不发只能后端**（客户端无字段可传），对账清单在 troubleshooting。 |
+| T0052 | `0296c01d1` | 「先验证再修」：`getMyProfile` / `getMyProfilePageAvatar` 加 **PII-free 字段存在性**日志（`[profile] self …` / `[profile] page code=… …`，仅 dev/preview 构建），因为 `rn-net` 默认 400 字符会把 self 的 `profession/education/bio` 截掉。待真机日志决定改客户端（合并 `GetUserProfilePageInfo`）还是后端。 |
+
+真机验收未做（实机在用户那边）：① 键盘弹着点输入屏左上角关闭 → Feed 应完整一屏；
+② 进 edit 子页第一下不顿；③ 详情页只剩点赞、无 Say hi/评论入口。
+
 ## 相关沉淀
 
 - [[expo-router-protected-stack-leftovers]]、[[react-async-hook-loading-stuck]]、
   [[sitin-proto-request-missing-id]]、[[design-mock-measure-and-sample]]
+- [[luka-profile-fields-lost-on-relogin]]、[[subscription-coins-zero]]（T0052 / T0061）
 - [[rn-card-deck-recycling]]、[[mov-alpha-compression]]（新增「坑六：母版的 alpha 1–15 灰洗」）、[[rn-derived-app-theme-swap]]
 - [[rn-simulator-pixel-measurement]]（截屏量 UI 几何）、[[colna-fastembed-cache]]（模型缓存落在 cwd）、[[simulator-fresh-device-signed-in]]（新建模拟器拷 keychain/data 拿已登录会话）
 - [[ios-device-free-team-debug]]（免费 Personal Team + iOS 16 设备真机调试）、[[rn-scroll-perf-and-blur-header]]（滚动卡顿 + BlurView 页头）、[[rn-home-widget-ios-blank]]（小组件白屏）
