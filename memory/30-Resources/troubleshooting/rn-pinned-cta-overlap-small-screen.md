@@ -37,6 +37,29 @@ tags: [troubleshooting, react-native, layout, small-screen, sitin-rn, luka]
 
 同仓库同构的先例：`onboarding/{looking-for,faith,drink,smoke,who-you-meet}.tsx` —— 它们的选项数量更多，本来就带着 `ScrollView`，只有 gender 这一屏漏了。
 
+## 第二个实例：照片编辑页把照片放大之后（2026-09-22 当天）
+
+`sitin-rn` `apps/luka/src/app/edit-profile/photos.tsx`（A 版 redesign）：照片位从
+`200×240` 的固定小块换成**通栏竖幅**（`aspectRatio: 1/1.2`，宽 = 屏宽 − 40），页面总高
+在 390×844 上刚好、在 375×667（SE）上超出 → 同样的静默溢出。
+
+差别只在判据怎么用：这一屏不是「固定高度的列表」，而是**一个随屏宽等比放大、且本身
+尺寸可观的元素**（照片 / 视频 / 大插画）。`aspectRatio` 让它宽高一起长，窄屏上并不会
+变小多少，所以「大屏没事」这句安慰话在这里是**假**的 —— 大屏只是刚好够。
+
+修法同样是内容区 `ScrollView`，但多一条：**贴底的 Save 必须留在 `ScrollView` 之外**，
+滚的只有内容（照片再高也不能把按钮顶走）。结构由
+`tests/design/edit-profile-photos.test.ts` 守着：
+
+```tsx
+<ScrollView className="min-h-0 flex-1" contentContainerClassName="pb-4">
+  {/* eyebrow / 标题 / 照片 / AI tip */}
+</ScrollView>
+<View className="px-5 pt-4" style={{ paddingBottom: … }}>
+  <ContinueButton … />
+</View>
+```
+
 ## 判据 / 检查法
 
 - 屏结构是「可伸缩内容区 + 贴底固定栏（CTA / tab bar）」时，问一句：**内容会不会在任何机型上超过内容区？** 会，就必须 `ScrollView`；固定高度的列表项（卡片、行、ruler）尤其危险。
