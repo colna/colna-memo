@@ -31,3 +31,5 @@ renderChrome?: (index: number, frontStyle: AnimatedStyle<ViewStyle>) => ReactNod
 **同源坑**：信息带原来靠卡片的 `overflow: hidden` 裁底角，搬出来以后要自己给 `borderBottomLeftRadius` / `borderBottomRightRadius` + `overflow: hidden`，否则卡底两角会露出照片的方角。
 
 **验证方式**：本机只装了 `simctl`、没有 Simulator.app，模拟器界面点不了（截图能取、点不动）→ 这类层级改动只能靠实机截图验收。结构性判断记住「zIndex 不出兄弟层」这一条，能省一轮往返。
+
+**后续（2026-09-22 当天）**：产品看完那一版后直接决定**撤掉卡角那只小崽**，于是整段 `renderChrome` 接缝回退、信息带回到卡片子树里（只保留毛玻璃底）。也就是说**这条经验没有被长期使用** —— 但约束本身没变（下次真有「卡内元素要压卡外浮层」的需求，仍按上面这个形状做），而且「先算清能不能靠调层级解决、不能就让产品在层级与减法之间选」这一步很值：一次往返就定案。
