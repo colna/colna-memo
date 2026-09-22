@@ -12,6 +12,10 @@ tags: [project, sitin-rn, luka, react-native]
 
 ## 工作约定
 
+- **仓库远端（2026-09-22）**：origin 由 `git@github.com:presence-io/sitin-rn.git` 改为
+  **`https://gitlab.lumosolo.com/app-rn/sitin-rn`，只走 HTTPS**（本地 config 两条 `insteadOf`
+  把 SSH 写法强制重写回 HTTPS）。本机凭据走 osxkeychain，首次输入用户名 + PAT 后免输。
+  GitHub 侧 CI（`.github/workflows`）尚未迁移。
 - 分支：`feat|fix|chore/<事>`，PR **合入 `feature/luka-ios`**（不是 `main`）。
   因此 `pr-gate.yml` 的 `checks` 不跑，只跑 `ai-code-review`。
 - 提交与 PR 作者统一 **colna**；gh 操作前先 `gh api user -q .login` 确认。
@@ -30,10 +34,10 @@ tags: [project, sitin-rn, luka, react-native]
 
 来源：飞书表格《赛跑包物料分配》（wiki `MsHDw25LvifYddkOJUgc2PvOnJc`，Luka 行 15:38 由用户更新）。
 
-- **整套域名 `lukasoc.com` → `lukasap.com`**（旧域名废弃）：API `api-{dev,prod}.lukasap.com`、CDN `file.lukasap.com`、Alive `{dev,prod}-tcp.lukasap.com:8000`；**后端 `appName` 不变，仍是 `luka` / `luka_android`**（2026-09-21 19:43 用户确认表格里写的 `lukasap` 已过时 —— 后端在 `lukasap.com` 上注册的仍是 `luka`；仓库已由 `lukasap` 回改为 `luka`，未提交）。
+- **整套域名 `lukasoc.com` → `lukasap.com`**（旧域名废弃）：API `api-{dev,prod}.lukasap.com`、CDN `file.lukasap.com`、Alive `{dev,prod}-tcp.lukasap.com:8000`；**后端 `appName` 不变，仍是 `luka` / `luka_android`**（2026-09-21 19:43 用户确认表格里写的 `lukasap` 已过时 —— 后端在 `lukasap.com` 上注册的仍是 `luka`；仓库已由 `lukasap` 回改为 `luka`，提交 `464491d64`）。
 - **商店身份跟着换**（用户拍板「都改了」）：bundle id / Android package `com.lukasoc.luka` → **`com.lukasap.luka`**；App Group `group.com.lukasoc.luka` → **`group.com.lukasap.luka`**（HomeWidget 与两个扩展的 id 由 bundle id 派生，自动跟着变）；本地 native module `luka-call-recharge` 的 gradle `group` 同步换。
   - ⚠️ **Apple 侧要重建**：Developer 后台的 App ID / App Group / 描述文件，以及 App Store Connect 应用记录（旧 `com.lukasoc.luka` 记录作废，需按新 id 新建）；本机 Ad Hoc / App Store 描述文件也要重签。
-- 仓库侧已替换（**未提交**）：`app.config.ts`、`README.md`、`legal.ts`、测试 4 个文件（config contract / payment-environment / iap-verify / fake-payment guard）、`docs/app-store-checklist-review.md`、`docs/app-store-review-findings.md`（审核邮箱）。
+- 仓库侧已替换（**已提交** `0c18c24cc` 域名/身份、`d820db478` 客服邮箱）：`app.config.ts`、`README.md`、`legal.ts`、测试 4 个文件（config contract / payment-environment / iap-verify / fake-payment guard）、`docs/app-store-checklist-review.md`、`docs/app-store-review-findings.md`（审核邮箱）。
 - **Contact Email / 客服邮箱**：**`apple@lukasap.com`**（2026-09-21 17:07 定，取自飞书 wiki《Luka-上架文案包（IOS）》「应用基本信息」表；覆盖同日《赛跑包物料分配》的 `lukaiosfeedback@lukasap.com`）→ 已写进 `src/lib/legal.ts` 的 `SUPPORT_EMAIL`，管 Help 屏 / 忘记密码 / 商店列表三处；提交 `d820db478`。
 - **远端机**（出正式包用）：`EU745.macincloud.com:6000` / `user303982` / IP `92.63.141.145`；密码在表格里，不入库。
 - **刻意没动**：`.template-rename.json` —— 它是派生当时的重命名记录，不是「当前取值」，改了反而会误导 `template-migrate`。
