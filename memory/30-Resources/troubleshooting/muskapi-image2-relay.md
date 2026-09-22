@@ -52,6 +52,14 @@ Python `urllib`（gen_image.py 走的库）默认读 `HTTP_PROXY` / `HTTPS_PROXY
 - 图生图单张：72s（09-09 旧 key）／ **261s**（09-14 新 key，上游拥挤时）。
 - 客户端超时别低于 300s；慢 ≠ 卡死，别提前杀。
 
+## 不要并发（2026-09-22 实测）
+
+三条 `--ref` 图生图并行发（同一 key、同一时刻）：1 条 45s 成功，另两条在
+`h.getresponse()` 处 `http.client.RemoteDisconnected: Remote end closed connection without response`
+—— 网关侧直接断连，不是 5xx 回包。**重试串行即可恢复**（本题 A/B 两张随后一次串行跑完，
+183s / 277s）。多版出图的正确姿势：写多个 `--prompt-file`，**一条命令里 `&&` 串行**，
+不要用 `&` 并发；失败那两条自动重试时也不用改 prompt（不是 prompt 的问题）。
+
 ## 相关
 
 - [image-gen 参考图怎么选、prompt 怎么配套](image-gen-reference-image.md)
