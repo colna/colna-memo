@@ -149,6 +149,26 @@ magick shot.png -crop ${W}x${H}+${X}+${Y} +repage -fuzz 6% -fill white -opaque "
 - 折行结论落到 spec 里：**显式 `\n` + 两行的高度**（沿用 `25-edit-name.mjs` 的写法），
   别只给一行高度靠 Figma 自己折。
 
+## 同一件事的 Node 版：fontkit 直接读 ttf（省掉写 Swift 那一步）
+
+Swift + CoreText 是**金标准**（iOS 上就是它排版）。但临时目录里 `npm i fontkit`（记得
+`--cache $PWD/npmcache`，否则会踢到 `~/.npm` 的权限问题）后，几行 Node 就能量同一批数，
+不需要写/编译 Swift，适合「量十来段、只想知道断点」的场合：
+
+```js
+import * as fontkit from 'fontkit';            // 注意：没有 default export
+const f = fontkit.openSync('/…/@expo-google-fonts/nunito/700Bold/Nunito_700Bold.ttf');
+const width = (s, size) => f.layout(s).glyphs.reduce((n, g) => n + g.advanceWidth, 0) * size / f.unitsPerEm;
+```
+
+- 贪心折行 = 按空格累加，超了就把整词落下一行（与 TextKit 的 `byWordWrapping` 同结果）。
+- **行高不要手写 1.5**：`Text` 的 variant 给的是 `text-base`（含 lineHeight），但
+  `text-[Npx]` 与它同属 font-size 分组、被 `tailwind-merge` 丢掉 → RN 退回 Nunito 自然行高
+  **≈ 1.364×**（15 → 20.46、13.5 → 18.41、12 → 16.37…）。有显式 `leading-[Npx]` 的就用 N。
+- 与 CoreText 的差异在 1% 内，但**临界值**（差 < 5pt）要按「更宽的那一种」判：例如
+  `Let Luka read my published photos` 15pt Bold 在 240pt 列里量 244.9 → 两行（只差 4.9pt，
+  真机确实折）。差这么小的时候，把两种量法的结论都写进 spec 注释。
+
 ## `numberOfLines={N}` 的截断：词边界折行 + 末行换省略号，spec 里要写死
 
 瀑布流卡片（Luka Feed / Nearby）的正文是 `numberOfLines={2}`。Figma 侧 bridge 插件给带
