@@ -83,6 +83,22 @@ magick asset.png -trim -format '%wx%h %X%Y\n' info: # 透明边还剩多少
 - 算高度别忘了 tuck：素材底边是角色扒着的台沿，图片底要落到台沿下几 pt，悬空高度 = 素材高 − tuck（luka 是 148×90 的素材、tuck 5 → 悬空 85）。
 - 改完必须截图看页头，读代码看不出来（和上面「贴到屏幕边上」是同一条教训）。
 
+**2026-09-22 复现（edit-profile 编辑器卡片，`PeekingHamster` + `EditorCard`）**：同类漏检又出现三次
+—— Location（09-21 已修）、Bio / Education、Interests（09-22 修）。这一族的量法已固定：
+
+- 角色悬空高度：`SIZE 112` 方盒、前爪压卡片上沿 `PAW_OVERLAP 10`、视频画布 320 且内容顶在第
+  33px（`tilt-head.mov`）→ 可见部分伸到卡片上沿之上约 **82pt**；Android/转场帧的静态图
+  `hamster-lean.webp`（982×791，contain + 底对齐）约 **80pt**。
+- 标题下沿到卡片顶只有 `pb-5` 的 20pt，所以卡片容器要 `mt-16`（20 + 64 = 84pt ≥ 82）才让开；
+  Location / Bio / Education / Interests 现在都是这个写法。Occupation 走的是另一条路：标题
+  `pr-28` 提前折行，把右端让出仓鼠的列（它那屏标题本来就长）。
+- 判「盖没盖到字」按行带量角色轮廓的左沿：`magick frame.png -crop 320x30+0+Y +repage -trim`，
+  再和字形的横向范围比。字形的纵向带：line box 底 = 卡片顶 −(`pb`)，基线 = line box 顶 +
+  half-leading + ascent（Nunito asc 1.011 / desc 0.353，fontSize 24 + lineHeight 30 → 半行距
+  −1.37）；只看**基线到 cap 顶**那一段就够（`OS/2.sCapHeight` 705/1000）。
+- 只加 `mt` 不加 `padding`：角色绝对定位锚在容器 padding box 顶上，padding 只会推走卡片
+  （同 `EditorCard` 的注释）。
+
 ## 「扁平 mockup」帧：只有比例可读，比就比同一屏里的同类量
 
 有的 mockup 在 Figma 里就是**一张图**（`children: []`、唯一 fill 是 `IMAGE`，JSON 不到 1KB）
