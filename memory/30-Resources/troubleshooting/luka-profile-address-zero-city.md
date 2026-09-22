@@ -48,5 +48,8 @@ FastLogin 新设备号 → `GetMatchFeedsV3` 扫 ~2000 个女用户 + 对 400 �
 
 - 定位到具体账号需 uid：给我 uid 即可按上面方式查 dev 原始值（或从设备
   `session.log` grep `resp GetUserBasicInfosV2` 的 payload 预览）。
-- 若要前端兜底（把纯数字/`0` 当空值过滤），`buildLocation` 在 iris / luka / koda / lumi
-  各有一份，需一起改；属防御性展示，根因仍在写这条数据的一端（女端/PWA 或灌库脚本）。
+- **客户端兜底已做（2026-09-22，luka）**：用户拍板「地址里的 0 段不显示」。
+  `apps/luka/src/lib/candidate-mapper.ts` 的 `buildLocation()` 现在把全 0 的段
+  （`/^0+$/`）当空值丢掉；**判据不能用「纯数字」，ZIP 兜底也是纯数字**（第一版就这么
+  写错了，被回归测试抓到）。iris / intro / blueprint 各有一份同款 `buildLocation`，
+  未同步。根因仍在写这条数据的一端（女端/PWA 或灌库脚本）。
