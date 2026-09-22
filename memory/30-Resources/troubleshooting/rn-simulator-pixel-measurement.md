@@ -47,3 +47,36 @@
 - 深链：`xcrun simctl openurl booted "<scheme>://<path>"`（例：`luka://me` 直达 Me tab）。
 - 分段/子 tab 存在 `useState` 时深链进不去：**临时把默认值改成目标分段 + `simctl terminate`
   → `simctl launch` 冷启动**（Fast Refresh 会保留 state，改初始值不生效），截完把这一行撤掉。
+## 补充（2026-09-22，给每个块上色 + 逐行数色：一次拿到整屏的分块高度）
+
+给待查的每一块临时套一个纯色背景（`style={{ backgroundColor: "#FFFF00" }}` 这类，块内文字仍可读），
+截屏后把图缩到「1px = 1pt」再逐行数颜色，就能一次拿到所有块的 top/bottom：
+
+```sh
+# 缩到 393 宽（原图 1179 → 3px/pt 变 1px/pt），找每个目标色的连续行段
+magick probe.png -resize 393x -depth 8 txt:- | ...   # 用 python 解析 "x,y: (r,g,b)" 逐行归类
+```
+
+比逐列 `-trim` 强的地方：**不怕低对比边、不怕文字污染，也不怕绝对定位的浮层**（只要先给容器上色）。
+本次用它量出「权益卡只剩 9pt、可用空间全被固定块吃掉」，比读代码猜快得多。
+
+**先 `magick identify x.png` 拿真实尺寸**：`-crop` 的窗口超出图高时只报警告、不报错，会让人
+把 375×812 的机器当成 393×852 算一晚上（本次的坑，浪费了一轮）。设备名（`iPhone X (11 Pro eq)`）
+也不可信 —— 以 `identify` 为准，3x 时 `px / 3 = pt`。
+
+## 补充（2026-09-22，dev build 里 `console.log` 到不了 `log stream`）
+
+想用 `onLayout` + `console.log` 读数值时注意：**RN 0.86 的 dev build 把 console 走 Metro 的
+调试器通道，不落 `xcrun simctl spawn booted log stream`**（`eventMessage CONTAINS "[tag]"` 里一条
+都收不到）。要读数值就**渲染到屏幕上**（临时的 `Text` 叠加层 / `Alert`），截屏后用眼睛或 OCR 读。
+`onLayout` → `setState` 的读数条本身还会在布局变动时抛 `Cannot read property 'layout' of null`
+的红屏（量完即撤，别留在分支里）。最省事的仍然是上色法 —— 它不需要 App 输出任何东西。
+
+## 补充（2026-09-22，被 `Stack.Protected` 挡住的屏：临时放宽守卫）
+
+`luka` 的路由（如 `/paywall/likes`、`/paywall/visitor`）在 `Stack.Protected guard={authed &&
+profileComplete && !pendingDeletion}` 里，账号没补完资料时深链也进不去（这正是设计）。只想截屏
+核对布局时，**临时把那条 `guard` 改成 `true`**，冷启动后深链进入，截完立刻 `cp` 备份还原 ——
+但**先确认这份 worktree 没有别的会话在写**（本次另一个会话正在改同目录的 `paywall/index.tsx`），
+临时改动留在共享工作区里可能被别人的提交带上去。
+
