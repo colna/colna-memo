@@ -330,6 +330,9 @@ iPad 模拟器（feed 为空的账号）深链 `/my-feed` 实拍确认。
 | 【开白】Apple 面板点关闭却登录 / 进注册 | `20a662685` | `runThirdPartyLogin` 把「取消」当失败静默回落设备登录，本机 deviceId 的历史账号（开白 / 普通）被直接登回来、无账号则 pending 进注册页。改为取消（`authorize` 回 `null`）原地停下；原生失败 / 后端拒绝仍回落。测试取消用例改断言不建会话；`security-hardening.md` / `widget-guide.md` / `app-store-checklist-review.md` 同步。待真机回归。 |
 | 【开白】登出后 onboarding 每步闪 Settings | `b8e548a62` | `popToSessionRoot` 的 `dismissAll()` 无 target，`POP_TO_TOP` 被最内层嵌套栈（settings）吃掉，根栈里的 `settings` 在登出翻守卫时被无转场抽走、留原生残影。改 `dismissTo("/(tabs)")`（带 target 命中根栈）；`settings/logout`、Debug 注释同步。判据沉淀见 [[expo-router-protected-stack-leftovers]]。待真机回归。 |
 | 【开白】登出后每次转场闪 Chats（T0144，根修） | `c4c07d87d` → `67164e16e` | 残影跟着「登出瞬间的顶屏」走（Settings → Chats，录屏抽帧实证）。先试换 key 重建原生栈（`c4c07d87d`），真机复验仍闪；终解 = 嵌套 navigator 容器在 guard 换组同一帧被拆时会被原生 screen container 留下当转场基图（rns #4504 同类）→ `prepareSessionExit()` 先 `dismissTo("/(tabs)")` 再普通导航换成 `/session-cover` 空白盖，翻守卫时栈里没有嵌套容器可漏，随后 replace 登录页 / 删号页。见 [[expo-router-protected-stack-leftovers]]。 |
+| 付费墙权益卡高跟条数 | `19861257a` | 三张付费墙（会员 / likes / visitor）的权益卡从「吃满剩余高度、条目居中」改成**卡高跟着条数走**：卡 `shrink` + 卡与底部之间的空段（套餐 + CTA + Restore 仍固定屏底）；放不下时仍卡内滚。新增 `tests/design/paywall-card-hugs-rows.test.ts`。待真机验收。 |
+
+**本机模拟器 dev client 落后（2026-09-23 发现）**：iPhone X 模拟器的 `com.lukasoc.luka.devx` 是 **09-20 16:30** 编译的，缺 `expo-web-browser`（09-23 DTC 引入）→ 冷启动 / 付费墙红屏 `Cannot find native module 'ExpoWebBrowser'`。要在这台模拟器上验证任何当前代码，先 `pnpm luka:ios` 重打 dev client。
 
 T0135 与 T0124/T0048 同族：老包（≤09-22 17:44）是「离开才清」，页内停留即会「旧数 + 新增」；需含 `9e86478ea`+B1 的新包复验。
 
