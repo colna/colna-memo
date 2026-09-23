@@ -325,7 +325,7 @@ iPad 模拟器（feed 为空的账号）深链 `/my-feed` 实拍确认。
 
 | 主题 | 提交 | 内容 |
 | --- | --- | --- |
-| T0135 徽标「原数据+新增」 | 未提交（规范模式） | 根因 = Visitors 段缺「屏内兜底」：人停留访客页时新访问往徽标上加、旧的不清；Activity 早已有同款兜底（`9e86478ea` 时加的）。`notifications.tsx` 补 `tab === "visitors"` → `markVisitorsSeen()`；设计测试 + 文档同步。服务端实证（`MarkMatchLikedRead` 真清 per-row `isUnread`）与造 like 手法见 [[luka-likes-visitors-unread-semantics]]。 |
+| T0135 徽标「原数据+新增」 | `ea8651d72` | 根因 = Visitors 段缺「屏内兜底」：人停留访客页时新访问往徽标上加、旧的不清；Activity 早已有同款兜底（`9e86478ea` 时加的）。`notifications.tsx` 补 `tab === "visitors"` → `markVisitorsSeen()`；设计测试 + 文档同步。服务端实证（`MarkMatchLikedRead` 真清 per-row `isUnread`）与造 like 手法见 [[luka-likes-visitors-unread-semantics]]。 |
 
 T0135 与 T0124/T0048 同族：老包（≤09-22 17:44）是「离开才清」，页内停留即会「旧数 + 新增」；需含 `9e86478ea`+B1 的新包复验。
 
