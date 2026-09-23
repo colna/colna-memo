@@ -62,3 +62,30 @@ git push --force-with-lease
 
 另外：仓库有多条产品线时，`origin/main` 未必是你这条线的 base。
 先 `git show origin/main:<你改的文件>`，报 “不存在” 就说明这条线还没合进 main。
+
+## 脏工作区拉取远端，而不碰并行 WIP（2026-09-23 实操）
+
+共享 worktree 有别人未提交的改动时，`git pull --rebase --autostash` 会在 pop 时
+与重叠文件冲突，把冲突标记写进别人的 WIP。可先用只读预检确认会冲突
+（`git merge-tree --write-tree origin/<br> $(git stash create)`），再走下面这套：
+
+```bash
+git fetch origin <branch>
+git rev-list --left-right --count HEAD...origin/<branch>
+# 本地若只有「与远端等价」的提交（git show <c> | git patch-id 相同），直接：
+git reset origin/<branch>            # mixed，不动 worktree，等价提交丢进 reflog
+# 远端改过、本地没改的文件 → 恢复到新 HEAD：
+git diff --name-status <old-HEAD> origin/<branch> | cut -f2 | sort > /tmp/inc.txt
+git status --short | awk '{print $2}' | sort > /tmp/dirty.txt   # 拉取前先存
+comm -23 /tmp/inc.txt /tmp/dirty.txt | while read -r p; do git checkout HEAD -- "$p"; done
+# 两边都改的文件 → 逐个三方合并，只有干净才写回：
+git merge-file -q -p <wip文件> <old-HEAD版本> <新HEAD版本> > /tmp/merged \
+  && cp /tmp/merged <文件> || echo "冲突，留给用户"
+```
+
+- 关键点：`reset`（不带 `--hard`）只动 HEAD+index，worktree 是 WIP 的唯一副本；
+  绕过 autostash 就没有「pop 冲突污染工作区」这一步。
+- **判据**：拉取前先把 `git status --short` 存一份到 /tmp，之后靠它对账
+  「哪些是原 WIP、哪些是新出现的」，也能立刻发现并行会话**正在**写入的文件。
+- 等价 patch 提交（patch-id 相同、parent 不同）在裸 `reset` 下会被丢弃；
+  它已在远端，丢的只是本地副本，`reflog` 可追。
