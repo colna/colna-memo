@@ -133,6 +133,14 @@ tags: [project, sitin-rn, luka, react-native]
 - **`AGENTS.md` 规则 3 与本题实际做法冲突**：规则写「合入目标唯一是 `main`，⛔ 不再有
   `feature/<App名>` 这类常驻集成分支」，而本 app 一直合入 `feature/luka-ios`。待裁决（给 luka
   写明确例外，还是调整规则）。
+- **仓库已迁 GitLab HTTPS**（09-22）：origin = `https://gitlab.lumosolo.com/app-rn/sitin-rn`；但
+  `.github/workflows` 的 CI（构建 / PR 门禁 / AI review）还在 GitHub 侧，迁后需要另配，未处理。
+- **AiTip 的 3px 直角 chip** 与照片编辑页新稿不搭（共享组件，bio / occupation / education /
+  interests / location 五页都在用）—— 是否单开一笔迁到 12px 圆角，待用户裁决（09-22 照片页落地时提出）。
+- **paywall 三页 + 零件是否加进 `shape-language` MIGRATED 白名单** 未定（09-22 一屏改造遗留）。
+- **编辑资料定位页 `components/location/location-picker.tsx` 权限被拒仍是 toast**（T0126 只覆盖
+  注册页；toast 现在避让键盘后能看见），是否统一成 Alert 待定。
+- **根目录未跟踪的 `-` 文件**（devicectl UDID 误产物）删不删，待用户定夺。
 
 ## 2026-09-16 全 app 代码审查（只读，未修）
 
@@ -298,8 +306,24 @@ iPad 模拟器（feed 为空的账号）深链 `/my-feed` 实拍确认。
 真机验收未做（实机在用户那边）：① 键盘弹着点输入屏左上角关闭 → Feed 应完整一屏；
 ② 进 edit 子页第一下不顿；③ 详情页只剩点赞、无 Say hi/评论入口。
 
+## 2026-09-22 一批（均已提交推送，验证留真机）
+
+| 主题 | 提交 | 内容 |
+| --- | --- | --- |
+| T0048 爪印徽标 | `bb37c2ad3` + `71a075ddd` | A：回前台 / 进 Chats 立即刷新计数；B1（用户裁决）：徽标改数**名单里的行**（`lib/into-you-counts.ts`），与服务端汇总口径脱钩 —— 服务端 likes 含被 `filterOutMatched` 隐掉的人、visitors 是另一套来源，截图 6 vs 3 行即此。 |
+| T0088 重登地址丢 | `868535448` | 后端把提交地址整串存进 `geoLocation.region`（city/province 常空）→ 自我地址五处统一 `geoLocationLabel(geo)`（province → region → ZIP，丢全 0 占位段）。 |
+| T0121 下拉卡 spinner | `addd24c70` + `71665bf07` | 非会员下拉进付费墙，原生 RefreshControl spinner 永久卡住（JS 从没发过 `refreshing=true`）；两层修法见 [[rn-refreshcontrol-stuck-spinner]]。 |
+| T0123 赠币 %s | `f039e1ff4` | 后端 `vipDetail` 下发 `%s Sparks instantly added`，客户端 `benefitTextsFor` 逐行替换为 `plan.credits`，0 时丢行；`sparkGrantText` 三页共用。 |
+| T0126 定位权限被拒 | `d904d30c1` | 注册定位页拒绝分支 toast 被数字键盘完全盖住（贴底 toast 不感知键盘）→ 改 Alert 去设置 + `ToastHost` 键盘感知 clearance。 |
+| 付费墙一屏稿 | `2e7edc3c1` | likes / visitor / 会员三页：固定页 + 权益卡内滚（系统滚动条）+ 三格套餐 + CTA 置底；小崽上页头（`peeking-hamster` 加 `size`）；文案：visitor 权益三行（首行 `See everyone who opened your profile`）、档期名 weekly/monthly/yearly。 |
+| 通知页空态 | `b88a8e2e5` | 三支占位换整屏空态（发愁小崽 + Try Again 胶囊），页头小崽让位。 |
+| 通知 tab 徽标时机 | `9e86478ea` | 未读改回「进段即清」（09-21 的离开才清被用户推翻）；Activity 加名单落地后的兜底清（服务端逐行 `isUnread` 会顶回徽标）。 |
+
+另：通知两段「上滑超一屏 / 下拉刷新未订阅拉起订阅」`b6f9c93c2`（闸门不改翻页口径，未订阅返回后仍可滑完已加载内容）。
+
 ## 相关沉淀
 
+- [[rn-refreshcontrol-stuck-spinner]]、[[sitin-rn-boundaries-identity-in-comments]]（源码注释里别写别的 app 包名）
 - [[expo-router-protected-stack-leftovers]]、[[react-async-hook-loading-stuck]]、
   [[sitin-proto-request-missing-id]]、[[design-mock-measure-and-sample]]
 - [[luka-profile-fields-lost-on-relogin]]、[[subscription-coins-zero]]（T0052 / T0061）
