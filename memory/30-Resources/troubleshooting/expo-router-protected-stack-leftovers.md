@@ -99,6 +99,24 @@ too，保护就是入口门禁」——路由一旦可达，`unlimitedChat` 会�
 是否被调，要看派发的 action 有没有 target、target 是不是根 navigator。没有 target 的
 stack action 一定先给最内层。**
 
+## 追加二（2026-09-23）：残影跟着「登出瞬间的顶屏」走 —— 根治要换 navigator key
+
+上面那条 `dismissTo` 修法把顶屏从 `settings` 换成 `(tabs)` 之后，测试同学录屏里的残影
+也跟着变成了 **Chats**：登出后不重启，之后**每一次**导航转场都先闪一下 Chats（加载骨架 +
+上一个账号的红点底栏），不是只在 onboarding 闪。也就是说残影不是某一屏的 bug，而是
+**被移走的顶屏留在原生 `RNSScreenStack` 里当后续转场的基图**：guard 换组只增删 JS 路由，
+原生栈容器不重建。
+
+根治：根 `Stack` 按会话阶段加 key（`key={authed ? "authed" : "guest"}`），阶段一换
+整棵原生栈重建，旧视图连同残留一起释放；`onboarding → tabs` 同属 authed，不重建。
+配套不变量测试：`tests/design/protected-routes.test.ts`。commit `c4c07d87d`。
+
+判据补充：**只清栈不够，阶段边界要换 navigator key**。清栈解决「哪一屏留在 JS 栈里」，
+换 key 解决「原生容器把哪一屏当转场基图」。
+
+定位手法：录屏抽帧（`ffmpeg -vf "fps=10,scale=...tile=6x8"` 出接触表，再按时间点取
+全分辨率帧）能直接看出「闪的是真实路由还是残留」—— 残留帧里带的是上一个账号的徽标数据。
+
 ## 相关
 
 - [expo-router：深链冷启动进二级页，返回键报 GO_BACK](expo-router-deeplink-back-empty-stack.md)
