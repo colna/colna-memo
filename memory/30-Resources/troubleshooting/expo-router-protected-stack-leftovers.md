@@ -78,6 +78,27 @@ too，保护就是入口门禁」——路由一旦可达，`unlimitedChat` 会�
 教训：**`Stack.Protected` 不是全局路由守卫，只是「列进组的屏才受控」**。涉及权限/调试
 开关的屏，不能只靠入口点门禁，必须屏内自查或进守卫组。
 
+## 追加（2026-09-23）：`dismissAll()` 清不掉根栈里的二级页
+
+`popToSessionRoot()` 原实现是 `router.dismissAll()`，以为「登出前 `(tabs)` 还在，会退回它」。
+实际上 `dismissAll()` 派发的 `POP_TO_TOP` **没有 target**，会由当前**最内层的 stack** 处理：
+
+- 人站在 `/settings/logout`（`settings` 是个嵌套 Stack）时，`dismissAll()` 只把嵌套栈退到
+  `settings/index`；根栈仍是 `[(tabs), settings]`，`settings` 还押在顶上。
+- 随后 `logout()` 翻守卫：`settings` 被移出 routeNames、在**没有转场**的情况下从原生栈抽走，
+  留下残影 —— 2026-09-23 测试反馈：登出后不重启、重新登录走 onboarding，**每一步都闪一下
+  Settings**；重启（原生栈重建）后消失。
+- 旧报告「重新登录落在 Settings」在 `1c8942781`（文件路由穷举声明）之后不复现，所以这个
+  函数一直看起来「有效」，实则根栈从来没被它清过。
+
+修法：用带 target 的 `POP_TO` —— `router.dismissTo("/(tabs)")`。`getNavigateAction` 会按
+当前 state 与目标 state 的分歧点算出 target（这里是根栈），根栈的 StackRouter 才收到
+`POP_TO`，把 `settings` 真退掉。
+
+判据（可复用）：**想知道一次「清栈」有没有清到根，别只看 `canDismiss()` / `dismissAll()`
+是否被调，要看派发的 action 有没有 target、target 是不是根 navigator。没有 target 的
+stack action 一定先给最内层。**
+
 ## 相关
 
 - [expo-router：深链冷启动进二级页，返回键报 GO_BACK](expo-router-deeplink-back-empty-stack.md)
