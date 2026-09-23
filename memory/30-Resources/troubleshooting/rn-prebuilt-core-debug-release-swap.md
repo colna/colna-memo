@@ -93,3 +93,36 @@ node "$(node --print "require.resolve('react-native/scripts/replace-rncore-versi
   产物存在性检查失败静默回落源码编译，与预编译 Expo 模块混搭导致 dyld 崩溃。
 - 上游脚本：`node_modules/react-native/scripts/replace-rncore-version.js`、
   `scripts/cocoapods/rncore.rb`。
+
+## 追加（2026-09-23）：marker 修完仍要防「Expo 预编译模块 × core 变体」混搭
+
+同一天模拟器重建：先按上文 seed marker + `replace-rncore-version.js` 换回 Debug，
+**链接通过**，但 app 一启动就 SIGBUS 崩：
+
+```text
+EXC_BAD_ACCESS / KERN_PROTECTION_FAILURE
+React           facebook::react::YogaStylableProps::YogaStylableProps(...)
+React           facebook::react::BaseViewProps::BaseViewProps(...)
+ExpoModulesCore expo::ExpoViewProps::ExpoViewProps(...)
+ExpoModulesCore RawPropsParser::prepare<expo::ExpoViewProps>()
+```
+
+即 debug 的 React core 与**按 release 时期 stage 出来的 Expo 预编译模块**（ExpoModulesCore 等）
+ABI 混搭 —— `replace-rncore-version.js` 只换 React core / ReactNativeDependencies 两个
+xcframework，不碰 Expo 的预编译 pod。
+
+**修法（一次到位）：**
+
+```sh
+rm -rf apps/<app>/ios/Pods
+cd apps/<app> && pod install --project-directory=ios   # 缓存命中，会按 debug 重新 stage Expo 模块
+# 然后正常构建（expo run:ios）
+```
+
+**判断口径：** 崩溃栈同时出现 `ExpoViewProps`/`ExpoViewShadowNode` 构造与
+`YogaStylableProps`，且刚经历过 Release→Debug 的方向切换，就按这个处理。
+**教训：换 core 变体不能只换 core，Pods 里其它预编译产物要一起重来 —— 删 Pods 重装最省心。**
+
+同场加映（另一个坑）：同事提交引入新的原生模块（`expo-web-browser`）后，**旧模拟器包
+重拉 bundle 会红屏 `Cannot find native module 'ExpoWebBrowser'`** —— 必须 `pod install` +
+重构建，错误信息与 pod 无关时先查最近提交有没有加依赖。
