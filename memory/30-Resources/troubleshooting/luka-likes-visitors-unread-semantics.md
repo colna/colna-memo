@@ -19,7 +19,8 @@ tags: [troubleshooting, luka, sitin-rn, notifications, badge, backend-data, prot
    `filterOutMatched`（已在聊）隐掉的行；不再读 `totalUnreadLikedUserCount`（含被隐掉的人）。
    visitors 徽标数 `GetVisitorList` 里 `lastVisitTime > visitorTime` 的行；不再读
    `GetNewVisitorCount`（那是**访问事件数**，同一个人看两次算 2，名单只有 1 行 —— T0048 的
-   「徽标 1、列表 2 个红点」就是它）。
+   「徽标 1、列表 2 个红点」就是它）。**⚠️ 2026-09-23 修正：`lastVisitTime` 后端下发的是
+   毫秒，客户端基线是秒 —— 该比较修复前恒为真，见文末《T0150 根因》。**
 3. **客户端清零时机是唯一会漏的地方**：
    - 进段即清（`9e86478ea`，用户 2026-09-22 口径，推翻 09-21 的「离开才清」）；
    - **屏内兜底每段各一条**：人还在该段上、名单里又出现未读行就继续清（Activity →
@@ -45,8 +46,29 @@ tags: [troubleshooting, luka, sitin-rn, notifications, badge, backend-data, prot
    一个账号一个人只能点一次；再造一条就 `FastLogin` 第三个设备号。
 4. 用 A 的 token 依次拉 `GetMatchLikedList` / 调 `MarkMatchLikedRead` / 再拉，打印
    `totalUnreadLikedUserCount` 与每行 `isUnread`，即可证明服务端语义。
-5. 访客不好造：`ReportVisitorRequest` 客户端没人调，`GetUserProfilePageInfo` 看资料页在 dev
-   也没记访客（同性别/资料不全？）——「no visitor」。要造访客得走女端/PWA 那条上报链。
+5. 访客**可以造**（2026-09-23 实测通过，脚本 `/tmp/t0150-probe/visitor-probe6.ts`）：账号 B 调
+   `ReportVisitorRequest { visitorInfos: [{ visitorId: B.uid, visitedId: A.uid, actionType:
+   VISITOR_PROFILE }] }`（**不要带 `delayTime`**；带 `delayTime: 120000` 的没落库），A 再拉
+   `GetVisitorList` 就有行。`GetUserProfilePageInfo` 本身不记访客（返回 code=0）。
+
+# 2026-09-23 续：T0150 根因 —— `lastVisitTime` 是毫秒，客户端基线是秒
+
+- **症状**：测试同学「visitors 红点无法消失，一直存在」；Visitors 分段 tab 无徽标、但
+  **每张访客卡都有红点**；返回 Chats 稍等后爪印重新出现（截图 22 = 全量访客；底栏 63 =
+  消息 41 + 22）。
+- **实测**（dev 探针，同上第 5 条造访客）：`lastVisitTime = 1790151879016`，同时刻本地
+  `now = 1790151879` 秒 —— **后端下发 epoch 毫秒**；而 `Visitor.lastVisitTime` 的类型契约、
+  `visitor-time.ts` 基线与 `GetNewVisitorCount.startTime`（proto 注释「unix 时间戳 秒」）都是
+  **秒**。`毫秒 > 秒` 恒真 ⇒ 一切访客永远「未读」：卡片常红；进段清零把 store 擦成 0（tab 无
+  徽标）但卡片清不掉；离屏 `refresh()` 再算出全量 ⇒ 爪印「一直存在」。这就是 T0048 / T0124 /
+  T0135 反复打回的共同底因（此前只按「清零时机」和「徽标口径」修，从未验过字段单位）。
+- **修法**：共享引擎 `packages/business-vibes/src/vibes.ts` 的 `getScouted()` 归一
+  `visitTimeSeconds()`（`>= 1e12` 视为毫秒，否则原样透传 —— 对自己的后端下发秒的 app 无害）；
+  mapper 一处修，Luka 与所有消费方一起好。测试 +2（毫秒换算 / 秒透传）。
+- **同步文档**：`packages/business-vibes/README.md`《访客时间是秒》、
+  `apps/luka/docs/notifications.md`《徽标》。
+- **验证要点（真机）**：进 Visitors 后卡片红点/爪印应在下次 refresh 后归 0；停留在 Visitors
+  时新访客按 T0135 兜底当场清；离开后新访客仍计 1（口径不变）。
 
 # 相关
 
