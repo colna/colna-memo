@@ -117,6 +117,30 @@ stack action 一定先给最内层。**
 定位手法：录屏抽帧（`ffmpeg -vf "fps=10,scale=...tile=6x8"` 出接触表，再按时间点取
 全分辨率帧）能直接看出「闪的是真实路由还是残留」—— 残留帧里带的是上一个账号的徽标数据。
 
+⚠️ **真机复验证伪**：测试同学的包确认包含 `c4c07d87d` 后仍会闪 —— 换 key 不足以释放
+原生层留下的那份视图。终解见下。
+
+## 追加三（2026-09-23 · 终解）：别让 guard 在同一帧拆嵌套容器，退出前先换成空白盖
+
+残影的准确机制：**嵌套 navigator 容器**（`(tabs)`、`settings` 这类带 `_layout` 的屏）
+在 guard 换组的**同一帧**里既被移除、父容器又换了内容时，原生 screen container 会把它的
+视图留下当作后续转场的基图（同类问题见 rns #4504：「nested ScreenContainer 在同一帧被
+移除会留下孤儿 fragment」）。这也解释了为什么「顶屏是谁，残影就是谁」：
+Settings → `(tabs)` → Chats 一路跟着走。
+
+终解（commit `67164e16e`）：退出路径不再让 guard 直接拆嵌套容器 ——
+`prepareSessionExit()` 先用 `dismissTo("/(tabs)")` 退掉二级页，再用**普通导航**把 `(tabs)`
+自己换成 `/session-cover`（一屏整屏底色的过渡屏，`guard={true}`、声明在最后不抢
+`routeNames[0]`）；`logout()` 翻守卫时栈里只剩一屏普通屏，没有嵌套容器可漏，随后 replace
+到登录页（删号路径是 `/account-deletion`）。
+
+验证手法（模拟器可验 JS、验不了原生）：临时 `__repro` 脚本 + 模块级 interval 打根栈
+state，实测 `prepareSessionExit()` 后收敛为 `*session-cover`、`logout()` 后为 `*login`；
+原生残影模拟器复现不了，仍需真机复验。
+
+可复用结论：**会话边界不要在同一帧里拆带 `_layout` 的嵌套屏**。要么先退到普通屏再翻状态，
+要么让那个容器先离开导航栈。
+
 ## 相关
 
 - [expo-router：深链冷启动进二级页，返回键报 GO_BACK](expo-router-deeplink-back-empty-stack.md)
