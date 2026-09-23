@@ -31,6 +31,22 @@ tags: troubleshooting, ios, ipa, build, sitin-rn, luka
   与整卡可划修复。单看 mtime 有歧义（biome `--write` 也会 touch 文件），**必须验产物内容**。
 - 修法：打完在产物里 grep 本次新引入的跨模块符号；不一致就重打（复用工程约 2–6 分钟）。
 
+## 坑 3：podspec 新增资源文件（usdz 等）必须重新 pod install 才进包
+
+- 场景（2026-09-23，luka）：`ArkitPlay.podspec` 的 `s.resources = 'Resources/**/*.usdz'`，
+  09-22 新增 `LukaSniff.usdz`（代码 `CritterRig.swift` 直接引用）。复用工程打包，
+  产物里**没有**它 —— AR sniff 动作会静默失效，构建全程不报错。
+- 根因：CocoaPods 在 `pod install` 时把 glob 固化成 Pods.xcodeproj 里的静态文件列表。
+  之后源目录新增文件，不重新 pod install 就不会进 build phase。**已存在文件的内容更新
+  没问题**（如 LukaRun.usdz 改版就进包了），只有**新增文件**受影响。
+- 判据：`grep -c "<新资源名>" apps/<app>/ios/Pods/Pods.xcodeproj/project.pbxproj`
+  （0 → 没进工程；pod install 后应为 2）；或直接解包产物看文件在不在。
+- 修法：`cd apps/<app> && pod install --project-directory=ios` 后重打。
+  **build-ipa.sh 不会替你跑**：它只在 Podfile.lock 与 Manifest.lock 内容不一致时才
+  pod install，而新增文件不改 lock，所以跳过 —— 必须手动跑一次。
+  注意从 repo 根跑 `pod install --project-directory=apps/<app>/ios` 会报
+  `Pathname.new requires a String`（cwd 相关），与 build-ipa.sh 一致在 app 目录下执行。
+
 ## 产物核验三件套
 
 ```bash
