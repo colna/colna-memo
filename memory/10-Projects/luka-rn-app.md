@@ -329,7 +329,7 @@ iPad 模拟器（feed 为空的账号）深链 `/my-feed` 实拍确认。
 | 【开白】注册成功落 Nearby | `055bacc9b` | 按蓝图迁移 `0018`/`0021`/`0022` 终态接入 `lib/tab-landing` + 锚点屏 `TabLandingRedirect`：开白（登录 / 走完注册 / 冷启动）→ `/(tabs)/discover`（默认子页 Nearby），sign-in 商店审核 → Into You、普通账号 → Chats 不变。删 `pill-tabs` 不生效的 `initialRouteName`、删 tabs layout 的 sign-in effect、`intro-video` 出口统一回锚点、根 layout 重活排到 `whenTabLandingSettled()`、tab-bar 落地窗口不画选中态。新增 `tests/lib/tab-landing.test.ts`。台账仍 0009（部分同步不跳号）。待真机验收。 |
 | 【开白】Apple 面板点关闭却登录 / 进注册 | `20a662685` | `runThirdPartyLogin` 把「取消」当失败静默回落设备登录，本机 deviceId 的历史账号（开白 / 普通）被直接登回来、无账号则 pending 进注册页。改为取消（`authorize` 回 `null`）原地停下；原生失败 / 后端拒绝仍回落。测试取消用例改断言不建会话；`security-hardening.md` / `widget-guide.md` / `app-store-checklist-review.md` 同步。待真机回归。 |
 | 【开白】登出后 onboarding 每步闪 Settings | `b8e548a62` | `popToSessionRoot` 的 `dismissAll()` 无 target，`POP_TO_TOP` 被最内层嵌套栈（settings）吃掉，根栈里的 `settings` 在登出翻守卫时被无转场抽走、留原生残影。改 `dismissTo("/(tabs)")`（带 target 命中根栈）；`settings/logout`、Debug 注释同步。判据沉淀见 [[expo-router-protected-stack-leftovers]]。待真机回归。 |
-| 【开白】登出后每次转场闪 Chats（残影根治） | `c4c07d87d` | 上一笔把顶屏从 settings 换成 (tabs) 后残影跟着变 Chats（录屏抽帧实证 = 骨架 + 旧账号红点底栏）→ 根因是原生 RNSScreenStack 不随 guard 换组重建，被移走的顶屏留作转场基图。根 `<Stack key={authed ? "authed" : "guest"}>` 阶段边界重建整棵原生栈；onboarding→tabs 同阶段不重建。设计测试钉住。见 [[expo-router-protected-stack-leftovers]]。 |
+| 【开白】登出后每次转场闪 Chats（T0144，残影根治） | `c4c07d87d` | 上一笔把顶屏从 settings 换成 (tabs) 后残影跟着变 Chats（录屏抽帧实证 = 骨架 + 旧账号红点底栏）→ 根因是原生 RNSScreenStack 不随 guard 换组重建，被移走的顶屏留作转场基图。根 `<Stack key={authed ? "authed" : "guest"}>` 阶段边界重建整棵原生栈；onboarding→tabs 同阶段不重建。设计测试钉住。见 [[expo-router-protected-stack-leftovers]]。 |
 
 T0135 与 T0124/T0048 同族：老包（≤09-22 17:44）是「离开才清」，页内停留即会「旧数 + 新增」；需含 `9e86478ea`+B1 的新包复验。
 
