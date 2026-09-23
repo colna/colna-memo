@@ -326,7 +326,7 @@ iPad 模拟器（feed 为空的账号）深链 `/my-feed` 实拍确认。
 | 主题 | 提交 | 内容 |
 | --- | --- | --- |
 | T0135 徽标「原数据+新增」 | `ea8651d72` | 根因 = Visitors 段缺「屏内兜底」：人停留访客页时新访问往徽标上加、旧的不清；Activity 早已有同款兜底（`9e86478ea` 时加的）。`notifications.tsx` 补 `tab === "visitors"` → `markVisitorsSeen()`；设计测试 + 文档同步。服务端实证（`MarkMatchLikedRead` 真清 per-row `isUnread`）与造 like 手法见 [[luka-likes-visitors-unread-semantics]]。 |
-| 【开白】注册成功落 Nearby | 未提交 | 按蓝图迁移 `0018`/`0021`/`0022` 终态接入 `lib/tab-landing` + 锚点屏 `TabLandingRedirect`：开白（登录 / 走完注册 / 冷启动）→ `/(tabs)/discover`（默认子页 Nearby），sign-in 商店审核 → Into You、普通账号 → Chats 不变。删 `pill-tabs` 不生效的 `initialRouteName`、删 tabs layout 的 sign-in effect、`intro-video` 出口统一回锚点、根 layout 重活排到 `whenTabLandingSettled()`、tab-bar 落地窗口不画选中态。新增 `tests/lib/tab-landing.test.ts`。台账仍 0009（部分同步不跳号）。待真机验收。 |
+| 【开白】注册成功落 Nearby | `055bacc9b` | 按蓝图迁移 `0018`/`0021`/`0022` 终态接入 `lib/tab-landing` + 锚点屏 `TabLandingRedirect`：开白（登录 / 走完注册 / 冷启动）→ `/(tabs)/discover`（默认子页 Nearby），sign-in 商店审核 → Into You、普通账号 → Chats 不变。删 `pill-tabs` 不生效的 `initialRouteName`、删 tabs layout 的 sign-in effect、`intro-video` 出口统一回锚点、根 layout 重活排到 `whenTabLandingSettled()`、tab-bar 落地窗口不画选中态。新增 `tests/lib/tab-landing.test.ts`。台账仍 0009（部分同步不跳号）。待真机验收。 |
 
 T0135 与 T0124/T0048 同族：老包（≤09-22 17:44）是「离开才清」，页内停留即会「旧数 + 新增」；需含 `9e86478ea`+B1 的新包复验。
 
