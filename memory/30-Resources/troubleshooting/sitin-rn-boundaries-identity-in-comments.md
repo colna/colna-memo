@@ -34,4 +34,9 @@ pre-commit —— 也就是说,写了一段「别的 app 怎么怎么样」的�
 替代写法：`the sibling apps' billing guards the same way` 或「兄弟包的扣费判定相同」——不出现任何
 app 名字面量。注意 AIGC 生成的「参考 iris 的写法」类注释是高发区，写完先 `pnpm boundaries`。
 
+**再犯（2026-09-23）**:Luka 埋点审计时给 `services/native/analytics.ts` 的 `signin_click` 写注释解释
+「与共享目录拼写不一致，不改共享后缀，**Iris** 等其它 App 的 wire 不受影响」——又被 `mentions "iris"`
+拦下。改法同前：写成「其它 App 的 wire 不受影响」。凡是解释「为什么不能进共享包 / 为什么要本地保留」时，
+最容易顺手点名兄弟 app 当例子，这是第三类高发场景。
+
 **相关**:[sitin-rn 双 clone 跑错目录](sitin-rn-multi-clone-wrong-app.md)(另一类本地门禁的误报/误判)。
