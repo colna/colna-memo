@@ -86,6 +86,27 @@ grep -c -a 'deckSkipTargetFromCurrent' "$TMPD/Payload/Luka.app/main.jsbundle"
 - 验证成功标志：`** EXPORT SUCCEEDED **` + `ios/build/export/Luka.ipa` 出现。
   产物核验仍按「三件套」照做。
 
+## 坑 5：改了 eas.json 里 prebuild 期读取的 env（如 TIMPush 证书），复用工程的包不会生效
+
+- 场景（2026-09-24，luka）：17:00 在 `apps/luka/eas.json` 四个 profile 填了
+  `EXPO_PUBLIC_TIM_PUSH_BUSINESS_ID_IOS=44170`，17:50 复用工程出的 IPA 里
+  **没有** `Payload/Luka.app/timpush-configs.json` → 包收不到离线推送，构建全绿。
+- 根因：businessID 由 `@heyhru/rn-tim-push/plugins/timpush` 在 **prebuild 期**写进生成工程
+  （`ios/<App>/Resources/timpush-configs.json`）。`build-ipa.sh` 复用工程时不跑 prebuild，
+  `EAS_ENV_EXPORTS` 只是把 env 摆在那儿、没有消费者；复用路径只回写 DEVELOPMENT_TEAM。
+- 修法：改动这类值后必须 **clean prebuild** 再出包（交互答 `y`）。`archive-ios.sh` 每次
+  强制 clean prebuild，所以正式归档路径不受此坑影响。
+- 判据（并入「三件套」）：
+
+  ```bash
+  cat "$TMPD/Payload/Luka.app/timpush-configs.json"   # 应含 {"businessID":"44170"}
+  security cms -D -i "$TMPD/Payload/Luka.app/embedded.mobileprovision" \
+    | plutil -extract Entitlements.aps-environment raw -
+  ```
+
+  两个值要对上：Ad Hoc / 预览包 `aps-environment=production` → 需生产证书（或沙盒+生产通吃的
+  `.p8`）；dev build 是 `development`（沙盒）。证书环境填错 APNs 直接拒收且不报错。
+
 ## 本机出包固定姿势（2026-09 现状）
 
 ```bash
@@ -93,6 +114,6 @@ export PATH="$HOME/.nvm/versions/node/v24.21.0/bin:$PATH"   # 默认 Node 22 不
 printf 'n\n' | IOS_TEAM_ID=39CFYH6W55 scripts/build-ipa.sh luka test preview "" 10001
 ```
 
-- `printf 'n\n'` 回答脚本的「是否 clean prebuild」交互（非 clean；原生依赖变了才 clean）；
-  team 用 `IOS_TEAM_ID` 跳过选择，避免 stdin 被抢。
+- `printf 'n\n'` 回答脚本的「是否 clean prebuild」交互（非 clean；**原生依赖或 prebuild 期
+  env（TIMPush 证书等）变了才 clean**）；team 用 `IOS_TEAM_ID` 跳过选择，避免 stdin 被抢。
 - 构建日志在 `apps/luka/build-logs/build-<时间戳>.log`；脚本**不上传蒲公英**。
