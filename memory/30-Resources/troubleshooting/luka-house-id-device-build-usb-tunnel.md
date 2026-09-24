@@ -100,3 +100,36 @@ xcrun devicectl device capture screenshot --device <UDID> --destination /tmp/x.p
 
 前提：`apps/luka/.env`（gitignored）里要有 `EXPO_APPLE_TEAM_ID=39CFYH6W55`，
 否则 `app.config.ts` 的 `appleTeamId` 为空、自动签名会去问 Team。
+
+## 2026-09-24 追加：dev client 会拿旧 bundle；iPad 兼容窗口的真实几何
+
+### 改了 JS 但 iPad 上没生效 —— dev client 缓存了上次的 bundle
+
+- **现象**：Metro（8081）明明已经含新代码（`curl` 整个 entry bundle 里有新符号），但 iPad 上
+  反复 `devicectl ... --terminate-existing --payload-url <expo-development-client URL>` 拉起后
+  画面还是旧版；换一个端口起第二个 Metro（8082）也没用。
+- **根因**：expo-dev-client 把上次加载成功的 bundle 缓存在 App 里，冷启动时可能直接用它，
+  不重新拉。
+- **修法（不用重装、不用点屏幕）**：Expo CLI 的 dev server 有 **`POST /reload`**：向所有已连
+  客户端广播 reload，客户端会重新拉 bundle。
+  ```bash
+  curl -s -X POST http://localhost:8081/reload     # 200
+  ```
+  之后截图确认即可。排查顺序：① `curl` entry bundle 确认 Metro 内容；② `/reload`；③ 再不行才
+  换端口/重装。
+- **取 bundle 的正确 URL**（`/index.bundle` 那个是老写法，会 404）：
+  ```bash
+  curl -s -H "expo-platform: ios" http://127.0.0.1:8081/ | python3 -c "import json,sys;print(json.load(sys.stdin)['launchAsset']['url'])"
+  # 想看源码文本：把 launchAsset.url 里的 transform.bytecode=1 改成 0 再 curl
+  ```
+
+### iPad 兼容窗口的真实几何（375×669 逻辑点，整体放大 ~3.4×）
+
+- `useWindowDimensions()` 报 **375 宽**（与 iPhone 相同），但高度只有 **669**（iPhone 11 是 812）；
+  `PixelRatio` = 2，而截图 1640px 宽 → 实际渲染放大 ~3.4 倍。**别按截图像素猜布局**。
+- 实测（Luka 划卡页）：`vh 647 / topInset 124 / tabBarClearance 100 / BELOW 97 / hero 112`
+  → 卡片可用高度只有 **~214pt**（iPhone 上约 350）。
+- 推论：给 iPad 做「兼容」时，问题通常是**高度不够**，不是宽度太宽；把卡按 350×547 比例收窄
+  之后还要把卡内内容（字号/内边距/标签）一起收，否则固定的信息带仍会吃掉大半个卡。
+- 布局回归：改完用 `devicectl device capture screenshot` 看真机，同时在 `PixelRatio`/尺寸函数
+  上写单测（`discoveryCardFit` 那套）。
