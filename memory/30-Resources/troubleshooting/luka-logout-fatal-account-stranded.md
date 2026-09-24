@@ -95,3 +95,17 @@ PY
 - `last_exception_backtrace` 有 `RCTExceptionsManager reportFatal` → **JS fatal**（去装 fatal 遗言，别在 native 侧瞎找）。
 - `faultingThread` 队列名是重要线索：`com.meta.react.turbomodulemanager.queue` = 某次 TurboModule 调用链上出事。
 - 与 session.log 对照时记得 **.ips 用设备时区、日志可能是 UTC**。
+
+## 后续（2026-09-24）：第 4 份 .ips 是「冷启 11 秒」形态，仍同一 abort
+
+- `Luka-2026-09-29-142229.ips`：procLaunch 14:22:17 → capture 14:22:28（**冷启 11 秒后** SIGABRT）。
+  `lastExceptionBacktrace` 与 135457 完全同形（`RCTExceptionsManager reportFatal`，faulting `com.meta.react.turbomodulemanager.queue`）。
+- 日志对不上：`session(1).log` 只到 06:03Z（设备 14:03），这次崩溃（06:22Z）没有 session 记录，两条日志里零 `[CrashLog]` → 只能从设备现取。
+- 排除两条路：Luka `app.config.ts` 无 `updates` 段（`expo-updates` 未配置）→ **不是坏 OTA**；`sentryDsn` 是占位值（`o0.ingest.../0`）→ Sentry 拿不到。
+- 代码侧收窄：release 下 `metroRequire` 对未初始化模块走 `guardedLoadModule`，**模块顶层抛错直接 `ErrorUtils.reportFatalError`**
+  （`node_modules/metro-runtime/src/polyfills/require.js:98` 与 `:178-189`）；懒加载的路由/屏幕模块因此是冷启 fatal 的头号嫌疑面。
+  未捕获 promise rejection 只走 `isFatal=false`（`promiseRejectionTrackingOptions.js`），**不会 abort** —— 嫌疑集中在「同步抛错」。
+- 取证：测试机 Debug Tools → TOOLS → Export crash log（`crash.log`，`[CrashLog]` 同步写盘）。
+  先确认包里有 `414684b8c` 的遗言：**build 10000 分不出新旧** —— 本地 `build-ipa.sh` 传 10001 但 luka 产物恒 10000，EAS 包也是 10000。
+- 旁证（与崩溃无关，另开修）：session.log 每次导航都刷 `No route named "contact/bond"` —— 根布局把 `contact/bond` 声明在根 Stack 上，
+  bond 的 `formSheet` options 实际没生效。
