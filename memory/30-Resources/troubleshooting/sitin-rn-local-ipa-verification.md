@@ -67,6 +67,25 @@ grep -c -a 'deckSkipTargetFromCurrent' "$TMPD/Payload/Luka.app/main.jsbundle"
 - **terser 会内联模块内数值常量**：`const FULL_CARD_SWIPE_BAND = 1_000_000` 不会出现在包里，
   选 grep 目标时优先跨模块函数名 / 用户可见文案（如 `Like post`）。
 
+## 坑 4：exportArchive 报 `The network connection was lost`（archive 已好，只重跑导出）
+
+- 场景（2026-09-24，luka live-test）：archive 成功，紧接着
+  `error: exportArchive The network connection was lost.` / `** EXPORT FAILED **`，
+  脚本以 exit 70 退出。是 Xcode 与 Apple 服务的瞬时网络抖动，不是签名/描述文件问题。
+- **不用从头重打**：archive 与 `ios/build/ExportOptions.plist` 都在，对着同一归档只重跑
+  导出即可（脚本里那一条的等价命令）：
+
+  ```bash
+  cd apps/luka
+  EAS_BUILD_PROFILE=preview EXPO_APPLE_TEAM_ID=<team> SENTRY_DISABLE_AUTO_UPLOAD=true \
+  xcodebuild -exportArchive -archivePath ios/build/Luka.xcarchive \
+    -exportOptionsPlist ios/build/ExportOptions.plist -exportPath ios/build/export \
+    DEVELOPMENT_TEAM=<team> CURRENT_PROJECT_VERSION=10001 -allowProvisioningUpdates
+  ```
+
+- 验证成功标志：`** EXPORT SUCCEEDED **` + `ios/build/export/Luka.ipa` 出现。
+  产物核验仍按「三件套」照做。
+
 ## 本机出包固定姿势（2026-09 现状）
 
 ```bash
