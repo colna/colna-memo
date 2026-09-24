@@ -110,3 +110,25 @@ git merge-file -q -p <wip文件> <old-HEAD版本> <新HEAD版本> > /tmp/merged 
   保持 staged；注意它提交的是**工作区版本**，部分暂存过就得走上面那条路）。
 - **已推送才发现在里面**：共享分支上别为这个 `rebase --force`；要么留着，要么
   `git revert` 别人那部分并知会对方。
+
+## `git reset HEAD~1` 前先核对 HEAD 是否已被并行会话推进（2026-09-24 实操）
+
+同一天的另一幕：并行会话的 `git commit` 捎走了我 staged 的通知页（上一条的场景），
+我准备 `reset HEAD~1` 把它拆开 —— 但对方在我 reset 前的几秒**又提交了一笔**（recharge），
+HEAD 已经前进，`reset HEAD~1` 撤销的**是它那笔新提交**，不是我要拆的那个。表现是
+「目标 commit 还在 HEAD 上，工作区却多出一笔退回来的改动」。
+
+- **判据**：`reset` / `rebase` 前先 `git log --oneline -3` + `git reflog -5`；并行会话的
+  提交带几秒前的时间戳，HEAD 和你记忆里的不一致就停手。
+- **补救**：内容都在（目标 commit 还在，被误撤那笔回到工作区）。备份后按「对齐远端 +
+  cherry-pick 自己独有的」收尾，见下条。
+
+## 远端被并行会话 force push 后：对齐远端，只挑自己独有的（2026-09-24 实操）
+
+`git fetch` 输出 `+ <old>...<new> … (forced update)` 时：
+
+1. `git log --oneline -1 origin/<branch>` 看远端现在是什么；`git show --stat <远端commit>`
+   对一下文件清单，确认自己的改动是否已被它收进某个 commit。
+2. **别对着 force**。本地 `git branch backup/<日期>-<事>` 留个备份引用，再
+   `git reset --hard origin/<branch>`，然后只 `git cherry-pick` 远端没有的、你独有的提交。
+3. 普通 `git push` 即可 fast-forward（`pre-push` 的 boundaries / typecheck 照常跑）。
