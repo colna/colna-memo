@@ -89,3 +89,24 @@ git merge-file -q -p <wip文件> <old-HEAD版本> <新HEAD版本> > /tmp/merged 
   「哪些是原 WIP、哪些是新出现的」，也能立刻发现并行会话**正在**写入的文件。
 - 等价 patch 提交（patch-id 相同、parent 不同）在裸 `reset` 下会被丢弃；
   它已在远端，丢的只是本地副本，`reflog` 可追。
+
+## 共享 worktree 里 `git commit` 会捎上并行会话**已 staged** 的文件（2026-09-24 实操）
+
+- **症状**：只 `git add` 了自己的 2 个文件，`git commit` 后 `--stat` 却有 7 个 —— 多出的
+  5 个是并行会话已 `git add` 的 WIP（`git status --short` 第一列是 `M`，第二列空）。
+- **根因**：`git commit` 提交的是**整个 index**，不只是你刚 `add` 的那几个。
+- **未推送前的收拾**（HEAD 已动、index/worktree 原样保留，非破坏性）：
+
+  ```bash
+  git reset --soft HEAD~1                    # 撤销提交，index 仍是全部 7 个
+  git restore --staged <别人的 5 个文件>       # 把他们移出 index
+  git commit -m "..."                        # 只提交自己的
+  git add <别人的 5 个文件>                    # 还原他们原来的 staged 状态
+  git status --short                         # 对账：应与操作前逐字符一致
+  ```
+
+- **预防**：commit 前先 `git status --short | rg '^[MADRC]'` 看 index 里有没有别人的东西；
+  或直接用 `git commit -m "..." -- <我改的文件>`（只提交给定路径，index 中其余 staged
+  保持 staged；注意它提交的是**工作区版本**，部分暂存过就得走上面那条路）。
+- **已推送才发现在里面**：共享分支上别为这个 `rebase --force`；要么留着，要么
+  `git revert` 别人那部分并知会对方。
