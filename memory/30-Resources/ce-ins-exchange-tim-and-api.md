@@ -513,3 +513,15 @@ flowchart TB
 | `api/mq/CeEventProducer.kt` | Kafka `ce.exchanged` |
 | `infra/repository/InsExchangeOrderRepository.kt` | 订单表 CRUD + `FOR UPDATE` 行锁 |
 | `docs/` | 11 篇设计文档(architecture / grpc-api / order-lifecycle / data-model 等) |
+
+### 3.7 女主动完单（流程 C）调用时机 — 2026-10-08 代码核对 + 2026-10-09 线上案例
+
+**部署版（release/test-pwa，含 4.x 社媒交换调整）**：`handlePeerAccepted` 是女主动完单的唯一收口，3 个入口：
+
+1. **实时**：男方提交「同意/填 INS」→ 男方端发 `ExchangeSendMessage` → 女方收到该 TIM 消息**瞬间**触发（`useInsTaskInit.ts:201-205`）；消息到达 = 调用时机（App/TIM 离线则补投到再上线时）。
+2. **补偿**：`checkPendingOrders` 拉到「她创建的待处理单」（`isFollowOrder = createUserId===自己`，`:300`）后自动派发（`:802-807`）。触发时机：冷启动 init×2（`:518/:521`）、**小崽上线**（`:504-514`，按平台 scope）、收到 ExchangeRequest（`:196`）；要求「涉及平台在线」才自动派（`:313-321`）。
+3. **手动**：ExchangeSendBubble「Follow, get $X」按钮。
+
+前置/失败行为（`:743-763`）：未登录 → `tryStartInsRobot` 后 **return 不关单**（等补偿）；finish 失败（如订单过期）→ `if (!response) return` **静默、不更新状态、无重试** → 过期后若列表不再返回该单即永久卡（形态：未 follow + $0）。每次调用前打 BP 埋点 `get_ins_chat_reward`（order_id/male_user_id）可列全部调用时间。
+
+**2026-10-09 案例**（女 2100068544 / 男 2100068675，Quick）：11:16 创建 → 11:23 过期 → 11:24:06 首次 finish。新代码排除嫌疑（Quick+已授权路径守卫短路；若新守卫拦下则根本不会有该次调用）。两种解释待日志分辨：A 男方 11:24:06 才提交（或她 TIM 离线补投到该时刻）；B 男方更早同意但她小崽不在线（`:748`），11:24:06 冷启动/小崽上线走补偿派发。⚠️ 7 分钟有效期与「PAID 24h 过期」口径不符 → 待后端查该单 `expire_at` 与状态流转（INIT/PAID/REFUNDED）。
