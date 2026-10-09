@@ -59,6 +59,23 @@ xcrun simctl spawn booted launchctl kickstart -k system/com.apple.SpringBoard
 - `curl http://localhost:8081/json/list` 出现 `com.presence.gracechat (iPhone 18 Pro)`。
 - `xcrun simctl io booted screenshot /tmp/x.png` 看屏幕（无头调试全靠它）。
 
+## 附带坑：scene 修好后 dyld 报缺 `BaseModule.willDestroy`
+
+2026-10-09 sitin-rn / sofia 复现：scene 生命周期接好后启动仍崩，`termination.namespace = DYLD`、
+`Symbol not found: _$s15ExpoModulesCore10BaseModuleC11willDestroyyyFTj`，`Referenced from
+ExpoFont.framework`、`Expected in ExpoModulesCore.framework`。
+
+根因：prebuild 的 autolinking 从**嵌套旧副本**解析 core ——
+`packages/rn-metro-config/node_modules/expo-modules-core`（57.0.6，被该包
+`peerDependencies: { expo: "*" }` 带进来），而 SDK 57 的预编译模块（ExpoFont 57.0.4）
+引用新 core 才有的 `BaseModule.willDestroy`。同一个 lockfile 里同时存在 57.0.6 与 57.0.21
+时，Podfile 恰好选中了旧的那份。
+
+修法：`pnpm-workspace.yaml` 的 `overrides:` 钉 `expo-modules-core: 57.0.21`（luka 先例是
+57.0.18，同为 SDK 57 当前线），`pnpm install` 后全仓只剩一份 core，重跑 `pod install`
+（Podfile.lock 的 `ExpoModulesCore (from ...)` 应指向根 `node_modules/expo-modules-core`），
+再重建。判据：`grep -o "expo-modules-core@[0-9.]*" pnpm-lock.yaml | sort -u` 只剩一个版本。
+
 ## 相关
 
 - 仓库内文档：`docs/native-dev-onboarding.md` §八 常见故障（已加条目）。
