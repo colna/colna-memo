@@ -92,6 +92,8 @@ TIM 消息
 | `giftId` | string | **仅 CE 服务端 DH 场景**带,固定 `"rose"` |
 | `localPwaStatus` | enum | **PWA 本地写回**的处理态:`countdown / agreed / refused / expired` |
 
+> **渲染出处**(2026-10-09 查证):收到卡片的按钮文案 `Accept (+$${message.reward})`(`InsExchangeBubble.tsx:311`)读的就是本字段;点接受后实际到账以 `finishAndFollowInsExchangeOrder` 返回 `earnedAmount` 为准(见 §2.1)。
+
 ### 1.4 接受回执 `ExchangeSendPayload`
 
 `chatMessage.ts:469-480`
