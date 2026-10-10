@@ -62,3 +62,18 @@ sitin-rn 的桌面组件能力在 `packages/rn-home-widget`（iOS WidgetKit / An
   `npx expo prebuild` 没有）。
 - Expo 的 config 加载器**不能 import TS 源文件**到 `app.config.ts`（需要常量一致时：写
   字面量 + 一条单测读 `app.config.ts` 文本钉住与常量相同，sofia 已这么做）。
+
+# 内容取向（2026-10-10 定）
+
+**组件不是消息流/通知的替代。** 消息事件归系统推送与 App 内通知；组件再放一份既滞后
+（reload 预算、App 没运行不更新）又把私聊内容暴露在桌面。适合组件的是**状态型内容**：
+每天变化、App 不开也有意义、不携带私密正文。sofia 的结论 = 「今日推荐 + 开场白」，
+并顺手把两个表现开关做成快照字段（同样不必重出基包）：
+
+- `charIntervalMs`：打字节奏（毫秒/字，夹 `[30, 1000]`）。75ms 在桌面会明显被合并成
+  「一顿一顿」，130ms 是稳的默认。
+- `flash`：名称是否「闪两下」。闪是通知语汇，语义不是通知的内容（AI 在写字）传 `false`。
+
+锁「当天内容」的一贯做法：把选中的 `{date, pick...}` 存 app 侧（sofia 用
+`lib/storage` 的 `sofia.widget.daily.v1`），当天不再重选；用户清了卡就按缓存补发、
+不重新选（否则划卡会让组件跳人）。
