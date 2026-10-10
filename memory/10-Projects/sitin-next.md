@@ -43,6 +43,13 @@ pnpm test      # 运行测试
   - **PR #491** → base `feature/admin`:<https://github.com/presence-io/sitin-next/pull/491>
   - 上测试环境:cherry-pick 这 2 个提交到 `release/test-admin` 并 push(`c71e9276..b31e31c0`)。**不用 merge**:该分支基于旧的 261ef60b,feature/admin 从未合进 release/test-admin(分叉点 3d3de7e0),merge 会拖入整段 feature/admin delta 并产生回退型冲突(如 `guild-queue.ts` 会用旧版覆盖新 import 破坏构建)。
 
+### 社媒交换「授权证据」修复 — 手动用户名落名片不再误置授权态（2026-10-09/10）
+
+- **问题**：4.3 手动用户名路径（MyPicks 未授权接受交换）`saveContactCard` 落名片后，冷启动 `hasContactCard` 回填把未授权用户误判"已授权"→ 弹 Reconnect 抽屉 + MyPicks 三守卫失效（用户名弹窗跳过 / 自动关注 / 偷拉小崽）。
+- **修复**（前端过渡；后端名片 source 字段待补）：`insStore.authEvidenceByPlatform`（仅授权回调写入）+ 回填改 `hasContactCard && 证据` + merge 存量迁移。
+- **分支/提交**：`personal/zz/no-auth` `68d91457c`；已合 `release/test-pwa`（merge `2ebfda055`），push 完成。
+- **文档**：`packages/app-pwa/docs/社媒交换逻辑调整-女端技术方案.md`（A2/风险表/Q5/状态行）已同步；踩坑沉淀见知识库 `troubleshooting/sitin4.1-ce-social-auth.md`。
+
 ## 备注
 
 - 详细应用清单 / 线上域名见仓库 README「可部署应用」表。
