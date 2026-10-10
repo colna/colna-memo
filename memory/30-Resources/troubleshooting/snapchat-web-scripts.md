@@ -265,3 +265,10 @@ DM listener `diffAndReport` 逻辑:未读下 status/timestamp 变化就重报。
 - **现象**:`call`/未接来电 的后端回复已生成,但 `sendMessage` 30s `ELEMENT_TIMEOUT` 发不出去。
 - **真因**:带「呼叫中/未接来电」的会话打开后,Snapchat 把页面**弹回收件箱**(`url=/web, inChat=false`),`checkChatPageLoaded` 只轮询输入框 `div[role="textbox"][contenteditable="true"]` → 死等超时。**和 DM 去重无关**(曾被误当去重问题,白删了一轮去重)。
 - **未修 follow-up 方向**:`checkChatPageLoaded` 识别通话 UI / URL 被弹回 `/web` 时**快速失败**;或 `sendMessage`/`getChatMessages` 超时后**自动重导航一次**(通话结束后即可进)。
+
+## 登录页联合品牌脚本（login co-brand）三坑（2026-10-09）
+
+- **上传链只扫 `actions/` + `methods/`**：`upload-all.mjs` 的 manifest 不扫 `assets/`，素材模块（PNG→data URI 生成物）必须落 `actions/`，否则上传静默漏掉。`scripts/build.mjs` 的 GROUPS.login 里顺序是 asset→action→IIFE，`SCRIPT_GROUP_MAP` 各平台单独维护。
+- **IG 页面 CSP 拦注入**：`addScriptTag({content})` 被 `script-src` CSP 拦截。用 `page.evaluate(fn, arg)` / 字符串表达式走 CDP Runtime 注入绕过（等价 Android 原生 `evaluateJavascript`）；注入 fn 必须自包含，不能闭包引用 Node 侧变量。
+- **SC 页面加载慢**：首次可达 6s 输入框还没渲染出来，IIFE 的 `MutationObserver` 重试（400ms 防抖 + 120s 上限）不是装饰，是必须项。
+- 素材侧坑（Figma group 导出丢子元素）见 [[figma-export-group-missing-elements]]。
