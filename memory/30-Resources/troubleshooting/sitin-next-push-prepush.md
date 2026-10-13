@@ -65,3 +65,12 @@ git checkout <base> && npx turbo run build --filter=<失败的包> --force
 - **现象**:`git commit` 过了 pre-commit(lint+circular)却在 commit-msg 报 `found 1 problems`,`npx commitlint` 显示 `subject must not be sentence-case, start-case, pascal-case, upper-case [subject-case]`。
 - **根因**:subject 以**大写英文词开头**(如 `fix(app-pwa): CE 完单...`,`CE` 触发 upper-case)。中文开头 / 小写英文开头都 OK。
 - **修法**:subject 首词用中文或小写(`fix(app-pwa): 完单按...`)。body 里的大写词(IG/SC/CE)不受限。
+
+## 2026-10-12:`release/test-sp` 有 6 个 v3 存量失败测试(每次 push 都被全仓 pre-push 拦)
+
+- **现象**:push `release/test-sp`(哪怕只 cherry-pick 2~3 个无关 commit)被全仓 pre-push 拦,固定挂 6 个:
+  `ig-websocket.adapter` / `identity` / `behavior.service` / `todo-factory` / `ce-kafka.adapter` / `todo-scheduler` —— 全部在 **app-social-proxy-server v3 目录**。
+- **示例**:`todo-factory` 断言 `payload.userIgHandle === 'alice'` 实收 `undefined`。
+- **判定**:与本次改动零交集(personal 分支同改动全绿)→ 按既有授权惯例 `--no-verify` push。
+- **注意**:别用 `grep | head` 数失败数(当时先报 2 个,全量看是 6 个)。
+- **影响**:该分支后续 push 均需绕过或修复;建议相关同学清理或加 jest ignore。
