@@ -71,7 +71,7 @@ headers：`content-type: application/x-www-form-urlencoded`、`x-csrftoken`、`x
 - 环境：桌面 Chrome，DevTools Console；图片为 canvas 现场生成的 1080x1080 JPEG（40.6KB）。
 - 上传：`POST /rupload_igphoto/fb_uploader_1791775720937` → 200 `{"upload_id":"1791775720937","status":"ok"}`。
 - 创建：configure → 200，media `4006027583603056138_43150596056`（测试帖，caption `sp probe test … (ignore)`）。
-- 未验证：多图 carousel / story；桌面 web 官方照片发帖 UI 是否同参数（本次按手机 web 抓包复刻）。
+- 未验证：story；桌面 web 官方照片发帖 UI 是否同参数（本次按手机 web 抓包复刻）。多图 / 图+视频 carousel 已于 2026-10-13 实测抓包（见下文「carousel」节）。
 
 ## 视频（Reels）发帖流程（2026-10-12 实测，桌面 Chrome）
 
@@ -94,11 +94,26 @@ headers：`content-type: application/x-www-form-urlencoded`、`x-csrftoken`、`x
 - 封面帧获取：页面内 `<video>` + canvas 抽帧 → JPEG blob（无需用户上传封面）
 - configure 的错误响应（如 408）可能带 `Access-Control-Allow-Origin: *`，在 `credentials: include` 下被浏览器拒 → 表现为 CORS 报错，勿误判为上传失败
 
+## 多图 / 图+视频 carousel（2026-10-13 实测抓包）
+
+「图 + 视频」混发手动抓包校准（对应脚本 `createPost` 的 carousel 分支）：
+
+- 每个 child 独立上传、独立 `upload_id`：
+  - 图片 child 走 `i.instagram.com/rupload_igphoto`，rupload-params 干净版 `{"media_type":1,...}`
+  - 视频 child 的封面帧走 `rupload_igphoto`，`{"media_type":2,...}`
+- 创建走 `POST /api/v1/media/configure_sidecar/`，与 configure 差异：
+  - **JSON body**（非 form-urlencoded），带 `children_metadata: [{upload_id}, …]`
+  - **`client_sidecar_id` 独立生成**（与各 child 的 upload_id 不同）
+  - **`x-ig-app-id: 936619743392459`**（web 端 id；单图/视频用的 `1217981644879628` 不适用）
+  - 202 轮询同 `configure_to_clips`
+- 遗留不确定：carousel 内视频 child 的 `rupload_igvideo` params（clips/sidecar 标志）无抓包，按「干净版」推断；`x-ig-www-claim` 省略（单图经验不强制）。
+- 脚本入口：`createPost({files, caption, postKey})` —— 1 视频 → Reels 四步；1 图 → 照片 configure；2+ → 本 carousel 流程。`videoUrl` / `imageBase64` 入参已移除。
+
 ## CSP 限制（重要）
 
 IG 页面 `connect-src` 为白名单（instagram / facebook / fbcdn / cdninstagram 等系），**页面内 fetch 任何第三方 URL 都会被 CSP 直接拦截**（实测 `file.archat.us` 被拒）。因此：
 
-- 素材输入的生产路径是 **base64 传入**（或容器原生能力下载），`imageUrl`/`videoUrl` 仅适用于白名单域
+- 素材输入的生产路径：URL 经 SP `/script/media-chunk` 分片接口 + 容器原生 `requestHttp` 拉取（绕开页面 fetch）；脚本入参统一为 `files` 数组
 - 调试时可用「拖拽文件」替代（本地文件不走网络，不受 CSP 限制）
 
 ## 注意

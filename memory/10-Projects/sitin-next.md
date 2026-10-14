@@ -50,14 +50,14 @@ pnpm test      # 运行测试
 - **分支/提交**：`personal/zz/no-auth` `68d91457c`；已合 `release/test-pwa`（merge `2ebfda055`），push 完成。
 - **文档**：`packages/app-pwa/docs/社媒交换逻辑调整-女端技术方案.md`（A2/风险表/Q5/状态行）已同步；踩坑沉淀见知识库 `troubleshooting/sitin4.1-ce-social-auth.md`。
 
-### IG 发帖脚本（createImagePost / createVideoPost）+ Insights 抓取 — 直调私有接口方案（2026-10-12）
+### IG 发帖脚本（createPost：图 / 视频 / 图+视频 carousel）+ Insights 抓取 — 直调私有接口方案（2026-10-12；10-13 更名并扩展）
 
 - **背景**：SP 脚本新增「不点页面、直调 IG web 私有接口」发照片/视频帖（Reels），并抓取帖子 Insights；替代脆弱的 DOM 点击方案（接口方案不受页面改版影响）。
-- **脚本**（`packages/app-ins-scripts`）：`createImagePost({imageUrl|imageBase64, caption})` 两步（`rupload_igphoto` → `media/configure`）；`createVideoPost({videoUrl, caption})` 四步 + 转码轮询（GET 初始化 → `rupload_igvideo` → 封面抽帧上传 → `configure_to_clips`，202 轮询 2.5s）；素材经分片接口 + 原生 `requestHttp` 拉取（IG 页面 CSP 拦第三方 fetch，实测无法绕过）；`getMediaInsights({mediaId})` 幂等导航 + Resume 续跑 + 抓完跳回首页；两发帖方法返回 `mediaPk`（insights 主键）。
+- **脚本**（`packages/app-ins-scripts`）：`createPost({files, caption, postKey})` 按素材自动分派——1 视频 → Reels 四步 + 转码轮询（GET 初始化 → `rupload_igvideo` → 封面抽帧上传 → `configure_to_clips`，202 轮询 2.5s）；1 图 → 照片两步（`rupload_igphoto` → `media/configure`）；2+ → carousel（逐项分片拉取 → magic bytes 嗅探 → 图/视频各自独立 `upload_id` 上传 → `configure_sidecar` 202 轮询）。`videoUrl` / `imageBase64` 入参已移除（`files` 唯一入口）；`postKey` 原样透传，随 result 与 `sp_create_post` 埋点返回；素材经分片接口 + 原生 `requestHttp` 拉取（IG 页面 CSP 拦第三方 fetch，实测无法绕过）；`getMediaInsights({mediaId})` 幂等导航 + Resume 续跑 + 抓完跳回首页；发帖返回 `mediaPk`（insights 主键）。新增错误码 `MEDIA_LOAD_FAILED` / `IMAGE_UPLOAD_FAILED`。
 - **服务端**（`app-social-proxy-server`）：新增 `GET /script/media-chunk?url=&offset=&size=`（base64 文本分片，默认 256KB/上限 512KB，按 url 缓存 + 并发去重 + FIFO 淘汰 3 条）；⚠️ 无鉴权 + 任意 URL 拉取（SSRF 面），对外暴露前需评估。
-- **分支/PR**：`personal/zz/ins-create-post-script` → **PR #1227**（base `feature/sp`）OPEN；相关 commit 已 cherry-pick 进 `release/test-sp`。功能已同步 GraceChat assets（`haven/src/main/assets/scripts/instagram/`，未提交，需重建/热更生效）。
-- **待办**：PR #1227 review；真机容器联调 createVideoPost 分片链路；`upload-all.mjs` 上传需有效 `--token`（默认 super_admin 凭据已失效）。
-- **沉淀**：`30-Resources/instagram-create-post-api.md`（照片/视频全链路、headers、CSP、转码轮询）。
+- **分支/PR**：`personal/zz/ins-create-post-script` → **PR #1227**（base `feature/sp`）OPEN（已含更名 createPost 与 postKey 改动，10-13 push `f0b18b325` / `09572a528`）；相关 commit 已 cherry-pick 进 `release/test-sp`。功能已同步 GraceChat assets（`haven/src/main/assets/scripts/instagram/`，未提交，需重建/热更生效）。
+- **待办**：PR #1227 review；真机容器联调 createPost 分片链路（依赖 SP `/script/media-chunk` 部署 test）；carousel 视频 child `rupload_igvideo` params 待补抓验证；`upload-all.mjs` 上传需有效 `--token`（默认 super_admin 凭据已失效）。
+- **沉淀**：`30-Resources/instagram-create-post-api.md`（照片/视频/carousel 全链路、headers、CSP、转码轮询）。
 
 ## 备注
 
