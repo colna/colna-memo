@@ -118,3 +118,30 @@ $ git ls-files "packages/app-ins-scripts/dist/instagram" | wc -l
 - **收口 = 让树完全一致**:对残留文件 `git checkout origin/feature/pwa -- <file>` 逐个取 feature 版,`commit --amend`。
 - **验证用树哈希**:`git rev-parse HEAD^{tree}` == `git rev-parse origin/feature/pwa^{tree}` 相等 = 内容(含 submodule 指针)完全一致,比 `git diff --stat` 更硬。
 - 代价:被 merge 的分支(test)独有**内容**被覆盖(其独有 commit 只剩历史)。push 前告知用户哪些独有改动会被盖(尤其非临时的真实修复)。push 是 fast-forward(加一个合并提交),非破坏。
+
+## criss-cross 整分支合并:git 会静默保留「对方已删除」的文件(2026-10-14,feature/sp → release/test-sp)
+
+场景:release/test-sp merge origin/feature/sp(两个 merge base:`1d523b5e0` + `83ed48be7`)。feature/sp 早已删除 `createImagePost.js`/`createVideoPost.js`(f0b18b325 合并成 `createPost`),但 **merge 后旧文件原样留在工作区**,`--diff-filter=U` 也看不到它们——modify/delete 没报冲突,是它静默按 HEAD 侧保留。
+
+**发后必做(一条命令)**:列出「HEAD 有、对方没有」的路径,逐个查是否仍在 index:
+
+```bash
+comm -23 <(git ls-tree -r --name-only HEAD | sort) <(git ls-tree -r --name-only origin/feature/sp | sort) > /tmp/head-only.txt
+while IFS= read -r f; do git ls-files --error-unmatch "$f" >/dev/null 2>&1 && echo "KEPT $f" || echo "GONE $f"; done < /tmp/head-only.txt
+```
+
+判据:**GONE 的 = 对方显式删除,直接接受;KEPT 的才要审**。再查 release 线自 merge-base 起是否动过这些文件(`git log --oneline <base>..HEAD -- <paths>`):本次 114 个 HEAD-only 文件里 release 线只动过 3 个(即那两个脚本+测试),其余 KEPT 全属对方显式删除后按对方语义执行 `git rm`。
+
+**lockfile 取证法**:合并后所有 `package.json` 与对方分支 diff 为空(`git diff <对方> -- '**/package.json'` 逐文件核)⇒ 直接取对方的 `pnpm-lock.yaml`,不必跑 `pnpm install`(网络/元数据噪声全免)。
+
+**tsc 基线对照(worktree 版)**:证明「测试文件类型错误是否我引入」——把 worktree 建在**仓库目录内部**(如 `.tsc-check-xxx/`),`node_modules` 沿父目录查找直接命中主仓、无需 install:
+
+```bash
+git worktree add -f .tsc-check-x origin/feature/sp
+packages/<pkg>/node_modules/.bin/tsc -p .tsc-check-x/packages/<pkg>/tsconfig.json --noEmit   # ⚠️ 用包内 tsc(本例 5.9.3),根 node_modules 的 tsc(6.x)会因 deprecated 配置直接报错
+git worktree remove --force .tsc-check-x
+```
+
+生产口径验证用 `tsc -p tsconfig.build.json`(nest build 同款,排除 `**/__tests__/**` 与 `*.spec.ts`)——测试文件的既有类型错误不挡 build。
+
+**pre-push 命中缓存后可行**:`pnpm test --affected --dry=json` 先看 `cache.status` 分布(本次 118 test 任务 109 HIT / 65 build 任务 64 HIT),再决定直接 push 还是找用户授权 `--no-verify`。2026-10-14 本次带 hook 推送通过,未用 `--no-verify`。
