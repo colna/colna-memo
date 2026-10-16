@@ -41,3 +41,10 @@
 
 飞书 wiki《Aliyun cli配置oauth登录》：https://presence.feishu.cn/wiki/RW7Uwr57ZiunYIkgbB0cYnPAnIe
 （内嵌表格即站点对照表：0=CN aliyun.com / 1=INTL alibabacloud.com）
+
+## 坑 4：子进程 spawn aliyun 时 env 丢了 HOME → panic（2026-10-16 实战踩坑）
+
+- **现象**：STS 过期后首次触发自动刷新失败，报 `panic: mkdir /.aliyun: read-only file system`（aliyun CLI 把配置路径解析到了根目录）。
+- **根因**：Node `execFile` 的 `env` 选项是**整体替换**子进程环境（不是叠加）——我们用「凭证 + PATH」构造最小 env 时没带 `HOME`，aliyun CLI 靠 `HOME` 定位 `~/.aliyun/config.json`，缺失即 panic。**潜伏性**：STS 有效期内走直读路径从不触发刷新，所以这个 bug 直到过期后第一次刷新才暴露。
+- **修法**：spawn 环境固定附带 `PATH` + `HOME`（见 social-proxy-agent `skills.ts` 的 `execFileAsync` 注释）；回归测试：假脚本打印 `process.env.HOME` 断言透传。
+- **教训**：任何「最小 env spawn CLI」的封装，都要过一遍工具对 `HOME/PATH` 的隐式依赖；集成测试要覆盖「过期/降级路径」而不只是 happy path。
