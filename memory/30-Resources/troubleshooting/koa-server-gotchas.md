@@ -17,3 +17,4 @@ tags: [koa, typescript, zod, node, koa-agent, troubleshooting]
 5. **zod v4 用顶层格式**：`z.url()` / `z.coerce.number()` 在 4.6.x 可用；校验 `process.env` 时用默认 strip（不要 `.strict()`，env 里全是无关变量）；报错里 `issue.path.join('.')` 输出字段名友好。
 6. **TS NodeNext ESM + 构建**：源码相对导入写 `.js` 后缀（tsx / vitest / tsc 三边都能解析），`tsconfig.build.json` 显式 exclude `**/*.test.ts` 与测试基建目录，`node dist/index.js` 才能直接跑。
 7. **入口自动执行守卫**：`import.meta.url === pathToFileURL(process.argv[1]).href` 判断是否直接运行（tsx 与 node dist 都成立），被测试 import 时不会触发 `main()`。
+8. **CORS 预检的「测试盲区」**：`Access-Control-Allow-Methods` 没列全（如只放行 GET/POST，忘了 DELETE）时——**Node 集成测试用 `fetch` 不走 CORS，全绿**；浏览器端预检被拦、请求静默失败（表现：前端"删不掉"，服务端无日志）。修法：方法清单与路由实际使用对齐（GET/POST/DELETE/OPTIONS），并在测试里对预检响应头做断言（`access-control-request-method: DELETE`）。教训：涉及浏览器专属行为（CORS/预检/存储）的功能，集成测试通过 ≠ 浏览器可用。
