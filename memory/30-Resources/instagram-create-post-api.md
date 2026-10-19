@@ -135,7 +135,7 @@ IG 页面 `connect-src` 为白名单（instagram / facebook / fbcdn / cdninstagr
 - **`x-ig-www-claim` 不是 cookie**：IG web bundle 的 `PolarisWWWClaim` 把它存在 **sessionStorage 的 `www-claim-v2`**（localStorage 兜底），取不到时官方默认发 `"0"`；脚本已按此读取。缺该头可能是 configure 403 的原因之一
 - 403 处理：脚本从响应头 `x-ig-set-www-claim` 动态刷新 claim 并重试一次；configure 显式设置 `referrer: https://www.instagram.com/create/story/`（真实抓包同 referer）；视频补「先 configure 封面（不带 ?video=1、不带 link）→ 再 configure 视频」两步。若仍 403，优先看响应体：可能是限流/风控/账号权限，而非参数问题。
 - 图片必须归一化：Story 比例要求约 9/16~3/4；脚本统一转 1080x1920 JPEG（黑底居中），可避免小图/横图 configure 500
-- 视频：`rupload_igvideo` → 封面上传（`media_type=2`）→ `configure_to_story/?video=1`（视频 web 链路未抓包验证；202 需轮询）
+- 视频（按 instagrapi 成熟流程调整，未实测）：`rupload_igvideo` 带上 `extract_cover_frame=1`、`content_tags=has-overlay`、`for_album=1`（由服务端抽封面）→ 直接 `configure_to_story/?video=1`，不再单独上传/configure 封面；configure 追加 `length`、`poster_frame_index=0`、`audio_muted=false`、`filter_type=0`、`video_result=deprecated`、`original_media_type=video`。202 仍轮询。
 - 失败记录：先前按 `i.instagram.com` + `signed_body`（HMAC key v4）复刻 mobile private API，图片上传成功但 `configure_to_story` 返回 500（`something went wrong during media publish`），已放弃该路径
 - 坑：`rupload_igphoto` / `rupload_igvideo` 的 CORS 白名单**不含** `X-CSRFToken`、`X-Requested-With`；跨域上传带上会在预检失败。上传头只带 `X-ASBD-ID` / `X-IG-App-ID` / `X-Instagram-AJAX` / `X-Web-Session-ID` + `X-Entity-*` / `Offset` / `X-Instagram-Rupload-Params`；CSRF 头只给 configure。
 - 状态：`node --check` 通过；按抓包重写后尚未重新实测。
