@@ -131,3 +131,4 @@ IG 页面 `connect-src` 为白名单（instagram / facebook / fbcdn / cdninstagr
 - 视频：`rupload_igvideo` → 封面上传（`media_type=2`）→ configure 封面（不带 `?video=1`）→ `configure_to_story/?video=1`；202 / `Transcode not finished` 需轮询
 - 参考实现：`jackwener/opencli` 的 `clis/instagram/_shared/private-publish.js`（同签名/同 payload）
 - 状态：语法检查通过（`node --check`），尚未在真实账号上端到端实测；桌面 web 无 Story 入口，只能走接口或手机 App。
+- 坑：`rupload_igphoto` / `rupload_igvideo` 的 CORS 白名单**不含** `X-CSRFToken`、`X-Requested-With`；上传请求带上会在预检直接失败（`x-requested-with is not allowed`）。上传头只带 `X-ASBD-ID` / `X-IG-App-ID` / `X-Instagram-AJAX` / `X-Web-Session-ID` + `X-Entity-*` / `Offset` / `X-Instagram-Rupload-Params`；CSRF 头只给 configure。
