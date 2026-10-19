@@ -121,3 +121,13 @@ IG 页面 `connect-src` 为白名单（instagram / facebook / fbcdn / cdninstagr
 - 照片上传 www 同源即可；视频流程走 `i.instagram.com`（跨子域但 CORS 已允许，实测通过）。
 - 私有接口 + 风控：发内容是 IG abuse 高发区，自动化发帖比评论更敏感，频率与行为需克制。
 - 与 DOM 点击方案对比：接口方案不受页面改版影响、无「本地文件选择」限制（二进制可直接 fetch 上传）；DOM 方案更接近真人路径但脆弱。
+
+## Story（configure_to_story）测试脚本（2026-10-19，待实测）
+
+脚本：`packages/app-ins-scripts/scripts/test-ins-story.js`（DevTools Console 直接粘贴，图片/视频均支持）。
+
+- 底层按 mobile private API 复刻：`POST https://i.instagram.com/api/v1/media/configure_to_story/`，body 为 `ig_sig_key_version=4&signed_body=<hmac_sha256>.<json>`（签名 key 见脚本；公开 IG 客户端 key）
+- payload 关键字段：`source_type=4`、`upload_id`、`story_media_creation_date`、`client_shared_at`、`client_timestamp`、`configure_mode=1`、`edits/extra`、`jazoest`、`_csrftoken/_uid/_uuid/device`
+- 视频：`rupload_igvideo` → 封面上传（`media_type=2`）→ configure 封面（不带 `?video=1`）→ `configure_to_story/?video=1`；202 / `Transcode not finished` 需轮询
+- 参考实现：`jackwener/opencli` 的 `clis/instagram/_shared/private-publish.js`（同签名/同 payload）
+- 状态：语法检查通过（`node --check`），尚未在真实账号上端到端实测；桌面 web 无 Story 入口，只能走接口或手机 App。
