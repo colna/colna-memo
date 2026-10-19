@@ -122,13 +122,18 @@ IG 页面 `connect-src` 为白名单（instagram / facebook / fbcdn / cdninstagr
 - 私有接口 + 风控：发内容是 IG abuse 高发区，自动化发帖比评论更敏感，频率与行为需克制。
 - 与 DOM 点击方案对比：接口方案不受页面改版影响、无「本地文件选择」限制（二进制可直接 fetch 上传）；DOM 方案更接近真人路径但脆弱。
 
-## Story（configure_to_story）测试脚本（2026-10-19，待实测）
+## Story（configure_to_story）测试脚本（2026-10-19，按真实抓包修正）
 
 脚本：`packages/app-ins-scripts/scripts/test-ins-story.js`（DevTools Console 直接粘贴，图片/视频均支持）。
 
-- 底层按 mobile private API 复刻：`POST https://i.instagram.com/api/v1/media/configure_to_story/`，body 为 `ig_sig_key_version=4&signed_body=<hmac_sha256>.<json>`（签名 key 见脚本；公开 IG 客户端 key）
-- payload 关键字段：`source_type=4`、`upload_id`、`story_media_creation_date`、`client_shared_at`、`client_timestamp`、`configure_mode=1`、`edits/extra`、`jazoest`、`_csrftoken/_uid/_uuid/device`
-- 视频：`rupload_igvideo` → 封面上传（`media_type=2`）→ configure 封面（不带 `?video=1`）→ `configure_to_story/?video=1`；202 / `Transcode not finished` 需轮询
-- 参考实现：`jackwener/opencli` 的 `clis/instagram/_shared/private-publish.js`（同签名/同 payload）
-- 状态：语法检查通过（`node --check`），尚未在真实账号上端到端实测；桌面 web 无 Story 入口，只能走接口或手机 App。
-- 坑：`rupload_igphoto` / `rupload_igvideo` 的 CORS 白名单**不含** `X-CSRFToken`、`X-Requested-With`；上传请求带上会在预检直接失败（`x-requested-with is not allowed`）。上传头只带 `X-ASBD-ID` / `X-IG-App-ID` / `X-Instagram-AJAX` / `X-Web-Session-ID` + `X-Entity-*` / `Offset` / `X-Instagram-Rupload-Params`；CSRF 头只给 configure。
+- 真实抓包（手机 web 模拟，`referer: /create/story/`）：**同源 www + 普通 form，无签名**
+  - `POST https://www.instagram.com/rupload_igphoto/fb_uploader_<upload_id>`（`media_type=1`、`x-ig-app-id: 1217981644879628`）
+  - `POST https://www.instagram.com/api/v1/media/configure_to_story/`
+- configure form（照抄抓包）：`caption=&configure_mode=1&share_to_facebook=&share_to_fb_destination_id=&share_to_fb_destination_type=USER&upload_id=<id>&jazoest=<...>&fb_dtsg=<...>`
+- **jazoest = "2" + charCodeSum(csrftoken)**（抓包值 22722 与 `AKLtLGXaj...` 的字符和 22720 完全吻合；注意不是 dtsg）
+- headers：`x-ig-app-id: 1217981644879628`、`x-asbd-id: 359341`、`x-csrftoken`、`x-instagram-ajax`、`x-requested-with`、`x-web-session-id`（可能形如 `:6017b3:h13fp7`）；抓包还有 `x-ig-www-claim`（HttpOnly cookie，脚本未带，待验证是否必需）
+- 图片必须归一化：Story 比例要求约 9/16~3/4；脚本统一转 1080x1920 JPEG（黑底居中），可避免小图/横图 configure 500
+- 视频：`rupload_igvideo` → 封面上传（`media_type=2`）→ `configure_to_story/?video=1`（视频 web 链路未抓包验证；202 需轮询）
+- 失败记录：先前按 `i.instagram.com` + `signed_body`（HMAC key v4）复刻 mobile private API，图片上传成功但 `configure_to_story` 返回 500（`something went wrong during media publish`），已放弃该路径
+- 坑：`rupload_igphoto` / `rupload_igvideo` 的 CORS 白名单**不含** `X-CSRFToken`、`X-Requested-With`；跨域上传带上会在预检失败。上传头只带 `X-ASBD-ID` / `X-IG-App-ID` / `X-Instagram-AJAX` / `X-Web-Session-ID` + `X-Entity-*` / `Offset` / `X-Instagram-Rupload-Params`；CSRF 头只给 configure。
+- 状态：`node --check` 通过；按抓包重写后尚未重新实测。
