@@ -34,9 +34,13 @@ tags: project, agent, social-post, koa, langgraph, nextjs
 
 ## 状态（2026-10-19 10:55）
 
-- 测试：server 93 + web 27 = 120 passed；lint / typecheck / build 全过。
-- 本地 commit：`85ae4b9`、`cc0bb60`、`dd70925`、`a2f9a0c`、`4fef129`、`6afdbc2`、`0e7362a`。
+- 测试：server 94 + web 27 = 121 passed；lint / typecheck / build 全过。
+- 本地 commit：`85ae4b9`、`cc0bb60`、`dd70925`、`a2f9a0c`、`4fef129`、`6afdbc2`、`0e7362a`、`6e7bf53`。
 - 未配置 GitHub remote；未做线上部署。
+
+## 修复记录
+
+- 11:05：CORS 预检漏 PUT 导致设置保存被拦截；SqliteSaver 懒建表导致空库 `/agent/threads` 500。均已修复并加回归测试。
 
 ## 已知限制
 
