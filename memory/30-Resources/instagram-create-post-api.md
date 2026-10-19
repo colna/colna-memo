@@ -137,3 +137,4 @@ IG 页面 `connect-src` 为白名单（instagram / facebook / fbcdn / cdninstagr
 - 失败记录：先前按 `i.instagram.com` + `signed_body`（HMAC key v4）复刻 mobile private API，图片上传成功但 `configure_to_story` 返回 500（`something went wrong during media publish`），已放弃该路径
 - 坑：`rupload_igphoto` / `rupload_igvideo` 的 CORS 白名单**不含** `X-CSRFToken`、`X-Requested-With`；跨域上传带上会在预检失败。上传头只带 `X-ASBD-ID` / `X-IG-App-ID` / `X-Instagram-AJAX` / `X-Web-Session-ID` + `X-Entity-*` / `Offset` / `X-Instagram-Rupload-Params`；CSRF 头只给 configure。
 - 状态：`node --check` 通过；按抓包重写后尚未重新实测。
+- Link sticker（未实测）：configure form 追加 `story_sticker_ids=link_sticker_default` + `tap_models=[{"type":"story_link","link_type":"web","url":"https://wa.me/...","x":0.497,"y":0.768,"width":0.225,"height":0.042,...}]`（字段来自 instagrapi/InstagramApiSharp）；脚本已支持 `__insTestStory.pick(link)`，链接需带 `https://`，WhatsApp 建议带国家码。旧的 `media/validate_reel_url/` 现已 404，未做预校验。
