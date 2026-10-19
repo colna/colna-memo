@@ -131,7 +131,8 @@ IG 页面 `connect-src` 为白名单（instagram / facebook / fbcdn / cdninstagr
   - `POST https://www.instagram.com/api/v1/media/configure_to_story/`
 - configure form（照抄抓包）：`caption=&configure_mode=1&share_to_facebook=&share_to_fb_destination_id=&share_to_fb_destination_type=USER&upload_id=<id>&jazoest=<...>&fb_dtsg=<...>`
 - **jazoest = "2" + charCodeSum(csrftoken)**（抓包值 22722 与 `AKLtLGXaj...` 的字符和 22720 完全吻合；注意不是 dtsg）
-- headers：`x-ig-app-id: 1217981644879628`、`x-asbd-id: 359341`、`x-csrftoken`、`x-instagram-ajax`、`x-requested-with`、`x-web-session-id`（可能形如 `:6017b3:h13fp7`）；抓包还有 `x-ig-www-claim`（HttpOnly cookie，脚本未带，待验证是否必需）
+- headers：`x-ig-app-id: 1217981644879628`、`x-asbd-id: 359341`、`x-csrftoken`、`x-instagram-ajax`、`x-requested-with`、`x-web-session-id`（可能形如 `:6017b3:h13fp7`）、`x-ig-max-touch-points`（=navigator.maxTouchPoints）
+- **`x-ig-www-claim` 不是 cookie**：IG web bundle 的 `PolarisWWWClaim` 把它存在 **sessionStorage 的 `www-claim-v2`**（localStorage 兜底），取不到时官方默认发 `"0"`；脚本已按此读取。缺该头可能是 configure 403 的原因之一
 - 图片必须归一化：Story 比例要求约 9/16~3/4；脚本统一转 1080x1920 JPEG（黑底居中），可避免小图/横图 configure 500
 - 视频：`rupload_igvideo` → 封面上传（`media_type=2`）→ `configure_to_story/?video=1`（视频 web 链路未抓包验证；202 需轮询）
 - 失败记录：先前按 `i.instagram.com` + `signed_body`（HMAC key v4）复刻 mobile private API，图片上传成功但 `configure_to_story` 返回 500（`something went wrong during media publish`），已放弃该路径
