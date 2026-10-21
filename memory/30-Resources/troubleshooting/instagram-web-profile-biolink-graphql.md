@@ -63,6 +63,12 @@ tags: troubleshooting, instagram, graphql, profile, biolink, web
 - `nasa` -> pk `528817151` -> 5 条 bio_links，第一条 `https://www.nasa.gov`
 - `xlc7637` -> pk `76449409072` -> `bio_links = []`
 
+## 不进入 profile 页
+
+2026-10-21 复测：停留在 `/direct/inbox/`，抓当前页任意一次 `/api/graphql` 请求作为模板（复用 `csrftoken`/`lsd`/`fb_dtsg`/`__dyn`/`__csr`/`__hsdp`/`__sjsp`/`av` 等字段），再按上面的两步 doc id 调用，**无需导航到 profile 页**，`shangbin2026` 同样返回 `https://wa.me/48888800000`。
+
+实现要点：在页面里 monkey-patch `fetch`，缓存最近一次 GraphQL 的 headers + form body；调用时 clone 这份 body，只替换 `fb_api_req_friendly_name`、`doc_id`、`variables`、`__req`。`PolarisProfilePageContentQuery` 的 `__relay_internal__pv__*` 可沿用模板/硬编码值。
+
 ## 不可用 / 踩坑
 
 - `GET /api/v1/users/web_profile_info/?username=...` -> 429（返回 HTML Page Not Found）
