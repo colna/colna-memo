@@ -82,3 +82,19 @@ tags: troubleshooting, instagram, graphql, profile, biolink, web
 - **最稳**：在 WebView/页面上下文里 `fetch('/api/graphql')`，Cookie 和 CSRF 自动带上；从页面读取 `csrftoken`、`lsd`、`fb_dtsg` 等字段。
 - **服务端直连**：需要维护 sessionid + csrftoken + 整套 GraphQL 表单 token，且 token 会随页面刷新变化；不如 WebView 内调用稳。
 - 两步请求都走 `https://www.instagram.com/api/graphql`，不要用 `i.instagram.com` 私有接口。
+
+## 无模板兜底（页面加载后再注入）
+
+2026-10-21 实测：页面加载完再注入脚本，`interceptUserInfo` 没有捕获到 GraphQL 模板，仍可直接从页面模块生成请求：
+
+- `DTSG.getToken()` -> `fb_dtsg`
+- `LSD.token` -> `lsd`
+- `SiteData.haste_session` -> `__hs`
+- `SiteData.client_revision` -> `__rev`
+- `SiteData.comet_env` -> `__comet_req`
+- `SiteData.__spin_r` / `__spin_b` / `__spin_t` -> 同名表单字段
+- `CurrentUser.getPossiblyNonFacebookUserID()` -> `av`
+- `CurrentUser.getAppID()` -> `x-ig-app-id`
+- `jazoest = "2" + sum(charCodes(fb_dtsg))`
+
+最小 body 可省略 `__dyn` / `__csr` / `__hsdp` / `__sjsp` / `__s`；实测 search + profile 都返回 200。脚本优先用模板，模板不存在时走这条 token 兜底，因此不依赖注入时机。
