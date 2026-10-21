@@ -51,3 +51,12 @@ tags: [sitin-next, app-pwa, partnership-ads, 任务, 技术方案]
 - 查询并发由 30s 时间节流改为 `useLockFn` 在途锁:上一轮结束即可再查;回前台、挂载补查、手动 Received 均可触发 `finishTask(2000)`。
 - `getCommonFinishedTasks` 的后端语义已扩展为返回带 `status` 的用户任务,不能再把返回的每条记录都视为完成。当前 `useTask.ts` 未过滤 `status`,会把 `PENDING` 的 2000 标成 finished 并隐藏卡片;前端过滤还是后端恢复只返 FINISHED 尚待定口径。
 - 若卡片未来改成复用通用任务卡,仍须保留 `usePartnershipAds` hook,否则回前台验证闭环会丢失。
+
+## 2026-10-21 扩展：在线时长 + 主页链接任务（2001~2004）
+
+- 需求来源：《自动化发帖 · 规模放量 PRD》`https://presence.feishu.cn/docx/EWhhdbYIzoiELcxyjiDcmV9Hn6d`（需求一/二/四）。
+- 任务：2001 在线 2h（$1）、2002 在线 5h（补 $2）、2003 在线 8h（补 $2，封顶 $5）；2004 IG 主页挂 wa.me 链接（$2，一次性）。授权/未授权都发，仅单价不同；达成后用户手动 Claim。
+- 后端契约（前端按样例实现）：`listAllCommonTasks` 返回 `bizDate` + 每任务 `extra{onlineMs,targetMs,reached,agreed}`；Claim 仍走 `finishUserCommonTask`，2004 由后端经 social-proxy 读主页链接校验。
+- 前端落点：`PartnerAdsSection`（首页 Become a partner 区块）、`usePartnerTasks`、`partnerTasksStore`（只存列表原始快照 + 按 bizDate 的 claimedIds）、`partnerLinkTaskStore`（2004 按钮态）。2004 跳 `instagram://editprofile`，回前台/Received 单次查，不轮询。
+- 关键坑：`taskStore` 会合并 `ListUserCommonTask` 历史完成记录，每日任务第二天会被旧记录标成 finish 永久隐藏 → 伙伴区块改用独立快照 + bizDate；`finishTask` 加 `force` 跳过历史 finish 短路。
+- 待办：proto `extra=9` / `biz_date=4` 需在 presence-io/proto 提 MR；2004 的 wa.me 号码与 4 步引导未提供；需真实后端数据联调。
