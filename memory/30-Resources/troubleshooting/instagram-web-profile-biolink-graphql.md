@@ -101,4 +101,4 @@ tags: troubleshooting, instagram, graphql, profile, biolink, web
 
 ## 扩展：完整 profile
 
-`getProfileInfo` 复用同一组两步 GraphQL，返回 `data.user` 的可见字段：`full_name`、`biography`、`follower_count`、`following_count`、`media_count`、`total_clips_count`、`category`、`profile_pic_url`、`is_verified`、`is_private`、`is_professional_account`、`bio_links`、`external_url`、`pronouns`、`city_name`、`address_street`、`zip` 等；`data.raw` 保留完整 GraphQL user 对象（默认开启，`includeRaw:false` 关闭）。`getProfileBioLink` 为兼容别名。
+`getProfileInfo` 复用同一组两步 GraphQL，参数为 `socialId`（兼容 `username` / `manSocialId`），返回 `data.user` 的可见字段：`full_name`、`biography`、`follower_count`、`following_count`、`media_count`、`total_clips_count`、`category`、`profile_pic_url`、`is_verified`、`is_private`、`is_professional_account`、`bio_links`、`external_url`、`pronouns`、`city_name`、`address_street`、`zip` 等；`data.raw` 保留完整 GraphQL user 对象（默认开启，`includeRaw:false` 关闭）。`getProfileBioLink` 为兼容别名。
