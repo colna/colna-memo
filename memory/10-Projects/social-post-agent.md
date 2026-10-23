@@ -11,7 +11,7 @@ tags: project, agent, social-post, koa, langgraph, nextjs
 ## 基本信息
 
 - 路径：`/Users/colna/WORK/social-post-agent`
-- 技术栈：Koa 3 + zod + LangGraph JS（OpenAI 兼容，默认 DeepSeek）+ next 16 + React 19 + SQLite（better-sqlite3）
+- 技术栈：Koa 3 + zod + LangGraph JS（OpenAI 兼容，默认 DeepSeek）+ Next.js 16.4.2 + React 19 + SQLite（better-sqlite3）
 - 启动：`pnpm install && pnpm dev`；web `http://127.0.0.1:3001`，server `http://127.0.0.1:3000`
 - 数据：`apps/server/data/`（`social-post.sqlite` / `agent.sqlite` / `settings.json`，均 gitignore）
 - 文档：`docs/01~04` + README
@@ -38,6 +38,7 @@ tags: project, agent, social-post, koa, langgraph, nextjs
 - 测试：server 105 + web 27 = 132 passed；lint / typecheck / build 全过。
 - 新增：FB 服务端直连（`facebook.ts` / `facebook-parse.ts`）、Agent 帖子 8 列表格、undici 代理（HTTPS_PROXY/HTTP_PROXY）。
 - 实机 smoke：agent 对话抓取 FB NASA 4 条帖子，输出 8 列表格（封面图片 / 类型 / 文案 / 点赞 / 评论 / 转发 / 时间 / 原帖）。
+- Next.js 安全升级：16.4.0 → 16.4.2（`next upgrade --agent=security` 选到 16.5.0-canary.25，npmmirror 无此版本；改升稳定 16.4.2）。
 - 本地 commit：`85ae4b9`、`cc0bb60`、`dd70925`、`a2f9a0c`、`4fef129`、`6afdbc2`、`0e7362a`、`6e7bf53`、`c322a1a`。
 - 未配置 GitHub remote；未做线上部署。
 
