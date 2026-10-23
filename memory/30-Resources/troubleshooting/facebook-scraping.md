@@ -46,3 +46,15 @@ tags: [troubleshooting, facebook, scraping, crawler]
 ## 附:本机 Python 环境坑
 
 homebrew Python **3.14.6 坏了**(`pyexpat` 符号 `_XML_SetAllocTrackerActivationThreshold` 缺失,pip/ensurepip/venv 全崩)。跑 crawler pytest 用 **`uv venv --python 3.12`** 建干净环境。本工作区跑 Python 测试一律走 uv。
+
+## 2026-10-23 实测：doc_id 已换，浏览器上下文仍可翻页
+
+- 带登录 cookie 请求 `https://www.facebook.com/NASA/`：200，HTML 内嵌 **1 条** Story（`post_id=1664477875047582`，reactions 3166）。
+- 当前首屏 preloader：
+  - `preloaderID=adp_ProfileCometTimelineFeedQueryRelayPreloader_...`
+  - `queryID=39455371677441618`（`ProfileCometTimelineFeedQuery`），variables `count=1`、`userID=100044561550831`。
+- 实际滚动翻页走 **`ProfileCometTimelineFeedRefetchQuery`**，`doc_id=28686798157609476`，variables 含 `count` + 长 `cursor`（`feedLocation=TIMELINE`）。
+- 稳定做法：在已登录页面上下文 `fetch('/api/graphql/', {method:'POST', body: form, credentials:'include'})`，复用页面自己的 refetch form，把 `count` 改 10；实测 200，返回 3 条 Story（`1662401645255205`、`1662377895257580`、`1658876782274358`），`page_info.has_next_page=true`。
+- 仍不建议从 Node/Python raw HTTP 直发：TLS/HTTP2 指纹会触发 `1357054` 软封。浏览器扩展或页面上下文优先。
+- 扩展里 fallback `27002668536074808` 已过时；动态从 preloader 抠 `queryID` 的逻辑仍有效，建议 fallback 改为 `28686798157609476`。
+- 请求仍需 `x-fb-lsd` / `x-fb-friendly-name` / `x-asbd-id=359341`，表单字段沿用页面 refetch 请求（`__dyn/__csr/__hsdp/__hblp/__sjsp/__comet_req/...`）；缺客户端提示字段会 500。
