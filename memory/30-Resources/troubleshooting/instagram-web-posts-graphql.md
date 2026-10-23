@@ -144,3 +144,10 @@ REA 连接已登录 Chrome 抓 `/api/graphql`，并结合 `static.cdninstagram.c
 请求形状（实测）：`POST https://www.instagram.com/api/graphql`，`application/x-www-form-urlencoded`，必带 `fb_api_caller_class=RelayModern`、`fb_api_req_friendly_name=<Op>`、`variables=<JSON>`、`doc_id=<id>`；headers 至少 `x-csrftoken`、`x-fb-lsd`、`x-ig-app-id: 936619743392459`、`x-asbd-id: 359341`、`origin`、`referer`、桌面 Chrome UA、登录 cookie。最稳做法是复用页面真实请求的 headers + form body（现有 `interceptUserInfo` 已缓存模板），只替换 `friendly_name` / `doc_id` / `variables`。
 
 其他 REST：`/api/v1/friendships/create|destroy|approve|ignore/{user_id}/`、`/api/v1/news/inbox/`、`/api/v1/news/inbox_seen/`、`/insights/media/{media_id}/...`、`/api/v1/business/account/convert_account/`、`/api/v1/business/account/get_suggested_categories/`。
+
+## 2026-10-23 补充：全部请求在用户 WebView 内同源发起
+
+- **约束确认**：所有 IG API 均由注入脚本在用户手机 WebView 的 `instagram.com` 页面上下文发起，不走服务端代理，也不把 `sessionid` 传给服务端。
+- **带来的好处**：cookie、`csrftoken`、`fb_dtsg`、`lsd`、UA、`Origin`/`Referer`、设备指纹天然一致；没有 CORS 问题；`executeAction` 不再需要为 API 调用做页面跳转恢复；正常读写不需要 `sessionid` 出设备。
+- **仍需处理**：doc_id / operation 随 IG 构建轮换；token 过期刷新；限流与 `feedback_required`/`checkpoint_required`；一台设备多账号时 `CookieManager` 是全局的，必须保证账号隔离；WebView 后台挂起/被杀后的重试与幂等；CSP/Service Worker 对 `fetch` 的影响；登录、验证码、2FA、消息请求边界、实时 DM、Story link sticker 等 UI/状态流程。
+- **结论**：在“请求只在用户 WebView 内发起”的前提下，核心读写 API 化的可行性比服务端方案更高；仍建议 API-first + DOM fallback，不建议严格 100% API-only。
