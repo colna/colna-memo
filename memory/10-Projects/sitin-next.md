@@ -68,7 +68,7 @@ pnpm test      # 运行测试
 - **验证**：lint/circular/build 通过；真实页面已验证点赞/取消、评论/删除、Insights 20 项、personal→creator 转换，调用均不改变页面 URL。
 - **待收口**：MR !1266 合并状态；Android automation/login/bootstrap 资产已与 build 顺序对齐（38/38）但未 commit/push；sitin-next `build.mjs`、Android 相关改动未提交。
 - **测试环境**：`release/test-sp` 已重置为 `feature/sp` 并合入 getMediaInsights API 改动（merge `cd7a3be82`），旧 tip 保留在 `backup/release-test-sp-20261026-before-reset`；部署后需复测 media-chunk 与 Story `isBake:false`。
-- **2026-10-27 追加**：`followUserById` 改为 GraphQL `usePolarisFollowUserFollowMutation`（doc `27767812149509802`，`target_user_id`）+ pipeline；用户名→pk/关注态复用 `getProfileInfo`；`insGraphql` 增加「真实请求模板优先 + `for (;;);` 前缀剥离」；`executeAction` 把 `followUserById` 加入 `SESSION_ONLY_ACTIONS`。真机（`ins-script-device-test`，账号 `xuzaixing2026`）已验证：`getProfileInfo` 模板路径、`followUserById` 关注 `@instagram` 成功、二次调用 `alreadyFollowing:true`；随后账号触发 IG 人机验证，`@instagram` 关注尚未取关，需完成 CAPTCHA 后恢复。Android assets 已同步（5 个变更）但未 commit/push。
+- **2026-10-27 追加**：`followUserById` 改为 GraphQL `usePolarisFollowUserFollowMutation`（doc `27767812149509802`，`target_user_id`）+ pipeline；用户名→pk/关注态复用 `getProfileInfo`；`insGraphql` 增加「真实请求模板优先 + `for (;;);` 前缀剥离」；`executeAction` 把 `followUserById` 加入 `SESSION_ONLY_ACTIONS`。真机（`ins-script-device-test`，账号 `xuzaixing2026`）已验证：`getProfileInfo` 模板路径、`followUserById` 关注 `@instagram` 成功、二次调用 `alreadyFollowing:true`；随后账号触发 IG 人机验证，`@instagram` 关注尚未取关，需完成 CAPTCHA 后恢复。sitin-next 已提交并 push（`eb1b5f1ca`，MR !1266）；Android assets 已同步（5 个变更）但未 commit/push。
 
 ## 备注
 
