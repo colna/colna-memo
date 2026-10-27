@@ -151,3 +151,27 @@ REA 连接已登录 Chrome 抓 `/api/graphql`，并结合 `static.cdninstagram.c
 - **带来的好处**：cookie、`csrftoken`、`fb_dtsg`、`lsd`、UA、`Origin`/`Referer`、设备指纹天然一致；没有 CORS 问题；`executeAction` 不再需要为 API 调用做页面跳转恢复；正常读写不需要 `sessionid` 出设备。
 - **仍需处理**：doc_id / operation 随 IG 构建轮换；token 过期刷新；限流与 `feedback_required`/`checkpoint_required`；一台设备多账号时 `CookieManager` 是全局的，必须保证账号隔离；WebView 后台挂起/被杀后的重试与幂等；CSP/Service Worker 对 `fetch` 的影响；登录、验证码、2FA、消息请求边界、实时 DM、Story link sticker 等 UI/状态流程。
 - **结论**：在“请求只在用户 WebView 内发起”的前提下，核心读写 API 化的可行性比服务端方案更高；仍建议 API-first + DOM fallback，不建议严格 100% API-only。
+
+## 2026-10-27 补充：`/api/graphql` 的 `for (;;);` 前缀与请求模板
+
+- **现象**：本机已登录 Chrome 内 `fetch('/api/graphql')` 返回
+  `for (;;);{"__ar":1,"error":1357031,...}` 或 `for (;;);{"data":...}`，直接 `JSON.parse` 会报
+  “响应不是合法 JSON”。IG 的 AJAX 响应可能带该防 JSON 劫持前缀，所有 GraphQL 响应解析前应先
+  `if (text.startsWith("for (;;);")) text = text.slice(9)`。
+- **最小 token body 可能被拒**：只用 `DTSG/LSD/PolarisConfig` 拼最小 form body 时，某些会话会返回
+  `error 1357031`（内容不存在）或 `feedback_required`。优先复用 `interceptUserInfo` 捕获的真实
+  GraphQL 请求模板（body + headers），只替换 `fb_api_req_friendly_name` / `doc_id` / `variables` /
+  `__req`；模板里的 `__dyn` / `__hsdp` / `__sjsp` / `__spin_r|b|t` / `x-web-session-id` 等指纹字段
+  不要丢。无模板时再回退到最小 token body。
+- **重放模板**：仅替换上述字段时，`__s`/`__hsdp`/`__sjsp` 可能仍与原请求绑定；若服务端拒绝，需重新
+  捕获一条当前页面的真实请求（导航/刷新/点一次页面动作），不要长期复用旧模板。
+- **`av` 不是 `ds_user_id`**：真实请求的 `av` 是 `CurrentUser.getPossiblyNonFacebookUserID()` 的 17 位
+  ID，`ds_user_id` cookie 是 11 位短 ID；拼 body 时优先用 `CurrentUser`，cookie 只作兜底。
+- **关注接口**：当前线上 profile 关注按钮走
+  `usePolarisFollowUserFollowMutation`（doc `27767812149509802`，`variables={target_user_id}`，
+  响应 `data.xdt_create_friendship.friendship_status.following`）；另有 REST
+  `/api/v1/friendships/create/{target_user_id}/`。用户名→pk 可用
+  `PolarisSearchBoxRefetchableQuery`（doc `27706427925724183`）+ `PolarisProfilePageContentQuery`
+  （doc `28717443601247930`，返回 `friendship_status.following/outgoing_request`）。
+- **风控边界**：`feedback_required` / `error 1357031` 是账号/会话级限制，不是请求体拼错；测试号
+  suspended 时不要继续重试，换号后再验证。

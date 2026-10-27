@@ -68,6 +68,7 @@ pnpm test      # 运行测试
 - **验证**：lint/circular/build 通过；真实页面已验证点赞/取消、评论/删除、Insights 20 项、personal→creator 转换，调用均不改变页面 URL。
 - **待收口**：MR !1266 合并状态；Android automation/login/bootstrap 资产已与 build 顺序对齐（38/38）但未 commit/push；sitin-next `build.mjs`、Android 相关改动未提交。
 - **测试环境**：`release/test-sp` 已重置为 `feature/sp` 并合入 getMediaInsights API 改动（merge `cd7a3be82`），旧 tip 保留在 `backup/release-test-sp-20261026-before-reset`；部署后需复测 media-chunk 与 Story `isBake:false`。
+- **2026-10-27 追加**：`followUserById` 改为 GraphQL `usePolarisFollowUserFollowMutation`（doc `27767812149509802`，`target_user_id`）+ pipeline；用户名→pk/关注态复用 `getProfileInfo`；`insGraphql` 增加「真实请求模板优先 + `for (;;);` 前缀剥离」；`executeAction` 把 `followUserById` 加入 `SESSION_ONLY_ACTIONS`。静态逆向、build、临时 harness 已验证；真实账号验证待换测试号（`shangbin2026` 已 suspended，`xlc` 会话 feedback_required）。Android assets 未同步、未 commit/push。
 
 ## 备注
 
