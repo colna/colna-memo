@@ -94,7 +94,13 @@ assets 里的 `.js` 要进 `JsScriptManager.ASSET_SCRIPT_ORDER` 才会按 build 
 字母序排到 `executeAction` 之后，action 还没挂载就被调度器初始化。`sync-android.mjs` 会按
 `build.mjs` 的 GROUPS 重写并回读校验。
 
-### 9. `likePost` 的 `alreadyLiked` 恒为 false
+### 9. `checkLoginStatus` 返回 `isBanned:true` / `/accounts/suspended/`
+
+`type:2`、`isBanned:true`、`path:/accounts/suspended/` 是 IG 账号级风控，不是脚本异常。
+2026-10-27 测试账号 `shangbin2026` 在连续点赞/评论复测后出现该状态；停止执行、换测试号/申诉，
+不要在同一账号上连续重试，真实链路也不应继续派任务。
+
+### 10. `likePost` 的 `alreadyLiked` 恒为 false
 
 API 版没有先查当前状态，`result.alreadyLiked` 永远是 false。判断是否重复点赞用
 `hasLiked` + 本地页面 `likesDelta` / 已登录 profile 的 `likeState`。`commentPost` 没有去重，
@@ -108,3 +114,5 @@ API 版没有先查当前状态，`result.alreadyLiked` 永远是 false。判断
 - `commentPost` 首次 1149ms，`commentId=18009478151786627`；复测 1653ms，
   `commentId=18153527230534882`；公开页评论数 1 → 2，`og:description` 同步。
 - 测试帖 `https://www.instagram.com/p/Degh6sdE_Sa/`；两条测试评论可用 IG 页面手动删除。
+- **后续状态**：复测 `checkLoginStatus` 时 `shangbin2026` 返回 `isBanned:true` /
+  `path=/accounts/suspended/`，账号被 IG 风控；下次真机测试先换测试号。
