@@ -59,6 +59,16 @@ pnpm test      # 运行测试
 - **待办**：MR !1175 review 合并；`release/test-sp` 的 retry 提交 `f9b3eaf37` **本地未推**（部署测试环境时推）；**真机 media-chunk `HTTP -1` 排查**（原生 OkHttp `SSLHandshakeException: connection closed` 时段性出现——浏览器对比 / 换网络 / VPN 检查 / 服务端网关日志；本机 GitHub 通道同样 TLS 断连佐证链路问题）；真机验证删除帖/收件箱/shortCode；carousel 视频 child `rupload_igvideo` params 补抓；`upload-all.mjs` 上传需有效 `--token`（默认 super_admin 凭据已失效）；工作区 `upload-all.mjs` 有未提交改动（默认 baseUrl dev→prod，外部改动）待确认处理。
 - **沉淀**：`30-Resources/instagram-create-post-api.md`（照片/视频/carousel 全链路、headers、CSP、转码轮询）。
 
+## 进行中 / 待收口
+
+### IG API 收敛：insGraphql + comment/like（2026-10-26）
+
+- **分支 / MR**：`feature/sp-ins-comment-like-api` → `feature/sp`，MR !1266；提交 `a5fd42c91`（commentPost/likePost API + pipeline）与 `43c8ac616`（getMediaInsights/toProfessionalAccount 复用 insGraphql）。
+- **实现**：新增 `actions/insGraphql.js` 统一页面 context、GraphQL/REST、headers 与错误；commentPost/likePost 使用真实 mutation，旧 DOM 版保留为 `*Dom.js` 不参与构建。
+- **验证**：lint/circular/build 通过；真实页面已验证点赞/取消、评论/删除、Insights 20 项、personal→creator 转换，调用均不改变页面 URL。
+- **待收口**：MR !1266 合并状态；Android automation/login/bootstrap 资产已与 build 顺序对齐（38/38）但未 commit/push；sitin-next `build.mjs`、Android 相关改动未提交。
+- **测试环境**：`release/test-sp` 已重置为 `feature/sp` 并合入 getMediaInsights API 改动（merge `cd7a3be82`），旧 tip 保留在 `backup/release-test-sp-20261026-before-reset`；部署后需复测 media-chunk 与 Story `isBake:false`。
+
 ## 备注
 
 - 详细应用清单 / 线上域名见仓库 README「可部署应用」表。

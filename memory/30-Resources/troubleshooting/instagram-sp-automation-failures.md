@@ -46,3 +46,11 @@ tags: [instagram, social-proxy, app-ins-scripts, troubleshooting]
 4. 脚本热更加版本校验，缺失方法时明确报「脚本版本过低」并触发拉取。
 5. `COMMENT_POST` 显式配置 120s 以上 timeout，或缩短等输入框时间。
 6. 任务队列按设备吞吐排期，避免 60s/条的串行任务堆积到过期（CANCELLED）。
+
+## 2026-10-26 12 条 IG 发帖失败归因补充
+
+- **`PROFILE_NOT_FOUND`（7 条）**：`createPost` 不访问目标主页，正常不可能由它返回。更可能是设备仍在跑旧版 `executeAction`，被上一任务残留的 404 页面前置检查锁死。`createPost` 已在 `SESSION_ONLY_ACTIONS`，执行前只应校验会话。
+- **`VIDEO_INIT_FAILED`（2 条）**：唯一来源是 `createPost.js` 的 `initVideoUpload`，请求 `GET i.instagram.com/rupload_igvideo/...`。`302` 通常是请求未被识别为已登录（cookie/sessionid 缺失或失效）；`403` 通常表示会话存在但被风控或限制上传。不要先归因于素材或上传代码。
+- **`hasActiveSession()` 的盲区**：只检查 `ds_user_id` cookie 是否存在，无法识别「cookie 还在、sessionid 已死」，会把失效账号放行到真正发请求时才失败。
+- **`execute is not a function`**：Android `ActionDispatcher` 直接调用 `window.SocialProxy.execute(...)`；设备 automation 未含 `executeAction`（热更或注入缺失），客户端也没有 `typeof` 防御。
+- **下一次取证**：同时收集完整 `error_detail`、`dom_snapshot.url`、设备实际加载的 automation 脚本版本，再区分页面污染、账号失效与 IG 风控。

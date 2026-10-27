@@ -145,3 +145,32 @@ git worktree remove --force .tsc-check-x
 生产口径验证用 `tsc -p tsconfig.build.json`(nest build 同款,排除 `**/__tests__/**` 与 `*.spec.ts`)——测试文件的既有类型错误不挡 build。
 
 **pre-push 命中缓存后可行**:`pnpm test --affected --dry=json` 先看 `cache.status` 分布(本次 118 test 任务 109 HIT / 65 build 任务 64 HIT),再决定直接 push 还是找用户授权 `--no-verify`。2026-10-14 本次带 hook 推送通过,未用 `--no-verify`。
+
+## release 分支整体重置为 feature/sp + 备份（2026-10-26）
+
+场景：`release/test-sp` 与 `feature/sp` 已有大量分叉，直接 merge 会因旧 Story 实现、Dockerfile、admin 等 8 个文件冲突；但业务目标是让测试环境尽快等于新的 `feature/sp` 加少量 API 提交。
+
+**做法**
+
+1. 先把旧 tip 保留成远端备份，不能只留在 reflog：
+
+   ```bash
+   git push origin cce78d503:refs/heads/backup/release-test-sp-20261026-before-reset
+   ```
+
+2. 确认备份可见后，用 `--force-with-lease` 把 release 分支重置到 `feature/sp`：
+
+   ```bash
+   git push --force-with-lease origin a8807b3e7:release/test-sp
+   ```
+
+3. 在重置后的分支上 `--no-ff` 合并目标 feature 分支。此时不再与旧 release 历史解冲突：
+
+   ```bash
+   git switch release/test-sp
+   git merge --no-ff feature/sp-get-media-insights-api
+   ```
+
+**结果**：merge commit `cd7a3be82`，无冲突；合并后确认 `story-bake.service.ts` 已存在 `isBake === false` 复制分支。
+
+**边界**：这是破坏性改写远端分支历史，必须先取得明确授权并保留备份分支；若只是缺一两个提交，优先 cherry-pick，避免重置整条 release 线。
