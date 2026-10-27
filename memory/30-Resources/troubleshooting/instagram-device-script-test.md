@@ -116,3 +116,22 @@ API 版没有先查当前状态，`result.alreadyLiked` 永远是 false。判断
 - 测试帖 `https://www.instagram.com/p/Degh6sdE_Sa/`；两条测试评论可用 IG 页面手动删除。
 - **后续状态**：复测 `checkLoginStatus` 时 `shangbin2026` 返回 `isBanned:true` /
   `path=/accounts/suspended/`，账号被 IG 风控；下次真机测试先换测试号。
+
+## 2026-10-27 补充：只有 sessionid 时如何登录 app 内 WebView
+
+- 进入 app 后先拿 PWA WebView 的 devtools socket：
+  `adb shell cat /proc/net/unix | grep webview_devtools_remote`；`adb forward tcp:9223 localabstract:webview_devtools_remote_<pid>`。
+- 用 Playwright `connectOverCDP('http://127.0.0.1:9223')` 连上 PWA 页面，`context.addCookies` 写
+  `.instagram.com` 的 `sessionid`（值保持 `%3A` 原样）和 `ds_user_id`。app 内所有 WebView 共享
+  `CookieManager`，小崽 WebView 会直接复用登录态。
+- 写完后用 `open-debug.mjs --ensure-proxy 7897 --no-restart` 打开 `Test Ins Chats View`，
+  先跑 `checkLoginStatus` 确认 `isLoggedIn:true` / `isBanned:false`，再跑目标 action。
+- **不要**为了复查再把这个 sessionid 登录到本地第二个浏览器：同一 session 在多处登录很容易触发
+  IG `Confirm you're human` / CAPTCHA，之后 app 内 WebView 和 API 都会被重定向到
+  `/accounts/suspended/?next=...`。关注态直接在 app 内再跑 `getProfileInfo` 读
+  `friendship_status` 即可。
+- 若已触发 CAPTCHA：停止自动重试，把设备交给账号本人完成验证；完成前不要继续跑写操作。
+  2026-10-27 的 `followUserById` 真机验证就因此留下了 `@instagram` 的关注未取关。
+- 实测结果（账号 `xuzaixing2026` / uid `15059533160`）：
+  `getProfileInfo` source=`template`；`followUserById` 首次 `followed:true, alreadyFollowing:false,
+  userId:25025320`，10.1s；二次 `alreadyFollowing:true`；复查 `friendship_status.following:true`。
