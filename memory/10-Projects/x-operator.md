@@ -8,7 +8,7 @@ tags: [project, x, twitter, automation, content, monetization]
 
 ## 目标
 
-英文 X 个人 IP 账号 Colna，主打 Creator Change Log 系列，0 粉起步，全自动运营，面向欧美创作者/社媒运营。个人是脸和语气，Creator Change Log 是内容主线。无 Premium、零预算；不做 X 广告分成，变现路径为创作者工具联盟 → newsletter → 赞助/数字产品。
+英文 X 个人 IP 账号 Colna，主打 Creator Change Log 系列，0 粉起步，全自动运营，面向欧美创作者/社媒运营。个人是脸和语气，Creator Change Log 是内容主线。无 Premium；X API 为 pay-per-use，最低买一次 credits 拿 $20 赠送额度，90 天测试约 $3/月。不做 X 广告分成，变现路径为创作者工具联盟 → newsletter → 赞助/数字产品。
 
 ## 现状（2026-10-28）
 
@@ -17,7 +17,8 @@ tags: [project, x, twitter, automation, content, monetization]
 - 素材：`assets/avatar.png`、`assets/banner.png` 已生成，待上传；头像先用 C 标，个人 IP 最好换真人照片。
 - 已实现：X API OAuth 1.0a 发帖、两阶段 pending 防重复、RSS + Google Trends 选题、OpenRouter 免费模型生成、24 条队列、每日指标、周报、GitHub Actions 三个 workflow。
 - 已验证：本地 mock LLM 全链路；10 个候选、3 条有效、1 条被平台配额规则拦下；`npm run doctor` 能报缺 key。
-- 阻塞：X 开发者 app key、OpenRouter key、GitHub 私有仓库创建/推送；账号资料/头像/横幅需一次性设置。
+- 阻塞：X 开发者 app key、绑卡买最小 credits 拿 $20、OpenRouter key、GitHub 私有仓库创建/推送；账号资料/头像/横幅需一次性设置。
+- 成本：Post $0.015/次，带 URL $0.20/次（默认不发链接）；Posts Read $0.005/resource，指标每天 10 条；约 $2.85/月，$20 赠送额度 3 个月过期。
 - 本地网络必须走系统代理 `http://127.0.0.1:7897`；GitHub Actions 不需要。
 
 ## 关键决策
