@@ -30,6 +30,15 @@ tags: [troubleshooting, macos, disk, uv, pnpm, xcode, simulator]
 - `~/.npm/_cacache` 里可能有 root 属主的旧缓存文件（sudo npm 留下的），普通用户删不掉；`npm cache clean --force` 也会失败，残留 1G 级别可接受，别为它上 sudo。
 - 权限不足跳过的：`/Library/Developer/CoreSimulator/Caches`、`/Library/Updates`、`~/Library/Caches/dotslash`，不强求 sudo。
 
+## ToDesk 卸载（2026-10-28）
+
+- 官方机制：`/Library/LaunchDaemons/com.youqu.todesk.UninstallerWatcher.plist` 监听 `/Applications/ToDesk.app`，app 消失后自动以 root 运行 `ToDeskUninstallerStarter --module Full`，清理 LaunchDaemons/LaunchAgents、PrivilegedHelperTools、Audio HAL 驱动。
+- 直接 `rm -rf /Applications/ToDesk.app` 会因 bundle 内 `root:admin 755` 目录失败；用同卷 `mv /Applications/ToDesk.app ~/.Trash/ToDesk_removed.app` 即可触发 Watcher，无需 sudo。
+- 卸载器退出后残留 `/Library/Application Support/Todesk/dumps`（期间新生成的 dump）和 `/Library/Logs/ToDesk`（root:wheel 700），需要一次管理员授权删除。
+- `~/.Trash` 受 TCC 保护，普通 shell 甚至 osascript root 都是 `Operation not permitted`；用 Finder AppleScript：`tell application "Finder" to delete item "xxx" of trash`。
+- Core Audio Driver 由 `_coreaudiod` 持有，驱动文件删除后进程仍在，重启/注销后消失，不必强杀。
+- `~/Library/Preferences/com.todesktop.230313mzl4w4u92.*` 是 ToDesktop 打包 app 的通用 ID，未必属于 ToDesk，别乱删。
+
 ## 删除前的确认清单
 
 - 目标目录是否还有运行中进程（`ps -ef | rg <name>`）。
