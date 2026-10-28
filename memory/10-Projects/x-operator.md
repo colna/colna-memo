@@ -13,11 +13,11 @@ tags: [project, x, twitter, automation, content, monetization]
 ## 现状（2026-10-28）
 
 - 账号：已有 `@colna_zheng`（0 粉、1 following、2025-12 注册），等同新号；handle 保留，显示名 `Colna`，bio 已设 Creator Change Log，头像已换。公开 bio 不写 AI/自动化；不编造亲测经历/客户案例/数据。
-- 代码：`/Users/colna/WORK/x-operator`，约 1,300 行，4 个单测通过；尚未 `git init`/推送。
+- 代码：`/Users/colna/WORK/x-operator`；私有仓库 `https://github.com/colna/x-operator` 已推送，main 已同步；4 个单测通过。
 - 素材：`assets/avatar.png`、`assets/banner.png` 已生成，待上传；头像先用 C 标，个人 IP 最好换真人照片。
-- 已实现：OAuth 2.0 Bearer 发帖 + refresh 加密状态、两阶段 pending 防重复、Humanizer 二遍编辑、RSS + Google Trends 选题、DeepSeek 生成、24 条队列、每日指标、周报、GitHub Actions 三个 workflow。
-- 已验证：首条已发 `tweet 2115381703002947668`；`doctor` x_auth true + oauth2_refresh true；`npm test` 4/4；`DRY_RUN=1 node src/generate.mjs` 生成 4 条 humanized posts。
-- 阻塞：GitHub 私有仓库创建/推送 + secrets，等「推」；banner 未上传；$20 赠送未到账。
+- 已实现：OAuth 2.0 Bearer 发帖 + refresh 加密状态、两阶段 pending 防重复、Humanizer 二遍编辑、RSS + Google Trends 选题、DeepSeek 生成、24 条队列、每日指标、周报、GitHub Actions 三个 workflow；仓库 secrets/vars 已配。
+- 已验证：首条已发 `tweet 2115381703002947668`；`doctor` x_auth true + oauth2_refresh true；`npm test` 4/4；GitHub `generate` run 40670006737 成功，4 条 humanized posts 入队（queue 24）；`post` run 40670209710 因预热 `daily_limit` 跳过（预期）。
+- 上线状态：自动化已上线；下一条定时帖约 2026-10-29 12:30 UTC（20:30 北京），预热期 1 条/天。剩 banner 未上传、$20 赠送未到账；DeepSeek key 建议轮换。
 - 成本：Post $0.015/次，带 URL $0.20/次（默认不发链接）；Posts Read $0.005/resource，指标每天 10 条；约 $2.85/月，$20 赠送额度 3 个月过期。首条已花 $0.015，余额约 $4.985。
 - 本地网络必须走系统代理 `http://127.0.0.1:7897`；GitHub Actions 不需要。
 
@@ -34,6 +34,15 @@ tags: [project, x, twitter, automation, content, monetization]
 - 内容优先级：新新闻 prepend 到队列头部；introduction 帖 `priority: 100` 先发。
 - 个人 IP：第一人称、短句、观点明确；不冒充亲测，不写成品牌公告。
 - 停止线：90 天 <100 粉或 <5 万展示；180 天 <$50 收入。
+
+## 上线状态
+
+- 首条：`https://x.com/colna_zheng/status/2115381703002947668`
+- 仓库：`https://github.com/colna/x-operator`（private）
+- 定时：generate 06:00 UTC；post 12:30 / 16:30 / 21:30 UTC；metrics 23:00 UTC
+- 下一条：队列顶部 `YouTube is testing a lower payment threshold...`，明天 12:30 UTC 左右
+- 余额：约 $4.985；$20 赠送未到账
+
 - 风险：控制台生成的 OAuth 2.0 token 带 DM scope；代码不调用 DM，但 token 权限较大，必须只存 `.env`/secret/加密 state。
 
 ## 架构
