@@ -38,9 +38,10 @@ tags: [project, x, twitter, automation, content, monetization]
 ## 上线状态
 
 - 首条：`https://x.com/colna_zheng/status/2115381703002947668`
-- 仓库：`https://github.com/colna/x-operator`（private）
+- 第二条：`https://x.com/colna_zheng/status/2115403860965781914`（手动放行，`WARMUP=off`）
+- 仓库：`https://github.com/colna/x-operator`（private，commit `d52ebb0`）
 - 定时：generate 06:00 UTC；post 12:30 / 16:30 / 21:30 UTC；metrics 23:00 UTC
-- 下一条：队列顶部 `YouTube is testing a lower payment threshold...`，明天 12:30 UTC 左右
+- 今天已发 2 条；后续 cron 因 `daily_limit` 跳过，明天恢复正常 1 条/天。下一条在明天 06:00 UTC generate 更新后，约 12:30 UTC 发。
 - 余额：约 $4.985；$20 赠送未到账
 
 - 风险：控制台生成的 OAuth 2.0 token 带 DM scope；代码不调用 DM，但 token 权限较大，必须只存 `.env`/secret/加密 state。
