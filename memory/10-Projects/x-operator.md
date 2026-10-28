@@ -27,6 +27,8 @@ tags: [project, x, twitter, automation, content, monetization]
 - 节奏：3 条/天（UTC 12:30 / 16:30 / 21:30），免费 API 额度内；默认无 source reply，`ENABLE_SOURCE_LINKS=true` 才附。
 - 不做关注/私信/自动回复，避免封号和 automation 规则风险；个人 IP 路线不公开 AI/自动化，平台仍可能自动标注。
 - 只用官方 API，不用浏览器/登录会话自动化。
+- 不走 X web 逆向/会话自动化：违反 ToS、绕过 pay-per-use、封号风险；REA 只用于合法分析。
+- LLM 支持 OpenRouter 免费 / DeepSeek；DeepSeek key 不落仓库（已在聊天暴露，建议轮换）。
 - 风控：预热 1→2→3 条/天；默认不发链接；0-10 分钟 jitter；资料完整后再发；开发者 app 不勾 DM。
 - 内容优先级：新新闻 prepend 到队列头部；introduction 帖 `priority: 100` 先发。
 - 个人 IP：第一人称、短句、观点明确；不冒充亲测，不写成品牌公告。
