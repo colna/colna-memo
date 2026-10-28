@@ -54,7 +54,7 @@ tags: [project, x, twitter, automation, content, monetization]
 - `src/generate.mjs`：RSS/Google Trends → 相关性/来源黑名单/平台配额 → LLM（`source_index` 映射 source_url，避免长 URL 截断）→ Humanizer 二遍编辑 → 校验 → prepend。
 - `src/lib/oauth2.mjs`：refresh token 轮换 + AES-256-GCM 加密状态；`ensureOAuth2Token` 在 post/metrics/doctor 前执行。
 - `src/lib/x.mjs`：`uploadMediaV2`（v2 JSON base64）+ `createTweetV2`（undici，绕开代理下 `twitter-api-v2` 的 TLS reset）；`post.mjs` 支持 `image_path` 附件。
-- 配图：image2 网关 `GROUP_NOT_ALLOWED`（区域封锁）；改走 AIGC Studio `POST /api/generations`（cookie），模型 `gpt-image-2.5-sunburst`，输出 1536x1024 PNG。
+- 配图：image2 网关 `GROUP_NOT_ALLOWED`（区域封锁）；改走 AIGC Studio `POST /api/generations`（cookie），模型 `gpt-image-2.5-sunburst`，输出 1536x1024 PNG。`image2-gen` skill 已改为默认 AIGC Studio/Sunburst，旧网关用 `--provider api`。
 - `src/metrics.mjs`：每日 own timeline，按 tweet id 去重，周日生成周报。
 - Workflows：`post.yml`、`generate.yml`、`metrics.yml`，均带 `contents: write` 和 concurrency。
 
