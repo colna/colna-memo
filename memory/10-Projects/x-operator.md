@@ -14,7 +14,7 @@ tags: [project, x, twitter, automation, content, monetization]
 
 - 账号：已有 `@colna_zheng`（0 粉、1 following、2025-12 注册），等同新号；handle 保留，显示名 `Colna`，bio 已设 Creator Change Log，头像已换。公开 bio 不写 AI/自动化；不编造亲测经历/客户案例/数据。
 - 代码：`/Users/colna/WORK/x-operator`；私有仓库 `https://github.com/colna/x-operator` 已推送，main 已同步；4 个单测通过。
-- 素材：`assets/avatar.png`、`assets/banner.png` 已生成，待上传；头像先用 C 标，个人 IP 最好换真人照片。
+- 素材：`assets/avatar.png`、`assets/banner.png` 已生成；新增通用 banner `assets/banner-generic.png`（纯视觉）与 `assets/banner-generic-branded.png`（带 COLNA/CREATOR CHANGE LOG）。profile banner 目前仍为空，X API 不能改，需手动上传。
 - 已实现：OAuth 2.0 Bearer 发帖 + refresh 加密状态、两阶段 pending 防重复、Humanizer 二遍编辑、RSS + Google Trends 选题、DeepSeek 生成、24 条队列、每日指标、周报、GitHub Actions 三个 workflow；仓库 secrets/vars 已配。
 - 已验证：首条已发 `tweet 2115381703002947668`；`doctor` x_auth true + oauth2_refresh true；`npm test` 4/4；GitHub `generate` run 40670006737 成功，4 条 humanized posts 入队（queue 24）；`post` run 40670209710 因预热 `daily_limit` 跳过（预期）。
 - 上线状态：自动化已上线；下一条定时帖约 2026-10-29 12:30 UTC（20:30 北京），预热期 1 条/天。剩 banner 未上传、$20 赠送未到账；DeepSeek key 建议轮换。
