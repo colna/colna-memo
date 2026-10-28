@@ -4,17 +4,17 @@ date: 2026-10-28
 tags: [project, x, twitter, automation, content, monetization]
 ---
 
-# x-operator（Creator Change Log）
+# x-operator（Colna 个人 IP）
 
 ## 目标
 
-英文 X 账号，0 粉起步，全自动运营，面向欧美创作者/社媒运营。无 Premium、零预算；不做 X 广告分成，变现路径为创作者工具联盟 → newsletter → 赞助/数字产品。
+英文 X 个人 IP 账号 Colna，0 粉起步，全自动运营，面向欧美创作者/社媒运营。定位是个人 operator，不是官方 changelog。无 Premium、零预算；不做 X 广告分成，变现路径为创作者工具联盟 → newsletter → 赞助/数字产品。
 
 ## 现状（2026-10-28）
 
-- 账号：已有 `@colna_zheng`（0 粉、1 following、2025-12 注册），等同新号；handle 保留，显示名改 `Colna | Creator Change Log`。
+- 账号：已有 `@colna_zheng`（0 粉、1 following、2025-12 注册），等同新号；handle 保留，显示名 `Colna`，第一人称 operator notes。
 - 代码：`/Users/colna/WORK/x-operator`，约 1,300 行，4 个单测通过；尚未 `git init`/推送。
-- 素材：`assets/avatar.png`、`assets/banner.png` 已生成，待上传。
+- 素材：`assets/avatar.png`、`assets/banner.png` 已生成，待上传；头像先用 C 标，个人 IP 最好换真人照片。
 - 已实现：X API OAuth 1.0a 发帖、两阶段 pending 防重复、RSS + Google Trends 选题、OpenRouter 免费模型生成、24 条队列、每日指标、周报、GitHub Actions 三个 workflow。
 - 已验证：本地 mock LLM 全链路；10 个候选、3 条有效、1 条被平台配额规则拦下；`npm run doctor` 能报缺 key。
 - 阻塞：X 开发者 app key、OpenRouter key、GitHub 私有仓库创建/推送；账号资料/头像/横幅需一次性设置。
@@ -22,12 +22,13 @@ tags: [project, x, twitter, automation, content, monetization]
 
 ## 关键决策
 
-- Niche：平台规则/功能变更 + 可执行动作，覆盖 Instagram、TikTok、YouTube、X、LinkedIn。
+- Niche：平台规则/功能变更 + 个人 operator take，覆盖 Instagram、TikTok、YouTube、X、LinkedIn。
 - 节奏：3 条/天（UTC 12:30 / 16:30 / 21:30），免费 API 额度内；默认无 source reply，`ENABLE_SOURCE_LINKS=true` 才附。
 - 不做关注/私信/自动回复，避免封号和 automation 规则风险；账号打开 automated 标签。
 - 只用官方 API，不用浏览器/登录会话自动化。
 - 风控：预热 1→2→3 条/天；默认不发链接；0-10 分钟 jitter；资料完整后再发；开发者 app 不勾 DM。
 - 内容优先级：新新闻 prepend 到队列头部；introduction 帖 `priority: 100` 先发。
+- 个人 IP：第一人称、短句、观点明确；不冒充亲测，不写成品牌公告。
 - 停止线：90 天 <100 粉或 <5 万展示；180 天 <$50 收入。
 
 ## 架构
