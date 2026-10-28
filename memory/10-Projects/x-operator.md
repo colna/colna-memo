@@ -17,7 +17,7 @@ tags: [project, x, twitter, automation, content, monetization]
 - 素材：`assets/avatar.png`、`assets/banner.png` 已生成，待上传；头像先用 C 标，个人 IP 最好换真人照片。
 - 已实现：X API OAuth 1.0a 发帖、两阶段 pending 防重复、RSS + Google Trends 选题、OpenRouter 免费模型生成、24 条队列、每日指标、周报、GitHub Actions 三个 workflow。
 - 已验证：本地 mock LLM 全链路；10 个候选、3 条有效、1 条被平台配额规则拦下；`npm run doctor` 能报缺 key。
-- 阻塞：X 开发者 app key、绑卡买最小 credits 拿 $20、OpenRouter key、GitHub 私有仓库创建/推送；账号资料/头像/横幅需一次性设置。
+- 阻塞：X 开发者 app key、绑卡买最小 credits 拿 $20、GitHub 私有仓库创建/推送；账号资料/头像/横幅需一次性设置。LLM 已接 DeepSeek（本地 `.env`，实测 4 条生成通过；key 待轮换）。
 - 成本：Post $0.015/次，带 URL $0.20/次（默认不发链接）；Posts Read $0.005/resource，指标每天 10 条；约 $2.85/月，$20 赠送额度 3 个月过期。
 - 本地网络必须走系统代理 `http://127.0.0.1:7897`；GitHub Actions 不需要。
 
@@ -37,7 +37,7 @@ tags: [project, x, twitter, automation, content, monetization]
 ## 架构
 
 - `src/post.mjs`：`prepare` 写 pending 并提交 → `post` 发主帖（可选 source reply）；失败/超时可恢复。
-- `src/generate.mjs`：RSS/Google Trends → 相关性/来源黑名单/平台配额 → LLM → 校验 → prepend。
+- `src/generate.mjs`：RSS/Google Trends → 相关性/来源黑名单/平台配额 → LLM（`source_index` 映射 source_url，避免长 URL 截断）→ 校验 → prepend。
 - `src/metrics.mjs`：每日 own timeline，按 tweet id 去重，周日生成周报。
 - Workflows：`post.yml`、`generate.yml`、`metrics.yml`，均带 `contents: write` 和 concurrency。
 
