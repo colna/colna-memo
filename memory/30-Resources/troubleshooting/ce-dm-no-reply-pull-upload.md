@@ -15,7 +15,9 @@ tags: [troubleshooting, sitin-next, social-proxy, ce, instagram, dm-listener, re
 
 ## 结论
 
-这次**不是 handle 问题**：`FOLLOW_BACK` 成功（`alreadyFollowing=true`）。DM listener 也正常上报了 `NEW_MESSAGE`，`PULL_NEW_MESSAGE` 成功拉到 32 条消息，但 **native `uploadMessages` 没有回传 `CHAT_HISTORY` SCRIPT_EVENT**，所以服务端没有创建 `IG_DM_RECEIVED` / `REPLY_DM`，自动回复断在设备侧上传这一步。
+这次**不是 handle 问题**：`FOLLOW_BACK` 成功（`alreadyFollowing=true`）。DM listener 也正常上报了 `NEW_MESSAGE`，`PULL_NEW_MESSAGE` 成功拉到 32 条消息。
+
+真正的断点是：**这 32 条消息全都没有 `id`**（`getChatMessages` 结果里 `sender` 128 处、`id` 0 处）。native `InsMessageDto.toEntity()` 要求 `id` 非空，缺失就返回 null 被过滤；`BridgeSyncActions.uploadMessages` 于是 `inserted=0`，`ActionDispatcher.startUploadIns` 看到 `getAllUnuploaded` 为空，不会发 `CHAT_HISTORY`。服务端因此没有 `IG_DM_RECEIVED` / `REPLY_DM`。
 
 另外 `MUTE_USER`（clickMute）连续超时失败，触发 `[Todo:cancel-sleeping] cancelled=1`，把同 signal 的 `SEND_DM`（女方主动打招呼）取消了，所以女方也没有先发第一条。
 
@@ -29,7 +31,7 @@ tags: [troubleshooting, sitin-next, social-proxy, ce, instagram, dm-listener, re
 | 02:45:33~02:49:45 | 10:45~10:49 | `MUTE_USER` clickMute 连续 4 次 60s 超时 → `[Todo:fail]` → `cancel-sleeping cancelled=1` |
 | 02:46:04 | 10:46:04 | `SCRIPT_EVENT NEW_MESSAGE source=navbar badgeCount=1` → `IG_NEW_MESSAGE` → `PULL_NEW_MESSAGE` |
 | 02:47:27 | 10:47:27 | `SCRIPT_EVENT NEW_MESSAGE source=inbox threads=[{lilybrown4783, "Hi", unread}]` → 第二次 `PULL_NEW_MESSAGE` |
-| 02:48:34 | 10:48:34 | `getChatMessages success=true newMessages=32`，最后一条 incoming 是 `Hi` |
+| 02:48:34 | 10:48:34 | `getChatMessages success=true newMessages=32`，最后一条 incoming 是 `Hi`；**32 条消息均无 `id`** |
 | 之后 | — | **没有任何 `CHAT_HISTORY` / `IG_DM_RECEIVED` / `REPLY_DM`** |
 
 对比 prod 同一时段（creator=6171344）：
@@ -44,23 +46,30 @@ SCRIPT_EVENT request_id=upload_... data.type=CHAT_HISTORY
 ## 为什么会这样
 
 1. `getChatMessages` 脚本只负责拉消息；`AndroidBridge.uploadMessages(...)` 落本地 DB 后，由 `ActionDispatcher.startUploadIns` 用 `sendNativeEvent("upload_...")` 发 `CHAT_HISTORY`。
-2. dev 这次 `uploadMessages` 没有产生事件，可能是：
-   - 设备 APK 版本较旧，native `uploadMessages`/outbox 未实现或未生效；
-   - 本地 DB 里这些消息已经是 `uploaded=1`（`getAllUnuploaded` 为空），所以不重发；
-   - outbox/WS 发送失败（设备日志会有 `uploadMessages saved` / `sent batch` / error）。
+2. `app-ins-scripts/instagram/methods/getChatMessages.js` 只有在 DOM 找到 `div[aria-labelledby*="mid."]` 时才给消息写 `id = mid`；找不到 `mid` 的文本消息没有 `id` 字段。
+3. `assignCallIds()` 用 `if (m.id !== null) continue;` 判断「非通话消息已有 id」，但缺 `mid` 的文本消息是 `undefined`，`undefined !== null` 为 true → 不会生成兜底 id。
+4. native `InsMessageDto.toEntity()`：`id` 为空直接返回 null；`uploadMessages skipped N message(s) missing id`，`getAllUnuploaded` 为空 → 不产生 `CHAT_HISTORY`。
+5. 这次 dev 的 IG 聊天 DOM 没有给出 `mid`（aria-labelledby 不含 `mid.$...`），所以 32 条全被 skip。
 3. 服务端 `DeviceGateway.handleScriptResult` 也没有兜底直接路由 `getChatMessages` 的结果：`shouldRoute` 只看 `result.data.interaction`、`result.data.data.type`，而该结果是 `data.data.interaction=true` 且没有 `type`，即使走到 `routeInteractionToV3` 也会因 `Missing type` 跳过。
 
 ## 修复建议
 
-### 设备侧（先查）
+### 脚本侧（主修复）
+
+- `assignCallIds()` 把判断改成「没有有效 id 就生成兜底 id」：`if (m.id) continue;`，对 `undefined`/`null` 都生成。
+- 兜底 id 必须**跨次拉取稳定**，否则会重复入库/重复回复。建议用 `hash(chatId + sender + text + timestamp/dateLabel + _domIndex)`，或 `chatId + ':' + timestamp + ':' + _domIndex`；不要用每次变化的 `captureTs`。
+- 给 `mid` 缺失的文本消息也走同一套兜底，并加单测（构造 `id: undefined` 的消息，断言最终有 id）。
+- 如果 `mid` 是因为 DOM 版本变化拿不到，补一个选择器/降级策略，或记录 `mid` 缺失率。
+
+### 设备侧（辅助排查）
 
 - 升级 dev 测试机 APK 到包含 `BridgeSyncActions.uploadMessages` / `ActionDispatcher.startUploadIns` 的版本。
 - 在机器人 WebView 里确认 `typeof AndroidBridge.uploadMessages === "function"`。
 - 看设备日志是否有：
+  - `uploadMessages skipped N message(s) missing id`
   - `uploadMessages saved: inserted=... duplicates=...`
   - `uploadMessages: sent batch of N ... requestId=upload_...`
-  - 或 `uploadMessages: no unuploaded messages`（说明本地 DB 认为已上传，需要清 DB 或补发）
-- 也可以先清掉该 chat 的本地上传标记后重试一次。
+  - 或 `uploadMessages: no unuploaded messages`
 
 ### 服务端（建议加固）
 
