@@ -175,3 +175,38 @@ REA 连接已登录 Chrome 抓 `/api/graphql`，并结合 `static.cdninstagram.c
   （doc `28717443601247930`，返回 `friendship_status.following/outgoing_request`）。
 - **风控边界**：`feedback_required` / `error 1357031` 是账号/会话级限制，不是请求体拼错；测试号
   suspended 时不要继续重试，换号后再验证。
+
+## 2026-10-29 补充：他人主页 Reels 播放量（play_count）
+
+- 页面：`https://www.instagram.com/<username>/reels/`
+- endpoint：`POST https://www.instagram.com/api/graphql`
+- operation：`PolarisProfileReelsTabContentQuery`
+- doc_id：`39368442709468666`（2026-10-29 构建，随 IG 版本轮换）
+- 必带登录 cookie（`sessionid` / `csrftoken` / `ds_user_id`）与页面真实请求模板；直接 curl 重放最小体可能
+  返回 `error 1357054`（Your Request Couldn't be Processed），在页面内 fetch 复用真实 body 稳定。
+- variables（第一页）：
+
+```json
+{
+  "data": {
+    "include_feed_video": true,
+    "page_size": 12,
+    "target_user_id": "<profile_pk>"
+  },
+  "user_id": "<profile_pk>",
+  "__relay_internal__pv__PolarisShortDramaEnabledrelayprovider": true
+}
+```
+
+- 响应路径：`data.fetch__XDTUserDict.clips_connection.edges[].node.media`
+  - `play_count` = 前台显示的播放量/浏览量（实测 raluca6302：`3212009` / `4829250` / `3085550` …
+    对应页面 `321.2万` / `482.9万` / `308.5万`）
+  - `view_count` 为 `null`，不要用
+  - 同节点还有 `like_count` / `comment_count` / `code` / `pk` / `product_type`（`clips`）
+  - `page_info.end_cursor` / `page_info.has_next_page`
+- 翻页：variables 顶层加 `after=<end_cursor>`、`first=12`（Relay fragment metadata：
+  `connection: [{count:"first", cursor:"after", direction:"forward", path:["clips_connection"]}]`）；
+  `data.page_size` 保持 12。
+- username → pk：`PolarisProfilePageContentQuery`（doc `28717443601247930`）或 `web_profile_info`；
+  raluca6302 的 pk 为 `3022188365`。
+- 响应可能带 `for (;;);` 前缀，解析前先去掉。
