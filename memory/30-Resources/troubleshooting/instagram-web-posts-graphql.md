@@ -210,3 +210,6 @@ REA 连接已登录 Chrome 抓 `/api/graphql`，并结合 `static.cdninstagram.c
 - username → pk：`PolarisProfilePageContentQuery`（doc `28717443601247930`）或 `web_profile_info`；
   raluca6302 的 pk 为 `3022188365`。
 - 响应可能带 `for (;;);` 前缀，解析前先去掉。
+- 已封装为 `SocialProxy.getProfileReels({ username | userId, pages?, pageSize? })`
+  （`packages/app-ins-scripts/src/instagram/methods/getProfileReels.js`，pipeline 形式，
+  返回 `items[].playCount`）。
