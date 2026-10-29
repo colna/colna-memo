@@ -103,3 +103,9 @@ SCRIPT_EVENT request_id=upload_... data.type=CHAT_HISTORY
 - `GraceChat-Earn-Android/haven/src/main/java/com/harbor/prod/socialproxy/bridge/ActionDispatcher.kt`
 - `GraceChat-Earn-Android/haven/src/main/java/com/harbor/prod/socialproxy/bridge/BridgeSyncActions.kt`
 - 前一篇：[[ce-follow-back-invalid-ig-handle]]
+
+## 影响范围复查（2026-10-29）
+
+- **dev 近 7 天**：`method=getChatMessages` 仅 6 条（全部是 creator `2100069412` 这台测试机；4 次超时/失败，2 次成功各 32 条消息）；`CHAT_HISTORY` 0、native `upload_` 0、`IG_DM_RECEIVED` 0、`REPLY_DM` 0。
+- **prod 近 3 小时**：`method=getChatMessages` 1507 条；`CHAT_HISTORY` SCRIPT_EVENT 295 条（其中 native `upload_` 11 条、空历史 `SE-` 284 条）；`IG_DM_RECEIVED` 592、`REPLY_DM` 16。
+- **结论**：dev 这台设备所有成功拉取都因消息缺 `id` 未上报；prod 仍有正常 native upload/回复，但 DOM 拿不到 `mid` 的拉取同样会被 skip，不是 dev 专属问题。
