@@ -13,7 +13,7 @@ tags: [project, x, twitter, automation, content, monetization]
 ## 现状（2026-10-29）
 
 - 账号：已有 `@colna_zheng`（0 粉、1 following、2025-12 注册），等同新号；handle 保留，显示名 `Colna`，bio 已设 Creator Change Log，头像已换。公开 bio 不写 AI/自动化；不编造亲测经历/客户案例/数据。
-- 代码：`/Users/colna/WORK/x-operator`；私有仓库 `https://github.com/colna/x-operator` 已推送，main 已同步；4 个单测通过；最新 commit `f4175ef`。本地有未提交的“每帖强制带图”改动（待 push）。
+- 代码：`/Users/colna/WORK/x-operator`；私有仓库 `https://github.com/colna/x-operator` 已推送，main 已同步；4 个单测通过；最新 commit `89fd27a`（每帖强制带图）。
 - 素材：`assets/avatar.png`、`assets/banner.png`、`assets/banner-generic*.png`；配图已定稿手绘明亮风，活跃素材 `assets/generated/instagram-90min-handdrawn.png`、`youtube-payout-handdrawn.png`、`tiktok-shop-handdrawn.png`；旧深色 AI 图保留但不再使用。profile banner 仍为空，X API 不能改，需手动上传。
 - 已实现：OAuth 2.0 Bearer 发帖 + refresh 加密状态、两阶段 pending 防重复、Humanizer 二遍编辑、RSS + Google Trends 选题、DeepSeek 生成、每日指标、周报、GitHub Actions；新增 AIGC Studio 手绘配图自动生成（`src/lib/post-image.mjs`；`src/post.mjs` 每帖强制带图：有 `image_path` 用指定图，否则自动生成；生成/上传失败 exit 1 并保留 pending，不发纯文本；显式图缺失/上传失败会回退自动生成）；`image-test` workflow 在 Actions 验证成功（2.5MB 图，约 28s）。`ENABLE_IMAGES` 已废弃。
 - 已验证：首条 `tweet 2115381703002947668`；手绘 Instagram 重发 `tweet 2115634640224706688`（已确认 `media_keys` 有附件）；旧 YouTube/Instagram 平铺帖已删除；YouTube payout 改写（`priority:40` + 手绘图）排队；TikTok Shop 已挂手绘图；`doctor` x_auth true + oauth2_refresh true；`npm test` 4/4。
@@ -43,7 +43,7 @@ tags: [project, x, twitter, automation, content, monetization]
 - 首条：`https://x.com/colna_zheng/status/2115381703002947668`
 - 第二条（手绘 Instagram）：`https://x.com/colna_zheng/status/2115634640224706688`
 - 旧 YouTube `2115403860965781914`、旧 Instagram `2115420088350478660` 已删除。
-- 仓库：`https://github.com/colna/x-operator`（private，commit `f4175ef`）
+- 仓库：`https://github.com/colna/x-operator`（private，commit `89fd27a`）
 - 定时：generate 06:00 UTC；post 12:30 / 16:30 / 21:30 UTC；metrics 23:00 UTC
 - 今天已发 1 条（手绘 Instagram）；12:30 UTC cron 因 `daily_limit` 跳过；明天恢复 1 条/天，预计 2026-10-30 12:30 UTC 发 YouTube payout 改写（带手绘图）。
 - 余额：约 $4.9；$20 赠送未到账
