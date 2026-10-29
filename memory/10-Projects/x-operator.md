@@ -27,6 +27,7 @@ tags: [project, x, twitter, automation, content, monetization]
 
 - Niche：平台规则/功能变更 + 个人 operator take，覆盖 Instagram、TikTok、YouTube、X、LinkedIn。
 - 节奏：3 条/天（UTC 12:30 / 16:30 / 21:30），免费 API 额度内；默认无 source reply，`ENABLE_SOURCE_LINKS=true` 才附。
+- 发帖时间（2026-10-29 调研，待确认）：Buffer 2026（8.7M tweets）认为工作日 9–11 AM local 最强；Sprout 2026（2B engagements / 307k profiles）认为 Tue–Thu 12–6 PM local、Software/Tech 11 AM–4 PM；建议 16:00 / 19:00 / 21:30 UTC（EDT 12/3/5:30 PM ET，PT 9 AM/12 PM/2:30 PM；EST 11/2/4:30 PM ET）。当前首条在 PT 过早期。
 - 不做关注/私信/自动回复，避免封号和 automation 规则风险；个人 IP 路线不公开 AI/自动化，平台仍可能自动标注。
 - 只用官方 API，不用浏览器/登录会话自动化。
 - 不走 X web 逆向/会话自动化：违反 ToS、绕过 pay-per-use、封号风险；REA 只用于合法分析。
