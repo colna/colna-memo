@@ -13,12 +13,12 @@ tags: [project, x, twitter, automation, content, monetization]
 ## 现状（2026-10-29）
 
 - 账号：已有 `@colna_zheng`（0 粉、1 following、2025-12 注册），等同新号；handle 保留，显示名 `Colna`，bio 已设 Creator Change Log，头像已换。公开 bio 不写 AI/自动化；不编造亲测经历/客户案例/数据。
-- 代码：`/Users/colna/WORK/x-operator`；私有仓库 `https://github.com/colna/x-operator` 已推送，main 已同步；4 个单测通过；最新 commit `f4175ef`。
+- 代码：`/Users/colna/WORK/x-operator`；私有仓库 `https://github.com/colna/x-operator` 已推送，main 已同步；4 个单测通过；最新 commit `f4175ef`。本地有未提交的“每帖强制带图”改动（待 push）。
 - 素材：`assets/avatar.png`、`assets/banner.png`、`assets/banner-generic*.png`；配图已定稿手绘明亮风，活跃素材 `assets/generated/instagram-90min-handdrawn.png`、`youtube-payout-handdrawn.png`、`tiktok-shop-handdrawn.png`；旧深色 AI 图保留但不再使用。profile banner 仍为空，X API 不能改，需手动上传。
-- 已实现：OAuth 2.0 Bearer 发帖 + refresh 加密状态、两阶段 pending 防重复、Humanizer 二遍编辑、RSS + Google Trends 选题、DeepSeek 生成、每日指标、周报、GitHub Actions；新增 AIGC Studio 手绘配图自动生成（`src/lib/post-image.mjs`；`src/post.mjs` 支持 `image_path` 或 `ENABLE_IMAGES=true` 自动生成+上传；`post.yml` 已注入 AIGC env）；`image-test` workflow 在 Actions 验证成功（2.5MB 图，约 28s）。
+- 已实现：OAuth 2.0 Bearer 发帖 + refresh 加密状态、两阶段 pending 防重复、Humanizer 二遍编辑、RSS + Google Trends 选题、DeepSeek 生成、每日指标、周报、GitHub Actions；新增 AIGC Studio 手绘配图自动生成（`src/lib/post-image.mjs`；`src/post.mjs` 每帖强制带图：有 `image_path` 用指定图，否则自动生成；生成/上传失败 exit 1 并保留 pending，不发纯文本；显式图缺失/上传失败会回退自动生成）；`image-test` workflow 在 Actions 验证成功（2.5MB 图，约 28s）。`ENABLE_IMAGES` 已废弃。
 - 已验证：首条 `tweet 2115381703002947668`；手绘 Instagram 重发 `tweet 2115634640224706688`（已确认 `media_keys` 有附件）；旧 YouTube/Instagram 平铺帖已删除；YouTube payout 改写（`priority:40` + 手绘图）排队；TikTok Shop 已挂手绘图；`doctor` x_auth true + oauth2_refresh true；`npm test` 4/4。
 - 上线状态：自动化已上线；2026-10-29 已发 1 条手绘 Instagram，旧帖删除。下一条定时帖为 2026-10-30 12:30 UTC（20:30 北京）的 YouTube payout 改写（带手绘图）；之后 TikTok Shop（带图），其余无 `image_path` 的帖子自动生成手绘图。剩 banner 未上传、$20 赠送未到账；DeepSeek key 建议轮换。
-- 配图 cookie：`~/.aigc_studio_creds`（600）2026-11-04 过期；已设 GitHub secret `AIGC_STUDIO_COOKIE`，vars `AIGC_STUDIO_BASE=https://aigc-studio.sitinai.com`、`ENABLE_IMAGES=true`。过期后自动配图会失败并退回纯文本，需重新复制 `aigc_session` 更新 secret；更新后跑 `image-test` 验证。
+- 配图 cookie：`~/.aigc_studio_creds`（600）2026-11-04 过期；已设 GitHub secret `AIGC_STUDIO_COOKIE`，variable `AIGC_STUDIO_BASE=https://aigc-studio.sitinai.com`。过期后自动配图会失败、workflow 停下并保留 pending，**不会发纯文本**；更新 secret 后跑 `image-test` 验证。
 - 成本：Post $0.015/次，带 URL $0.20/次（默认不发链接）；Posts Read $0.005/resource；4 发 + reads 后余额约 $4.9，$20 赠送未到账。
 - OAuth state 注意：GitHub workflows 会轮换 refresh token，本地 `state/oauth2.enc.json` 可能过期；操作前先 `git pull --rebase --autostash`，以 state 为准，不要用本地 `.env` 的旧 token。
 - 本地网络必须走系统代理 `http://127.0.0.1:7897`；GitHub Actions 不需要。
@@ -51,11 +51,11 @@ tags: [project, x, twitter, automation, content, monetization]
 
 ## 架构
 
-- `src/post.mjs`：`prepare` 写 pending 并提交 → `post` 发主帖（可选 source reply）；失败/超时可恢复。
+- `src/post.mjs`：`prepare` 写 pending 并提交 → `post` 强制生成/读取图片并上传 → 发主帖（可选 source reply）；图片失败 exit 1、pending 保留，绝不发纯文本；失败/超时可恢复。
 - `src/generate.mjs`：RSS/Google Trends → 相关性/来源黑名单/平台配额 → LLM（`source_index` 映射 source_url，避免长 URL 截断）→ Humanizer 二遍编辑 → 校验 → prepend。
 - `src/lib/oauth2.mjs`：refresh token 轮换 + AES-256-GCM 加密状态；`ensureOAuth2Token` 在 post/metrics/doctor 前执行。
 - `src/lib/x.mjs`：`uploadMediaV2`（v2 JSON base64）+ `createTweetV2`（undici，绕开代理下 `twitter-api-v2` 的 TLS reset）；`post.mjs` 支持 `image_path` 附件。
-- `src/lib/post-image.mjs`：AIGC Studio 生成 3:2 手绘图（创建→轮询→下载），`post.mjs` 对无 `image_path` 的帖子自动生成并上传；`image-test.mjs` / `image-test.yml` 只验证生成、不发帖。
+- `src/lib/post-image.mjs`：AIGC Studio 生成 3:2 手绘图（创建→轮询→下载），`post.mjs` 对无 `image_path` 的帖子自动生成并上传；`image-smoke.mjs` / `image-test.yml` 只验证生成、不发帖。
 - 配图：image2 网关 `GROUP_NOT_ALLOWED`（区域封锁）；改走 AIGC Studio `POST /api/generations`（cookie），模型 `gpt-image-2.5-sunburst`，输出 1536x1024 PNG。`image2-gen` skill 已改为默认 AIGC Studio/Sunburst，旧网关用 `--provider api`。
 - `src/metrics.mjs`：每日 own timeline，按 tweet id 去重，周日生成周报。
 - Workflows：`post.yml`、`generate.yml`、`metrics.yml`，均带 `contents: write` 和 concurrency。
