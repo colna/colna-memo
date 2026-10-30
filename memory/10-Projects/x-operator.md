@@ -39,6 +39,14 @@ tags: [project, x, twitter, automation, content, monetization]
 - 个人 IP：第一人称、短句、观点明确；不冒充亲测，不写成品牌公告。
 - 停止线：90 天 <100 粉或 <5 万展示；180 天 <$50 收入。
 
+## 竞品观察（2026-10-30）
+
+- 样本：@MattNavarra（🚨 变更 + 3–5 条要点 + 官方截图；Geekout newsletter 30k+）、@LindseyGamble_（新闻 + “why it matters” 一句分析 + newsletter/thread）、@liahaberman（反常识结论先行 + 数据 + ICYMI 40K+）、@jayclouse（第一人称实验/数字/观点 + Creator Science 65K+）。
+- 共同点：都有第二层判断（不只是转发新闻）；有人格和立场；用真实截图/图表而非装饰插画；X 只是漏斗顶端，沉淀在 newsletter/社群；高频回复/引用，不是单向广播。
+- 0→1 指南（Growth Terminal、KickoffLabs 2026）：80% 回复 / 20% 发帖；每天 10 条以上有内容的回复；每周至少 1 条 thread；profile/pinned 先讲清“为什么关注”。
+- 与当前账号差距：4 帖 0 粉、无 pinned/banner、3 帖同一“X is testing Y”句式、无 quote/thread、配图为装饰性手绘；算法拿不到“谁会回复/谁在讨论”的信号。
+- 待决策：是否解禁“回复官方公告/大号”（或人工 15–20 分钟/天）；是否把 3 帖/天降为 1–2 帖/天；是否支持 quote tweet + 每周 thread；配图换成信息卡/官方图。
+
 ## 上线状态
 
 - 首条：`https://x.com/colna_zheng/status/2115381703002947668`
