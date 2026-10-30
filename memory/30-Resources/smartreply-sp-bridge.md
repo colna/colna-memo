@@ -92,3 +92,11 @@ MR !1319 的 4 条未解决 CR 均已修复并 resolve（commit `61a5c31af`）�
 ## 双路径回归
 
 Playwright 23 项检查通过：SmartReply `spBirdge`（环境/设备 ID/登录态/权限/页面检测/启动浮窗/登录态降级/会话状态）、协议错误（非 JSON `-502`、空串 `-502`、非信封 `-503`）、GraceChat `pwaBridge`（原方法路径、`isPermissionGranted`、超时 `-504`）、埋点（SmartReply → `pwa`，GraceChat → `female_package`）。
+
+## WebView 桥握手（2026-10-30 核对 smart-replay-android 源码）
+
+- 主 PWA 容器 `WebActivity` 使用 `BridgeWebView`，`onCreate` 里 `addJavascriptInterface(SocialPwaBridge, "spBridge")`，早于 `loadUrl`，所以 18 个端能力方法从页面首帧起就能直接调用，冷启动 `getLoginInfo` 不需要等待。
+- `jsbridge` 的 `BridgeWebViewClient.onPageFinished` 会注入 `WebViewJavascriptBridge.js`，该文件内部桥名是 `spBridge`，末尾执行 `readyEvent.initEvent("PwaBridgeReady")` 且 `readyEvent.bridge = spBridge`。
+- 结论：页面的 `connectWebViewJavascriptBridge()` 必须解析 `window.pwaBridge || window.spBridge || event.bridge`。原实现硬编码 `callback(pwaBridge)`，在 SmartReply 里会抛 `ReferenceError: pwaBridge is not defined`，导致 `initBridge()` 永不 resolve、`registerBridgeHandler()` 注册失败（`openSocialLogin` 等 native→JS 通道失效）。
+- 只有 `init` / `registerHandler` / `callHandler` 依赖 JS 注入时机；`ping`、`getLoginInfo` 等 `@JavascriptInterface` 方法不依赖。
+- native→JS：`finishPWAInsTask`、`finishFloatingPermission` 由客户端 `evaluateJavascript` 直接调 `window.*`；`openSocialLogin` 同协议，页面里的 `window.openSocialLogin` 兜底与 `registerBridgeHandler` 双通道都保留。
