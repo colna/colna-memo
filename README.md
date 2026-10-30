@@ -20,6 +20,8 @@
   索引文件 `.colna/` **不入 git**,可随时由 `colna index` 重建。
 - 这样绕开了嵌入式向量库"单进程写"的限制,不存在多设备写同一 DB 的冲突。
 
+![colna-memo 架构：Git + Markdown 是唯一真源，本地 zvec 索引供 CLI / MCP / Agents 使用](docs/images/colna-architecture.png)
+
 ## 技术栈
 
 - Rust
@@ -36,6 +38,8 @@ cargo build            # 首次会下载 zvec 预编译库
 
 由于 zvec 预编译动态库的 rpath 限制,直接跑二进制需要设 `DYLD_LIBRARY_PATH`。
 仓库提供了 `./colna` 包装脚本自动处理:
+
+![记忆闭环：Capture → Retrieve → Act → Record → Consolidate](docs/images/colna-memory-loop.png)
 
 ```bash
 ./colna index                      # 增量更新本地索引(只重嵌入变化的文件)
@@ -273,6 +277,10 @@ front-matter,文件名按标题生成且重名自动去冲突),写完顺手做�
 pull / rebase 失败会立即停止;pull 返回成功后还会复查 Git 中间态与 unmerged 文件,
 避免 autostash 恢复冲突时继续 reindex / push。本地 Memo 提交仍保留,处理 Git 问题后可安全重试。
 
+## 能力地图
+
+![colna 能力地图：Search / Context / Digest / Graph / Eval / Tasks](docs/images/colna-toolbox.png)
+
 ## 目录
 
 ```
@@ -313,6 +321,7 @@ src/
   gitsync.rs       colna sync(git 封装 + 自动 reindex)
   main.rs          CLI(index / search / context / clip / mcp / add / sync)
 colna              运行包装脚本(自动设置 dylib 路径)
+docs/images/       README 手绘示意图
 ```
 
 ## 路线图
