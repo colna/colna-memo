@@ -39,6 +39,7 @@ tags: 标签1, 标签2
 ## 切块规则
 
 - 按 Markdown 标题行(`#`、`##`、`###`…)切段,每段一个可检索 chunk。
+- 超长章节按 ~1200 字符继续切分(不切断代码块);每篇文档额外生成一个 `summary` 摘要块。
 - chunk 文本 = 标题 + 该段正文;空段跳过。
 - 稳定 id = `source_path + heading + 序号` 的 sha256。
 
@@ -65,3 +66,5 @@ tags: 标签1, 标签2
 - 通用附件(截图、PDF、外来素材、无 md 上下文的资源)统一进 `_attachments/`。
 - 项目自持的可视化 HTML(与同名 md 姐妹,如 `10-Projects/xxx/foo.md` 配 `foo.html`)可就近放项目目录下;
   chunker 只索引 md,HTML 无论放哪都不会被切段。就近的好处是维护/引用/搬迁一起走。
+- `00-Inbox/open-work.md`、`00-Inbox/Digest-*.md` 由 colna 生成;要改内容请改源 Daily/笔记,不要只改生成物。
+- `.colnaignore` 控制索引排除;敏感文件加进去后仍可用 `colna secrets` 扫描(它不读取索引)。

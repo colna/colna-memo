@@ -186,3 +186,40 @@ tags: project, rust, knowledge-base, zvec, embedding, mcp, para
 - 真实库已因 schema v4 全量重建:333 个文件 / 4586 chunks,state v4 + e5-base + chunker 2;
   `colna search` / `context` / MCP `kb_search` / `kb_get` / `kb_context` / `kb_put` 预览均通过。
 - 真实库 `kb_put` 预览路径 `00-Inbox/P0-Smoke-Test.md` 确认未落盘。
+
+## 2026-10-30 P1/P2 落地:整理 / 图谱 / 评测 / 摄取 / 任务 / 安全 / 技能
+
+### P1
+
+- **Daily 整理**:`colna digest`(今日重点 / 工作日志摘要 / 可沉淀经验 / 链接;`--semantic` 标相似笔记)、
+  `colna consolidate --apply`(未完成项转今日 Daily + 幂等写 Digest)、`colna work [--sync]`(open work 清单)。
+- **笔记图谱**:`colna graph` / `colna related <path>`;解析相对 Markdown 链接与 `[[wikilink]]`,
+  检索时按入链数加权(`--link-boost`,默认 0.05)。
+- **切块升级**:schema v5 + chunker 3;长章节按 ~1200 字符切分且不切断代码块;每篇文档增加摘要块
+  (`kind=summary`);`--no-summary` 可关闭摘要召回。
+- **检索评测**:`colna eval eval/smoke.json` 输出 recall@k / MRR;固定 6 条 smoke 用例。
+- **附件摄取**:`colna ingest <path>`;PDF(`pdftotext`)、HTML(`textutil`/`pandoc`)、图片(`tesseract`)、
+  音视频(`COLNA_WHISPER_CMD`);frontmatter 保留 `source_path/source_type/extracted_at/content_hash`。
+- **查询扩展 / 重排**:`--expand` 读 `COLNA_QUERY_EXPAND_CMD`;`--rerank` 用 fastembed BGE cross-encoder
+  (首次下载,默认关闭)。
+
+### P2
+
+- **Routine / watch**:`colna watch [--interval] [--once]` 轮询增量索引;
+  `colna watch-url <url> [--contains/--price]` 把变化写回 Daily `## 观察`,状态在 `.colna/watches.json`。
+- **任务 receipt**:`colna task start/checkpoint/finish/list`;frontmatter `status/project/goal`,
+  正文 `Goal/Plan/Checkpoints/Result/Evidence`;MCP 对应 `kb_task_*`。
+- **Scope / 多 vault**:`.colna/scopes.json` 把 scope 映射到路径前缀;`--scope` / MCP `scope`。
+  多 vault 仍用 `--root`。
+- **安全**:`.colnaignore` 排除索引;`colna secrets` 扫描私钥/token/凭据赋值,`--fix` 脱敏;
+  `colna encrypt/decrypt` 包装 `age`(本机未安装 age,未做真机验证)。
+- **技能索引**:`colna skills index` / `colna skills search`;独立 `.colna/skills.zvec`,不混入 memory/ 主库;
+  MCP `kb_skill_search`。
+
+### 验证
+
+- `cargo test`:56 passed;`cargo clippy --all-targets -- -D warnings` 通过。
+- 临时库端到端:digest / consolidate --apply / work / graph / related / eval / scope / secrets --fix /
+  ingest(txt/html) / task / watch-url / skills index+search / MCP `kb_task_*` 全链路通过。
+- 真实库因 schema v5 重建中(5656 chunks);完成后复跑 `eval/smoke.json` 与 MCP 读工具。
+- 未验证:`--rerank`(需下载 BGE reranker 模型)、age 加密(本机无 age)、whisper 转写(本机无 whisper)。
