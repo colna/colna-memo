@@ -148,3 +148,41 @@ tags: project, rust, knowledge-base, zvec, embedding, mcp, para
 ### 结论
 
 三者不是替代关系:OpenMuse 是「单 agent 工作台」,Rakazo 是「多 agent 队友 OS」,colna 是「记忆底座」。colna 最值得走的路不是变成第三个 agent 产品,而是把「捕获 → 检索 → 执行 → 记录 → 巩固」里的记忆环节做深,并通过 MCP 成为它们缺的那层本地、可同步、可审计的长期记忆。
+
+## 2026-10-30 P0 落地:写入闭环 / 检索过滤 / 新鲜度 / context / clip
+
+### 已实现
+
+- **MCP 写接口**:`kb_put` / `kb_append` / `kb_update` / `kb_archive`。
+  - 默认 `confirm=false` 只返回 diff/预览;`confirm=true` 才落盘。
+  - 新建默认 `00-Inbox/`,路径拒绝绝对路径 / `..` / `_` 前缀目录。
+  - `append` / `update` 必须带 `expected_hash`(sha256 乐观锁);`archive` 只移动到 `40-Archive/`,永不硬删。
+  - 写入后自动增量 reindex;MCP 的 stdout 保持纯 JSON,进度走 stderr。
+- **检索过滤 / 排序**:`--tag`(AND)、`--path`、`--since` / `--until`、`--type`;
+  时效加权 `--recency-weight`(默认 0.15)、MMR 去重(`--no-mmr` 关闭)、
+  结果输出 `vec` / `fts` / `recency` / `mmr` 分数构成。
+- **索引新鲜度**:`search` 默认先做增量校验(`--no-ensure-index` 跳过);
+  `.colna/index.lock` 进程锁,按 PID 判断存活,长索引不会被误删锁。
+- **`colna context "<task>"`**:书写约定 + 今日重点 + 最近工作日志 + 相关笔记 + 排错经验,`--max-chars` 控制预算。
+- **`colna clip <url>`**:`COLNA_CLIP_CMD` → 本地 defuddle → r.jina.ai;落 `00-Inbox/`,
+  front-matter 记 `source_url` / `fetched_at` / `content_hash`。
+- **索引 schema v4**:新增 `breadcrumb` 字段;state 记录 `model` / `chunker_version`,
+  模型或切块规则变更自动全量重建。
+
+### 改动文件
+
+- 新增:`src/indexer.rs`(索引抽离)、`src/search.rs`(过滤/时效/MMR)、`src/write.rs`(写入 + 预览)、
+  `src/context.rs`、`src/clip.rs`、`src/util.rs`。
+- 修改:`src/main.rs`(CLI 新命令/参数)、`src/mcp.rs`(7 个工具)、`src/store.rs`(breadcrumb + 原始分)、
+  `src/chunker.rs`(标题面包屑)、`src/state.rs`(v4 + 模型/切块版本)、`src/gitsync.rs`(移除重复写入逻辑)、
+  `src/embedder.rs`(模型 ID 常量)、`README.md`。
+- 未提交代码(规范模式);`memory/` 走 `colna sync`。
+
+### 验证
+
+- `cargo test`:42 passed;`cargo clippy --all-targets -- -D warnings` 通过。
+- 临时知识库验证:MCP `kb_put` 预览/确认、`kb_append`、`kb_update`、`kb_archive`、`kb_context` 全链路通过;
+  `kb_put` 的 diff 用 `diff -u` 输出,确认前不落盘。
+- 真实库已因 schema v4 全量重建:333 个文件 / 4586 chunks,state v4 + e5-base + chunker 2;
+  `colna search` / `context` / MCP `kb_search` / `kb_get` / `kb_context` / `kb_put` 预览均通过。
+- 真实库 `kb_put` 预览路径 `00-Inbox/P0-Smoke-Test.md` 确认未落盘。
