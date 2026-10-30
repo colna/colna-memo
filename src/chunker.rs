@@ -10,6 +10,8 @@ pub struct Chunk {
     pub source_path: String,
     pub title: String,
     pub heading: String,
+    /// 标题面包屑(如 `工作日志 › 沉淀`),用于检索结果展示与过滤。
+    pub breadcrumb: String,
     pub tags: String,
     pub date: String,
     /// 展示 / FTS / 存储用的原文(标题 + 正文)
@@ -21,16 +23,17 @@ pub struct Chunk {
 }
 
 /// front-matter 解析结果
-#[derive(Default)]
-struct FrontMatter {
-    title: Option<String>,
-    tags: Option<String>,
-    date: Option<String>,
+#[derive(Default, Debug, Clone)]
+pub struct FrontMatter {
+    pub title: Option<String>,
+    pub tags: Option<String>,
+    pub date: Option<String>,
+    pub extra: std::collections::BTreeMap<String, String>,
 }
 
 /// 解析 YAML 风格 front-matter(--- ... ---),只取 title/tags/date 三个键。
 /// 返回 (front_matter, 去掉 front-matter 后的正文)
-fn parse_front_matter(content: &str) -> (FrontMatter, &str) {
+pub fn parse_front_matter(content: &str) -> (FrontMatter, &str) {
     let mut fm = FrontMatter::default();
     let trimmed = content.trim_start_matches('\u{feff}'); // 去 BOM
     if !trimmed.starts_with("---") {
@@ -49,7 +52,9 @@ fn parse_front_matter(content: &str) -> (FrontMatter, &str) {
                     "title" => fm.title = Some(val),
                     "tags" => fm.tags = Some(val),
                     "date" => fm.date = Some(val),
-                    _ => {}
+                    _ => {
+                        fm.extra.insert(key, val);
+                    }
                 }
             }
         }
@@ -137,20 +142,26 @@ pub fn chunk_markdown(source_path: &str, content: &str) -> Vec<Chunk> {
         sections.push((cur_heading.clone(), cur_crumb.clone(), b.to_string()));
     }
 
-    // 组装 Chunk;text = 标题 + 正文(展示/FTS);embed_text = 上下文 + 正文(仅嵌入),空段跳过
+    // 组装 Chunk:整篇摘要 + 按标题分段,超长段按 ~1200 字符切分(不切代码块)
     let mut chunks = Vec::new();
-    for (i, (heading, crumb, sec_body)) in sections.into_iter().enumerate() {
-        let text = if heading.is_empty() {
-            sec_body.clone()
-        } else if sec_body.is_empty() {
-            heading.clone()
-        } else {
-            format!("{}\n{}", heading, sec_body)
-        };
-        if text.trim().is_empty() {
-            continue;
-        }
 
+    if let Some(summary) = build_summary(body) {
+        let text = format!("{fallback_title}\n\n{summary}");
+        chunks.push(Chunk {
+            id: make_id(source_path, "__summary__", 0),
+            source_path: source_path.to_string(),
+            title: fallback_title.clone(),
+            heading: "__summary__".to_string(),
+            breadcrumb: String::new(),
+            tags: tags.clone(),
+            date: date.clone(),
+            text: text.clone(),
+            embed_text: format!("{fallback_title} · 摘要\n{summary}"),
+        });
+    }
+
+    let mut ordinal = 1usize;
+    for (heading, crumb, sec_body) in sections.into_iter() {
         // 上下文前缀:文档标题 · 日期 · 面包屑(面包屑已含本级标题)
         let mut ctx: Vec<String> = Vec::new();
         if !fallback_title.is_empty() {
@@ -159,27 +170,190 @@ pub fn chunk_markdown(source_path: &str, content: &str) -> Vec<Chunk> {
         if !date.is_empty() {
             ctx.push(date.clone());
         }
-        let crumb_or_heading = if crumb.is_empty() { heading.clone() } else { crumb };
+        let crumb_or_heading = if crumb.is_empty() {
+            heading.clone()
+        } else {
+            crumb
+        };
         if !crumb_or_heading.is_empty() {
-            ctx.push(crumb_or_heading);
+            ctx.push(crumb_or_heading.clone());
         }
         let prefix = ctx.join(" · ");
-        let embed_text = match (prefix.is_empty(), sec_body.is_empty()) {
-            (true, _) => text.clone(),
-            (false, true) => prefix,
-            (false, false) => format!("{}\n{}", prefix, sec_body),
+        let breadcrumb = {
+            let title_prefix = format!("{fallback_title} › ");
+            if crumb_or_heading == fallback_title {
+                String::new()
+            } else {
+                crumb_or_heading
+                    .strip_prefix(&title_prefix)
+                    .map(str::to_string)
+                    .unwrap_or(crumb_or_heading)
+            }
         };
 
-        chunks.push(Chunk {
-            id: make_id(source_path, &heading, i),
-            source_path: source_path.to_string(),
-            title: fallback_title.clone(),
-            heading,
-            tags: tags.clone(),
-            date: date.clone(),
-            text,
-            embed_text,
-        });
+        for part in split_section(&sec_body) {
+            let text = if heading.is_empty() {
+                part.clone()
+            } else if part.is_empty() {
+                heading.clone()
+            } else {
+                format!("{}\n{}", heading, part)
+            };
+            if text.trim().is_empty() {
+                continue;
+            }
+            let embed_text = match (prefix.is_empty(), part.is_empty()) {
+                (true, _) => text.clone(),
+                (false, true) => prefix.clone(),
+                (false, false) => format!("{}\n{}", prefix, part),
+            };
+
+            chunks.push(Chunk {
+                id: make_id(source_path, &heading, ordinal),
+                source_path: source_path.to_string(),
+                title: fallback_title.clone(),
+                heading: heading.clone(),
+                breadcrumb: breadcrumb.clone(),
+                tags: tags.clone(),
+                date: date.clone(),
+                text,
+                embed_text,
+            });
+            ordinal += 1;
+        }
     }
+
     chunks
+}
+
+const MAX_SECTION_CHARS: usize = 1200;
+const SUMMARY_CHARS: usize = 600;
+
+/// 按 ~1200 字符切分,尽量不切断代码块。
+fn split_section(body: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    let mut in_code = false;
+
+    for line in body.lines() {
+        let is_fence = line.trim_start().starts_with("```");
+        let would_exceed = !in_code
+            && !current.is_empty()
+            && current.chars().count() + line.chars().count() + 1 > MAX_SECTION_CHARS;
+        if would_exceed {
+            parts.push(current.trim().to_string());
+            current.clear();
+        }
+        current.push_str(line);
+        current.push('\n');
+        if is_fence {
+            in_code = !in_code;
+        }
+    }
+    if !current.trim().is_empty() {
+        parts.push(current.trim().to_string());
+    }
+    if parts.is_empty() {
+        parts.push(String::new());
+    }
+    parts
+}
+
+/// 整篇摘要:标题列表 + 前 600 字符正文(跳过代码块)。
+fn build_summary(body: &str) -> Option<String> {
+    let mut headings = Vec::new();
+    let mut prose = String::new();
+    let mut in_code = false;
+
+    for line in body.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("```") {
+            in_code = !in_code;
+            continue;
+        }
+        if in_code {
+            continue;
+        }
+        if trimmed.starts_with('#') {
+            if headings.len() < 8 {
+                headings.push(trimmed.trim_start_matches('#').trim().to_string());
+            }
+            continue;
+        }
+        if prose.chars().count() < SUMMARY_CHARS {
+            prose.push_str(trimmed);
+            prose.push(' ');
+        }
+    }
+
+    let mut parts = Vec::new();
+    if !headings.is_empty() {
+        parts.push(headings.join(" / "));
+    }
+    let prose = prose.trim();
+    if !prose.is_empty() {
+        let mut clipped: String = prose.chars().take(SUMMARY_CHARS).collect();
+        if prose.chars().count() > SUMMARY_CHARS {
+            clipped.push('…');
+        }
+        parts.push(clipped);
+    }
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join("\n"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn builds_heading_breadcrumb_for_nested_sections() {
+        let content =
+            "---\ntitle: Demo\ndate: 2026-10-30\n---\n# Top\n\nintro\n\n## Child\n\nbody\n";
+        let chunks = chunk_markdown("demo.md", content);
+
+        assert_eq!(chunks.len(), 3);
+        assert_eq!(chunks[0].heading, "__summary__");
+        assert_ne!(chunks[1].heading, "__summary__");
+        assert_eq!(chunks[1].breadcrumb, "Top");
+        assert_eq!(chunks[2].breadcrumb, "Top › Child");
+        assert_eq!(chunks[1].title, "Demo");
+    }
+
+    #[test]
+    fn splits_long_sections_without_cutting_code_fences() {
+        let body = format!("```\n{}\n```\n\n{}", "x".repeat(1500), "tail");
+        let parts = split_section(&body);
+        assert_eq!(parts.len(), 2);
+        assert!(parts[0].contains("```"));
+        assert!(parts[0].contains(&"x".repeat(1500)));
+        assert_eq!(parts[1], "tail");
+    }
+
+    #[test]
+    fn builds_document_summary() {
+        let content = "---\ntitle: Demo\n---\n# Top\n\nfirst paragraph\n\n## Child\n\nsecond\n";
+        let chunks = chunk_markdown("demo.md", content);
+        let summary = chunks
+            .iter()
+            .find(|chunk| chunk.heading == "__summary__")
+            .unwrap();
+        assert!(summary.text.contains("Top"));
+        assert!(summary.text.contains("first paragraph"));
+        assert!(summary.text.contains("Child"));
+    }
+
+    #[test]
+    fn parses_front_matter_keys() {
+        let (fm, body) =
+            parse_front_matter("---\ntitle: T\ntags: a, b\ndate: 2026-01-02\n---\n\nBody\n");
+
+        assert_eq!(fm.title.as_deref(), Some("T"));
+        assert_eq!(fm.tags.as_deref(), Some("a, b"));
+        assert_eq!(fm.date.as_deref(), Some("2026-01-02"));
+        assert_eq!(body.trim(), "Body");
+    }
 }

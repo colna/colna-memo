@@ -1,0 +1,8 @@
+[
+  {"query": "colna-memo 架构 zvec", "expected": ["10-Projects/colna-memo.md"]},
+  {"query": "MCP 写接口 kb_put", "expected": ["10-Projects/colna-memo.md"]},
+  {"query": "SmartReply SP 桥", "expected": ["30-Resources/smartreply-sp-bridge.md"]},
+  {"query": "CE DM 没有自动回复", "expected": ["30-Resources/troubleshooting/ce-dm-no-reply-pull-upload.md"]},
+  {"query": "x-operator 内容策略", "expected": ["10-Projects/x-operator.md"]},
+  {"query": "PWA 本地端口冲突", "expected": ["30-Resources/troubleshooting/pwa-localhost-port-conflict.md"], "path": "30-Resources/troubleshooting/"}
+]

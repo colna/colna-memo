@@ -8,6 +8,9 @@ use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 /// embedding 向量维度(multilingual-e5-base = 768)
 pub const DIM: usize = 768;
 
+/// 写入 state.json 的模型标识;变更模型会自动触发全量重建。
+pub const MODEL_ID: &str = "multilingual-e5-base";
+
 pub struct Embedder {
     model: TextEmbedding,
 }
@@ -25,8 +28,7 @@ impl Embedder {
 
     fn with_progress(show: bool) -> Result<Self> {
         let model = TextEmbedding::try_new(
-            InitOptions::new(EmbeddingModel::MultilingualE5Base)
-                .with_show_download_progress(show),
+            InitOptions::new(EmbeddingModel::MultilingualE5Base).with_show_download_progress(show),
         )?;
         Ok(Self { model })
     }
@@ -35,8 +37,13 @@ impl Embedder {
     /// batch=32:内存紧张 / 共享机器上,小批次可显著降低单批峰值内存、避免 swap 抖动拖慢全量重建
     /// (默认 256 批在 e5-base/768 维 + 已满 swap 的机器上会龟速)。
     pub fn embed_passages(&mut self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
+        if texts.is_empty() {
+            return Ok(Vec::new());
+        }
         let docs: Vec<String> = texts.iter().map(|t| format!("passage: {}", t)).collect();
-        let embeddings = self.model.embed(docs, Some(32))?;
+        // 上层已做有界串行切片;显式限制为单个 fastembed batch,避免内部 Rayon 并发。
+        let batch_size = docs.len().min(32);
+        let embeddings = self.model.embed(docs, Some(batch_size))?;
         Ok(embeddings)
     }
 

@@ -8,8 +8,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const MEMORY_DIR: &str = "memory";
-// 新笔记默认落收件箱(PARA 约定,见 memory/CONVENTIONS.md),后续整理
-const NOTES_DIR: &str = "00-Inbox";
 
 /// 在 root 下执行一条 git 命令,返回 stdout(去尾换行)。失败则带上 stderr 报错。
 fn git(root: &Path, args: &[&str]) -> Result<String> {
@@ -37,7 +35,15 @@ fn check_conflict_markers(root: &Path) -> Result<()> {
         .arg("-C")
         .arg(root)
         .args([
-            "grep", "-n", "--untracked", "-e", "^<<<<<<<", "-e", "^>>>>>>>", "--", MEMORY_DIR,
+            "grep",
+            "-n",
+            "--untracked",
+            "-e",
+            "^<<<<<<<",
+            "-e",
+            "^>>>>>>>",
+            "--",
+            MEMORY_DIR,
         ])
         .output()
         .context("执行 git grep 失败(git 是否安装?)")?;
@@ -66,119 +72,95 @@ fn ensure_repo(root: &Path) -> Result<()> {
         .output()
         .context("执行 git 失败(git 是否安装?)")?;
     if !out.status.success() {
-        bail!("{} 不是 git 仓库,无法 sync。请先 git init 并配置远端。", root.display());
+        bail!(
+            "{} 不是 git 仓库,无法 sync。请先 git init 并配置远端。",
+            root.display()
+        );
     }
     Ok(())
 }
 
-/// 把标题转成相对安全的文件名:保留中英文与数字,空白转连字符,去掉路径分隔符等。
-fn slugify(title: &str) -> String {
-    let mut s = String::with_capacity(title.len());
-    for ch in title.chars() {
-        if ch.is_alphanumeric() {
-            s.push(ch);
-        } else if ch.is_whitespace() || ch == '-' || ch == '_' {
-            s.push('-');
-        }
-        // 其它字符(/ \ . : 等)直接丢弃,避免越权或扩展名歧义
+/// sync 不能在未完成的 Git 操作上继续,否则后续 commit/reindex 会污染现场。
+fn ensure_no_git_operation(root: &Path) -> Result<()> {
+    let git_dir = PathBuf::from(git(root, &["rev-parse", "--absolute-git-dir"])?);
+    let operation_markers = [
+        "rebase-merge",
+        "rebase-apply",
+        "MERGE_HEAD",
+        "CHERRY_PICK_HEAD",
+        "REVERT_HEAD",
+    ];
+    if let Some(marker) = operation_markers
+        .iter()
+        .find(|marker| git_dir.join(marker).exists())
+    {
+        bail!("检测到未完成的 Git 操作({marker}),请先处理后再 sync");
     }
-    let s = s.trim_matches('-').to_string();
-    if s.is_empty() {
-        "note".to_string()
-    } else {
-        s
+
+    let unmerged = git(root, &["diff", "--name-only", "--diff-filter=U"])?;
+    if !unmerged.is_empty() {
+        bail!("检测到未解决的 Git 冲突,请先处理后再 sync:\n{unmerged}");
     }
+    Ok(())
 }
 
-/// `colna add`:在 memory/00-Inbox/ 下新建一篇带 front-matter 的笔记,然后增量重建索引。
-///
-/// body 为正文(可来自 --body 或 stdin);date 用今天;不自动 git 提交(交给 sync)。
-pub fn add_note(
-    root: &Path,
-    title: &str,
-    tags: &str,
-    body: &str,
-    reindex: impl FnOnce(&Path) -> Result<()>,
-) -> Result<PathBuf> {
-    let notes_dir = root.join(MEMORY_DIR).join(NOTES_DIR);
-    std::fs::create_dir_all(&notes_dir)
-        .with_context(|| format!("创建笔记目录失败: {}", notes_dir.display()))?;
-
-    // 文件名:slug;若已存在则追加 -2 -3 ... 避免覆盖
-    let base = slugify(title);
-    let mut path = notes_dir.join(format!("{}.md", base));
-    let mut n = 2;
-    while path.exists() {
-        path = notes_dir.join(format!("{}-{}.md", base, n));
-        n += 1;
+/// 拒绝调用方已经 staged 的非 memory 文件,防止 `colna sync` 顺带提交源码等改动。
+fn ensure_no_staged_changes_outside_memory(root: &Path) -> Result<()> {
+    let staged = git(root, &["diff", "--cached", "--name-only"])?;
+    let outside: Vec<&str> = staged
+        .lines()
+        .filter(|path| *path != MEMORY_DIR && !path.starts_with("memory/"))
+        .collect();
+    if !outside.is_empty() {
+        bail!(
+            "检测到 memory/ 外已有 staged 改动,为避免误提交已中止 sync:\n{}",
+            outside.join("\n")
+        );
     }
-
-    let date = today();
-    let fm_tags = tags.trim();
-    let mut content = String::new();
-    content.push_str("---\n");
-    content.push_str(&format!("title: {}\n", title.trim()));
-    content.push_str(&format!("date: {}\n", date));
-    if !fm_tags.is_empty() {
-        content.push_str(&format!("tags: {}\n", fm_tags));
-    }
-    content.push_str("---\n\n");
-    let body = body.trim();
-    if !body.is_empty() {
-        content.push_str(body);
-        content.push('\n');
-    }
-
-    std::fs::write(&path, content).with_context(|| format!("写入笔记失败: {}", path.display()))?;
-    println!("📝 已新建笔记 → {}", path.display());
-
-    // 自动增量重建索引
-    reindex(root)?;
-    Ok(path)
+    Ok(())
 }
 
 /// `colna sync`:跨设备同步一条龙。
 ///
 /// 步骤:
-///   1. git pull --rebase(拉远端最新,真源对齐)
-///   2. reindex(把拉下来的变更吸收进本地索引)
-///   3. 冲突标记守卫:memory/ 残留 `<<<<<<<` / `>>>>>>>` 则中止
-///   4. git add memory/ + 有改动则 commit
-///   5. reindex(把本地新改动也吸收进索引)
-///   6. git push
+///   1. Git 状态与冲突标记守卫
+///   2. git add memory/ + 有改动则 commit
+///   3. git pull --rebase --autostash(拉远端最新,真源对齐)
+///   4. reindex(最终真源状态只处理一次)
+///   5. git push
 fn run_sync(root: &Path, message: &str, reindex: &dyn Fn(&Path) -> Result<()>) -> Result<()> {
     ensure_repo(root)?;
-
-    // 1. pull --rebase(无上游/无远端时给出友好提示,不致命)
-    println!("⬇️  git pull --rebase ...");
-    match git(root, &["pull", "--rebase"]) {
-        Ok(o) => {
-            if !o.is_empty() {
-                println!("{}", o);
-            }
-        }
-        Err(e) => println!("(跳过 pull:{})", first_line(&e.to_string())),
-    }
-
-    // 2. 拉完先 reindex,保证本地索引含远端内容
-    reindex(root)?;
-
-    // 3. 提交前守卫:有未解决的冲突标记就中止,不让脏文件进版本库
+    ensure_no_git_operation(root)?;
     check_conflict_markers(root)?;
+    ensure_no_staged_changes_outside_memory(root)?;
 
-    // 4. 暂存 memory/ 下的真源改动
-    git(root, &["add", MEMORY_DIR])?;
+    // 先保存本地 memory 真源,让后续 rebase 有稳定的本地提交可重放。
+    git(root, &["add", "--", MEMORY_DIR])?;
     let staged = git(root, &["status", "--porcelain", "--", MEMORY_DIR])?;
     if staged.is_empty() {
         println!("✅ memory/ 无本地改动,无需提交。");
     } else {
         println!("⬆️  提交本地改动 ...");
         git(root, &["commit", "-m", message])?;
-        // 4. 提交后再 reindex 一次(吸收本地新内容)
-        reindex(root)?;
     }
 
-    // 5. push
+    println!("⬇️  git pull --rebase --autostash ...");
+    let pull = git(root, &["pull", "--rebase", "--autostash"]).map_err(|e| {
+        anyhow!(
+            "pull --rebase 失败,已停止 reindex/push: {}",
+            first_line(&e.to_string())
+        )
+    })?;
+    if !pull.is_empty() {
+        println!("{}", pull);
+    }
+
+    ensure_no_git_operation(root)
+        .map_err(|error| anyhow!("pull 后 autostash 恢复未完成,已停止 reindex/push: {error}"))?;
+
+    // commit + pull 完成后真源才稳定,只需重建一次。
+    reindex(root)?;
+
     println!("⬆️  git push ...");
     match git(root, &["push"]) {
         Ok(o) => {
@@ -204,18 +186,274 @@ fn first_line(s: &str) -> String {
     s.lines().next().unwrap_or(s).to_string()
 }
 
-/// 今天日期 YYYY-MM-DD(本地时区)。用 date 命令,避免引入额外时间库。
-fn today() -> String {
-    Command::new("date")
-        .args(["+%Y-%m-%d"])
-        .output()
-        .ok()
-        .and_then(|o| {
-            if o.status.success() {
-                Some(String::from_utf8_lossy(&o.stdout).trim().to_string())
-            } else {
-                None
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::Cell;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static NEXT_TEST_ID: AtomicU64 = AtomicU64::new(1);
+
+    struct TestRepo {
+        sandbox: PathBuf,
+        local: PathBuf,
+        remote: PathBuf,
+    }
+
+    impl TestRepo {
+        fn new() -> Self {
+            let id = NEXT_TEST_ID.fetch_add(1, Ordering::Relaxed);
+            let sandbox = std::env::temp_dir().join(format!(
+                "colna-memo-gitsync-test-{}-{id}",
+                std::process::id()
+            ));
+            std::fs::create_dir_all(&sandbox).unwrap();
+
+            let remote = sandbox.join("remote.git");
+            let local = sandbox.join("local");
+            run_git(
+                &sandbox,
+                &["init", "--bare", "--initial-branch=main", path_str(&remote)],
+            );
+            run_git(&sandbox, &["clone", path_str(&remote), path_str(&local)]);
+            configure_repo(&local);
+
+            std::fs::create_dir_all(local.join("memory")).unwrap();
+            std::fs::create_dir_all(local.join("src")).unwrap();
+            std::fs::write(local.join("memory/base.md"), "base\n").unwrap();
+            std::fs::write(local.join("src/app.txt"), "original\n").unwrap();
+            run_git(&local, &["add", "memory", "src"]);
+            run_git(&local, &["commit", "-m", "initial"]);
+            run_git(&local, &["push", "-u", "origin", "main"]);
+
+            Self {
+                sandbox,
+                local,
+                remote,
             }
+        }
+
+        fn clone_peer(&self) -> PathBuf {
+            let peer = self.sandbox.join("peer");
+            run_git(
+                &self.sandbox,
+                &["clone", path_str(&self.remote), path_str(&peer)],
+            );
+            configure_repo(&peer);
+            peer
+        }
+    }
+
+    impl Drop for TestRepo {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.sandbox);
+        }
+    }
+
+    fn path_str(path: &Path) -> &str {
+        path.to_str().unwrap()
+    }
+
+    fn configure_repo(repo: &Path) {
+        run_git(repo, &["config", "user.name", "colna-test"]);
+        run_git(repo, &["config", "user.email", "colna-test@example.com"]);
+        run_git(repo, &["config", "commit.gpgsign", "false"]);
+        run_git(repo, &["config", "core.hooksPath", "/dev/null"]);
+    }
+
+    fn run_git(root: &Path, args: &[&str]) -> String {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout)
+            .trim_end()
+            .to_string()
+    }
+
+    #[test]
+    fn sync_preserves_local_dirty_source_and_integrates_remote_memory() {
+        let repo = TestRepo::new();
+        let peer = repo.clone_peer();
+        std::fs::write(peer.join("memory/remote.md"), "remote\n").unwrap();
+        run_git(&peer, &["add", "memory"]);
+        run_git(&peer, &["commit", "-m", "remote memory"]);
+        run_git(&peer, &["push"]);
+
+        std::fs::write(repo.local.join("memory/local.md"), "local\n").unwrap();
+        std::fs::write(repo.local.join("src/app.txt"), "dirty source\n").unwrap();
+        let reindex_calls = Cell::new(0);
+
+        run_sync(&repo.local, "local memory", &|_| {
+            reindex_calls.set(reindex_calls.get() + 1);
+            Ok(())
         })
-        .unwrap_or_default()
+        .unwrap();
+
+        assert_eq!(reindex_calls.get(), 1);
+        assert_eq!(
+            std::fs::read_to_string(repo.local.join("src/app.txt")).unwrap(),
+            "dirty source\n"
+        );
+        assert_eq!(
+            run_git(&repo.local, &["status", "--short", "--", "src"]),
+            " M src/app.txt"
+        );
+        assert_eq!(
+            run_git(&repo.remote, &["show", "main:memory/local.md"]),
+            "local"
+        );
+        assert_eq!(
+            run_git(&repo.remote, &["show", "main:memory/remote.md"]),
+            "remote"
+        );
+        assert_eq!(
+            run_git(&repo.remote, &["show", "main:src/app.txt"]),
+            "original"
+        );
+    }
+
+    #[test]
+    fn sync_rejects_staged_changes_outside_memory_without_reindexing() {
+        let repo = TestRepo::new();
+        std::fs::write(repo.local.join("memory/local.md"), "local\n").unwrap();
+        std::fs::write(repo.local.join("src/app.txt"), "staged source\n").unwrap();
+        run_git(&repo.local, &["add", "src/app.txt"]);
+        let reindex_calls = Cell::new(0);
+
+        let error = run_sync(&repo.local, "local memory", &|_| {
+            reindex_calls.set(reindex_calls.get() + 1);
+            Ok(())
+        })
+        .unwrap_err();
+
+        assert!(error.to_string().contains("memory/ 外"));
+        assert_eq!(reindex_calls.get(), 0);
+        assert_eq!(
+            run_git(&repo.local, &["diff", "--cached", "--name-only"]),
+            "src/app.txt"
+        );
+        assert_eq!(
+            run_git(&repo.local, &["log", "-1", "--pretty=%s"]),
+            "initial"
+        );
+    }
+
+    #[test]
+    fn pull_failure_stops_before_reindex_and_push() {
+        let repo = TestRepo::new();
+        let missing_remote = repo.sandbox.join("missing.git");
+        run_git(
+            &repo.local,
+            &["remote", "set-url", "origin", path_str(&missing_remote)],
+        );
+        std::fs::write(repo.local.join("memory/local.md"), "local\n").unwrap();
+        let reindex_calls = Cell::new(0);
+
+        let error = run_sync(&repo.local, "local memory", &|_| {
+            reindex_calls.set(reindex_calls.get() + 1);
+            Ok(())
+        })
+        .unwrap_err();
+
+        assert!(error.to_string().contains("已停止 reindex/push"));
+        assert_eq!(reindex_calls.get(), 0);
+        assert_eq!(
+            run_git(&repo.local, &["log", "-1", "--pretty=%s"]),
+            "local memory"
+        );
+        assert_eq!(
+            run_git(&repo.remote, &["log", "-1", "--pretty=%s"]),
+            "initial"
+        );
+    }
+
+    #[test]
+    fn autostash_restore_conflict_stops_before_reindex_and_push() {
+        let repo = TestRepo::new();
+        let peer = repo.clone_peer();
+        std::fs::write(peer.join("src/app.txt"), "remote source\n").unwrap();
+        run_git(&peer, &["add", "src/app.txt"]);
+        run_git(&peer, &["commit", "-m", "remote source"]);
+        run_git(&peer, &["push"]);
+
+        std::fs::write(repo.local.join("memory/local.md"), "local memo\n").unwrap();
+        std::fs::write(repo.local.join("src/app.txt"), "local dirty source\n").unwrap();
+        let reindex_calls = Cell::new(0);
+
+        let error = run_sync(&repo.local, "local memory", &|_| {
+            reindex_calls.set(reindex_calls.get() + 1);
+            Ok(())
+        })
+        .unwrap_err();
+
+        assert!(error.to_string().contains("autostash"));
+        assert_eq!(reindex_calls.get(), 0);
+        assert_eq!(
+            run_git(&repo.local, &["diff", "--name-only", "--diff-filter=U"]),
+            "src/app.txt"
+        );
+        assert_eq!(
+            run_git(&repo.remote, &["log", "-1", "--pretty=%s"]),
+            "remote source"
+        );
+
+        let second_error = run_sync(&repo.local, "second sync", &|_| Ok(())).unwrap_err();
+        assert!(second_error.to_string().contains("未解决的 Git 冲突"));
+    }
+
+    #[test]
+    fn rebase_conflict_blocks_retry_and_abort_restores_local_changes() {
+        let repo = TestRepo::new();
+        let peer = repo.clone_peer();
+        std::fs::write(peer.join("memory/base.md"), "remote memo\n").unwrap();
+        run_git(&peer, &["add", "memory/base.md"]);
+        run_git(&peer, &["commit", "-m", "remote memo"]);
+        run_git(&peer, &["push"]);
+
+        std::fs::write(repo.local.join("memory/base.md"), "local memo\n").unwrap();
+        std::fs::write(repo.local.join("src/app.txt"), "local dirty source\n").unwrap();
+        let reindex_calls = Cell::new(0);
+
+        let error = run_sync(&repo.local, "local memory", &|_| {
+            reindex_calls.set(reindex_calls.get() + 1);
+            Ok(())
+        })
+        .unwrap_err();
+
+        assert!(error.to_string().contains("pull --rebase 失败"));
+        assert_eq!(reindex_calls.get(), 0);
+        assert_eq!(
+            run_git(&repo.local, &["diff", "--name-only", "--diff-filter=U"]),
+            "memory/base.md"
+        );
+
+        let second_error = run_sync(&repo.local, "second sync", &|_| Ok(())).unwrap_err();
+        assert!(second_error.to_string().contains("未完成的 Git 操作"));
+
+        run_git(&repo.local, &["rebase", "--abort"]);
+        assert_eq!(
+            std::fs::read_to_string(repo.local.join("memory/base.md")).unwrap(),
+            "local memo\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(repo.local.join("src/app.txt")).unwrap(),
+            "local dirty source\n"
+        );
+        assert_eq!(
+            run_git(&repo.local, &["log", "-1", "--pretty=%s"]),
+            "local memory"
+        );
+        assert_eq!(
+            run_git(&repo.remote, &["log", "-1", "--pretty=%s"]),
+            "remote memo"
+        );
+    }
 }
