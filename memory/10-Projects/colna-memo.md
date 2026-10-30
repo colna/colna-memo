@@ -218,8 +218,11 @@ tags: project, rust, knowledge-base, zvec, embedding, mcp, para
 
 ### 验证
 
-- `cargo test`:56 passed;`cargo clippy --all-targets -- -D warnings` 通过。
+- `cargo test`:60 passed / 1 ignored(大集合 zvec finalize 回归);`cargo clippy --all-targets -- -D warnings` 通过。
 - 临时库端到端:digest / consolidate --apply / work / graph / related / eval / scope / secrets --fix /
   ingest(txt/html) / task / watch-url / skills index+search / MCP `kb_task_*` 全链路通过。
-- 真实库因 schema v5 重建中(5656 chunks);完成后复跑 `eval/smoke.json` 与 MCP 读工具。
+- 真实库:state v5 / e5-base / chunker 3,330 files / 5665 chunks;`eval/smoke.json` recall@k 1.000 / MRR 0.639;
+  `skills index` 81 个技能;MCP `kb_search` / `kb_context` / `kb_get` 读工具通过。
+- 索引加固:把 `.colna/index.lock` 单文件改成 `.colna/index.lock.d/` 目录(按 PID 判活,`rm -f index.lock` 不再能误删);
+  此前并行 `colna sync` 删除锁文件后与长索引并发,把 `scalar.0.ipc` 写成 0,已复现并修复。
 - 未验证:`--rerank`(需下载 BGE reranker 模型)、age 加密(本机无 age)、whisper 转写(本机无 whisper)。
