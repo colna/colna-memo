@@ -34,12 +34,34 @@
 cargo build            # 首次会下载 zvec 预编译库
 ```
 
-## 使用
+## 使用方式
 
 由于 zvec 预编译动态库的 rpath 限制,直接跑二进制需要设 `DYLD_LIBRARY_PATH`。
-仓库提供了 `./colna` 包装脚本自动处理:
+仓库提供了 `./colna` 包装脚本自动处理(`colna` 不在 PATH,请用 `./colna`):
 
 ![记忆闭环：Capture → Retrieve → Act → Record → Consolidate](docs/images/colna-memory-loop.png)
+
+### 最短路径
+
+1. `git clone` 后执行 `cargo build`。
+2. 第一次执行 `./colna index` 建本地索引。
+3. 日常查:`./colna search "..."`;需要整包上下文用 `./colna context "..."`。
+4. 记录:`./colna add` / `./colna clip` / `./colna ingest` 写进 `memory/`。
+5. 收尾:`./colna sync`(commit → pull --rebase → reindex → push)。
+
+### 日常流程
+
+| 场景 | 怎么做 |
+|---|---|
+| 新设备 | `git clone` → `cargo build` → `./colna index` |
+| 查 | `./colna search "..."`;上下文包 `./colna context "<task>"` |
+| 记 | `./colna add` / `clip` / `ingest`;写完 `./colna sync` |
+| 给 agent | 配置 MCP(见下文「MCP server」);新会话重启后生效 |
+| 整理 | `./colna digest` / `consolidate --apply` / `work --sync` |
+| 维护 | `./colna eval eval/smoke.json` / `skills index` / `watch --once --digest` |
+| 可选 | `--scope` / `secrets` / `watch-url` / `task` / `--rerank` |
+
+### 常用命令
 
 ```bash
 ./colna index                      # 增量更新本地索引(只重嵌入变化的文件)
@@ -215,7 +237,7 @@ v5 起索引包含 `breadcrumb`(标题路径)、`kind`(`section` / `summary`)字
 - `kb_task_finish(path, status?, outcome, evidence?, confirm?)`;
 - `kb_task_list(status?)`。
 
-在 Claude / 客户端的 MCP 配置中加入(用绝对路径,`./colna` 会自动设好 dylib 路径):
+Claude Code / Cursor 的 MCP 配置(`~/.claude.json` 的 `mcpServers` 或 `~/.cursor/mcp.json`):
 
 ```json
 {
@@ -227,6 +249,22 @@ v5 起索引包含 `breadcrumb`(标题路径)、`kind`(`section` / `summary`)字
   }
 }
 ```
+
+OpenCode 的 `~/.config/opencode/opencode.json`:
+
+```json
+{
+  "mcp": {
+    "colna-memo": {
+      "type": "local",
+      "command": ["/绝对路径/colna-memo/colna", "--root", "/绝对路径/colna-memo", "mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+配置后重启对应 agent 会话;`colna mcp` 是长驻 stdio server,不会热加载新工具。
 
 ### 任务 receipt
 
