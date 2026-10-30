@@ -10,6 +10,13 @@ tags: [project, x, twitter, automation, content, monetization]
 
 英文 X 个人 IP 账号 Colna，主打 Creator Change Log 系列，0 粉起步，全自动运营，面向欧美创作者/社媒运营。个人是脸和语气，Creator Change Log 是内容主线。无 Premium；X API 为 pay-per-use，最低买一次 credits 拿 $20 赠送额度，90 天测试约 $3/月。不做 X 广告分成，变现路径为创作者工具联盟 → newsletter → 赞助/数字产品。
 
+## 现状（2026-10-30）
+
+- 内容 v2 已上线（commit `04794a7`，main 已 push）：默认配图改为确定性信息卡（`@napi-rs/canvas`，1200x675，暖米色 + 平台色 + 标题 + MY TAKE），AIGC 手绘降为 fallback；生成改 2 条 change_take + 1 条 playbook；新增 `weak_hook` 拒绝“平台 is testing/launches…”开头；`storyTitles` 跨队列去重阈值 0.2；队列上限 12；发帖 1 条/天（前 7 天）→ 2 条/天；cron 改 15:00 / 21:00 UTC。
+- 队列已整理：活跃 9 条（TikTok Must Eat、TikTok Shop 改写、Instagram 付费、LinkedIn 变现 + 5 条 seed），其余 16 条移到 `content/seed-backlog.jsonl`；`image_path` 从队列移除，统一走卡。
+- 2026-10-30 01:24 UTC 已用旧代码发出弱开头 YouTube payout 帖（`2115978049636184305`），今日 `daily_limit` 已用完；新代码首帖预计 2026-10-31 15:00 UTC（TikTok Must Eat）。
+- 测试：`npm test` 9/9；本地卡片样例 `/tmp/x-operator-card.png` 和队列首条卡已目检。
+
 ## 现状（2026-10-29）
 
 - 账号：已有 `@colna_zheng`（0 粉、1 following、2025-12 注册），等同新号；handle 保留，显示名 `Colna`，bio 已设 Creator Change Log，头像已换。公开 bio 不写 AI/自动化；不编造亲测经历/客户案例/数据。
@@ -26,15 +33,15 @@ tags: [project, x, twitter, automation, content, monetization]
 ## 关键决策
 
 - Niche：平台规则/功能变更 + 个人 operator take，覆盖 Instagram、TikTok、YouTube、X、LinkedIn。
-- 节奏：3 条/天（UTC 16:00 / 19:00 / 21:30），免费 API 额度内；默认无 source reply，`ENABLE_SOURCE_LINKS=true` 才附。
-- 发帖时间（2026-10-29 调研并已改 cron）：Buffer 2026（8.7M tweets）工作日 9–11 AM local 最强；Sprout 2026（2B engagements / 307k profiles）Tue–Thu 12–6 PM local、Software/Tech 11 AM–4 PM；折中取 16:00 / 19:00 / 21:30 UTC（EDT 12/3/5:30 PM ET，PT 9 AM/12 PM/2:30 PM；EST 11/2/4:30 PM ET）。4 周后用自己 metrics 校准。
+- 节奏：1 条/天（前 7 天）→ 2 条/天；UTC 15:00 / 21:00；默认无 source reply，`ENABLE_SOURCE_LINKS=true` 才附。
+- 发帖时间（2026-10-30 改 cron）：取 15:00 / 21:00 UTC（EDT 11 AM / 5 PM ET；PT 8 AM / 2 PM PT），4 周后用 metrics 校准。
 - 不做关注/私信/自动回复，避免封号和 automation 规则风险；个人 IP 路线不公开 AI/自动化，平台仍可能自动标注。
 - 只用官方 API，不用浏览器/登录会话自动化。
 - 不走 X web 逆向/会话自动化：违反 ToS、绕过 pay-per-use、封号风险；REA 只用于合法分析。
 - OAuth 1.0a 反复 401，已切 OAuth 2.0；Client ID 实际是 `alF4...`（小写 l，不是数字 1），refresh token 6 个月，状态用 AES-256-GCM 加密存 `state/oauth2.enc.json`，key 为 `OAUTH2_STATE_KEY`。
 - LLM 用 DeepSeek；Humanizer skill 已装 `~/.agents/skills/humanizer`，生成后二遍编辑，`HUMANIZER=off` 可关。DeepSeek key 不落仓库（已在聊天暴露，建议轮换）。
 - 风控：预热 1→2→3 条/天；默认不发链接；0-10 分钟 jitter；资料完整后再发；开发者 app 不勾 DM。
-- 配图：2026-10-29 定稿手绘明亮风（暖米色纸、黑手绘线、珊瑚红/青绿/芥末黄、无文字/logo/真人）；prompt 在 `content/image-prompt.txt` / `content/image-style.md`，AIGC `gpt-image-2.5-sunburst` 3:2；不再用深色 AI 图。
+- 配图：2026-10-30 起默认信息卡（`src/lib/card-image.mjs`，暖米色 + 平台色 + 标题 + MY TAKE，1200x675），不再用装饰插画；`IMAGE_MODE=aigc` 可强制旧手绘 fallback，卡片失败才回退 AIGC。
 - 内容优先级：新新闻 prepend 到队列头部；introduction 帖 `priority: 100` 先发。
 - 个人 IP：第一人称、短句、观点明确；不冒充亲测，不写成品牌公告。
 - 停止线：90 天 <100 粉或 <5 万展示；180 天 <$50 收入。
@@ -52,11 +59,12 @@ tags: [project, x, twitter, automation, content, monetization]
 - 首条：`https://x.com/colna_zheng/status/2115381703002947668`
 - 第二条（手绘 Instagram）：`https://x.com/colna_zheng/status/2115634640224706688`
 - 旧 YouTube `2115403860965781914`、旧 Instagram `2115420088350478660` 已删除。
-- 仓库：`https://github.com/colna/x-operator`（private，commit `cbb4c0a`）
-- 定时：generate 06:00 UTC；post 16:00 / 19:00 / 21:30 UTC；metrics 23:00 UTC
-- 今天已发 1 条（手绘 Instagram）；今天 16:00/19:00/21:30 UTC 的 cron 因 `daily_limit` 跳过；下一帖 2026-10-30 16:00 UTC（12 PM ET / 9 AM PT）发 YouTube payout 改写（带手绘图）。
+- 仓库：`https://github.com/colna/x-operator`（private，commit `04794a7`）
+- 定时：generate 06:00 UTC；post 15:00 / 21:00 UTC；metrics 23:00 UTC
+- 2026-10-30 01:24 UTC 已用旧文案发 YouTube payout（`2115978049636184305`），今日额度用完；下一帖 2026-10-31 15:00 UTC 发 TikTok Must Eat（信息卡）。
 - 余额：约 $4.9；$20 赠送未到账
 - 风险：控制台生成的 OAuth 2.0 token 带 DM scope；代码不调用 DM，但 token 权限较大，必须只存 `.env`/secret/加密 state。
+- 2026-10-30：GitHub Actions 在 01:15 已有 pending、01:24 发帖，pull 时 queue/seen 冲突；已保留远端已发状态，手工合并队列（无重复发帖）。
 
 ## 架构
 
