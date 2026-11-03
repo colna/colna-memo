@@ -81,3 +81,35 @@ pnpm test      # 运行测试
 - **改动**：`packages/app-pwa/src/hooks/useInsTaskInit.ts`（+31/−6）。`!igAuthed && (hasBoundInstagram() || igCard === true)` 时补探一次；`await waitForBridge()` 防 -500；只有 `code===0 && type===0` 才补写 `setPlatformAuth` / `markAuthEvidence` / `setPlatformLoggedIn` / `setPlatformAbnormal(false)`，未授权且探测失败一律不写（避免手动用户名用户误弹 Reconnect）；兜底不置 `socialProxyChecking`。
 - **状态**：分支 `fix/pwa-coldstart-auth-fallback`（从 `feature/pwa` `845a2ed7f` 切出），commit `272ad2b7a`，已 push，MR [!1357](https://gitlab.sitinai.com/frontend/sitin-next/-/merge_requests/1357) → `feature/pwa`，`opened` / `can_be_merged`。eslint、`tsc -b`、`pnpm --filter @heyhru/app-pwa build` 均通过。
 - **未决**：线上实际卡门 A 还是门 B 判不了，需按日志对号 `[INS_BRIDGE] setPlatformAuth:`（`insStore.ts:97`）与 `[INS_BRIDGE] setPlatformAbnormal:`（`insStore.ts:125`）——有前无后 = 门 B，两条都无 = 非 APK / 门 A。native 侧更根治的修法是不在 PWA 未 attach 时移除 sticky，或 attach 后补投。
+
+## 进行中（2026-11-03）earning-ai 三分支集成 + 悬浮窗授权修复
+
+### 分支与 MR 现状
+
+| 分支 | tip | 去向 | 状态 |
+|---|---|---|---|
+| `feat/earning-ai` | `5a386f14f` | MR [!1360](https://gitlab.sitinai.com/frontend/sitin-next/-/merge_requests/1360) → `feature/pwa` | opened / can_be_merged / 无冲突 |
+| `release/test-pwa2` | `de5afdff5` | 已 push（`4bb38cfec..de5afdff5`） | 本地与远端 `0 0` |
+| `fix/pwa-coldstart-auth-fallback` | `272ad2b7a` | MR [!1357](https://gitlab.sitinai.com/frontend/sitin-next/-/merge_requests/1357) → `feature/pwa` | opened，待评审 |
+| `release/test-pwa` | `42be0162c` | — | 10:27 撤销 earning-ai 合并，未 push 过 |
+
+- `feat/earning-ai` 由 `origin/feat/gxy/pwa-native-bridge`（`eea7346ae`，已含 `feature/pwa` `845a2ed7f`）切出，再合 `origin/feat/pwa-byteplus-app-id-url`（`ab2920d33`）与 `fix/pwa-coldstart-auth-fallback`（`272ad2b7a`）→ merge `4da195319`、`ff8b4322e`。以 gxy 为基少一次大 merge，只处理 byteplus 与 fix。
+- 之后两个修复提交直接落该分支：`f46469c37`（版本门→端能力门，+8/−1）、`5a386f14f`（回前台补拉小崽，+42/−1）。
+- **撤销记录**：`release/test-pwa` 上误建的 merge `af23d240c` 已 `git reset --hard origin/release/test-pwa` 撤销（仍在 reflog 可恢复）；该 merge 从未 push。
+
+### push 被拒的标准处理
+
+12:52 推 `release/test-pwa2` 被拒：远端已前进 11 个提交（`fix/pwa-online-hotfix-1103` + profile 修复）。做法：`git fetch` → 确认 merge-base 仍是自己上次推送的 `ff8b4322e`（证明远端没回退/改历史）→ 本地仅 `f46469c37` 独有 → `git merge --no-ff FETCH_HEAD` 干净合并为 `4bb38cfec` → 再 push。**不在未确认 merge-base 前 rebase 或 force**。
+
+### 代码改动（web）
+
+- `packages/app-pwa/src/hooks/useInsTaskInit.ts` —— `initInsFollowedUsers` 版本门改能力门（`hasNativeMethod("checkSocialProxyPageAbnormal") && hasNativeMethod("startSocialProxyRobot") || version>=1.34`）；新增 `visibilitychange` 回前台补拉 `startRobot`（`floatingRetryRef` 防并发、`miniShown` 防重复、延迟 1.2s）。
+- Android `earning-ai-android` `release/v1.0.0`（`57c78f0`）本地 debug 配置**未提交**：`LocalTestConf.pwaHost` → `http://localhost:3000`、`app/src/debug/AndroidManifest.xml` 加 `usesCleartextTraffic="true"`。
+- 坑与根因已沉淀：[pwa-host-version-gate](../30-Resources/troubleshooting/pwa-host-version-gate.md)、[pwa-localhost-port-conflict](../30-Resources/troubleshooting/pwa-localhost-port-conflict.md)（adb reverse 双端端口不同）。
+
+### 未决
+
+- [ ] MR !1357 / !1360 评审合并。
+- [ ] PWA 冷启动实际卡门 A 还是门 B：对号 `[INS_BRIDGE] setPlatformAuth:`（`insStore.ts:97`）与 `[INS_BRIDGE] setPlatformAbnormal:`（`insStore.ts:125`）。
+- [ ] `bridge.ts` 的 `checkInsPageAbnormal` 二级降级在端能力侧新旧 APK 是否存在（2026-11-02 21:15 专家回报被截断，无结论）。
+- [ ] 权限授予后「Allow System Access」弹窗不自动关闭（建议 `InsAuthPermissionModal.tsx:133` granted 后自动 close）。

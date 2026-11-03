@@ -58,3 +58,17 @@ curl -sS http://$(ipconfig getifaddr en0):3000/  # Vite → HTML
 
 - 手机上的 `localhost` 默认是手机自己；不用 `adb reverse` 时，应该用 Mac 的 LAN IP。
 - 这次不是 service worker 缓存，也不是前端路由问题；响应体是 `social-proxy-agent` 的 404 JSON。
+
+## 变体（2026-11-03）：crossnote 占 127.0.0.1:3000，`adb reverse` 同端口映射打到它
+
+- **现场**：Vite 让出 3000 起在 3001；`adb reverse tcp:3000 tcp:3000` 后设备访问 `localhost:3000` 命中的是 VS Code crossnote（占 IPv4 `127.0.0.1:3000`），不是 Vite（只监听 IPv6 `*:3000`）。
+- **关键点**：`adb reverse` 的**两端端口可以不同**，而设备侧的 URL 由 PWA 自己决定（`LocalTestConf.pwaHost` debug 默认 `http://localhost:3000`，通常不想改代码）。
+- **修法**：把设备 3000 反向映射到宿主的 3001，设备 URL 保持 `localhost:3000`：
+
+  ```bash
+  pnpm --filter @heyhru/app-pwa dev -- --port 3001
+  adb reverse tcp:3000 tcp:3001
+  ```
+
+- **排查顺序**：`lsof -nP -iTCP:3000 -sTCP:LISTEN` 看 IPv4/IPv6 归属 → `curl 127.0.0.1:3000` 与 `curl [::1]:3000` 分别对号 → 再决定「改 Vite 端口 + reverse 换宿主端」还是「改宿主 pwaHost」。
+- 另一处坑：`android:usesCleartextTraffic="true"`（targetSdk 36 起）不加，WebView 加载 `http://localhost` 直接被拦。
