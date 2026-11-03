@@ -57,3 +57,17 @@ worktree `ln -s 主clone/node_modules` 后,`@heyhru/business-pwa-proto` 解析�
 ## gh 身份漂移:每次 gh 写操作前必查(2026-08-27)
 
 本机 gh keyring 同时有 colna 和 buchuan1023,active 账号会被别处(lark 扫码等)切走。**只在会话开头查一次不够**——某次 `gh pr create` 用了 buchuan1023 身份建 PR(#1039,commit 身份仍 colna 正确)。GitHub 不能改已建 PR 作者 → 只能 `gh auth switch --user colna` + 关 PR + 重开(#1040)。**规矩:每次 gh pr create / 任何 gh 写前都 `gh api user -q .login` 确认 colna**。见 [lark-cli-auth-and-perms](lark-cli-auth-and-perms.md) / [global-flag-ownership-drift](global-flag-ownership-drift.md)。
+
+## 本地 fork 的共享 release 分支：先证明「已被上游覆盖」再 reset（2026-11-02）
+
+- **场景**：`sitin-next` 本地 `release/test-pwa` 停在 `5e06b1c15`；远端同基点起 38 个新提交，本地独有 142 个（`git rev-list --left-right --count` = `142 38`）。
+- **判据**：`git cherry origin/release/test-pwa release/test-pwa` 显示本地提交在远端**无等价补丁**，但注册流程已以 `2aea4c6a9` squash 合入 → 本地那串是旧合并链，`git merge` 只会把重复历史再带回远端。
+- **做法（用户确认后才执行）**：
+  ```bash
+  git fetch https://gitlab.sitinai.com/frontend/sitin-next.git release/test-pwa
+  git reset --hard FETCH_HEAD
+  git update-ref refs/remotes/origin/release/test-pwa FETCH_HEAD
+  ```
+  结果：`release/test-pwa` = `42be0162c Merge branch 'feat/gxy/pwa-native-bridge' into release/test-pwa`，工作区干净，142 个本地提交按用户决定丢弃。
+- **与上面 2026-09-16 那条的区别**：那次是「本地陈旧但提交仍有价值」→ 改名 `*-stale-<日期>` 留底再重建；这次是「本地提交已被上游 squash 覆盖」→ 直接 reset。**取舍点是「是否已被上游包含」，不是 release 分支一律不许 reset。**
+- **reset 前只读核对**：远端是否已含各上游分支最新（本次确认含 `feature/pwa` 的 `845a2ed7f`，再动手）。

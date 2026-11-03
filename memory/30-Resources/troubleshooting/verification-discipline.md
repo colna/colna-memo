@@ -202,3 +202,11 @@ catch 加日志拿到 error.name → 定案
 > **动作**：**症状（「没动」）不能直接当根因（「事件没来」）**。让失败自己说话的最短路径是探针 + 一次真实运行；探针已经加好时，
 > 先跑、先读，再决定改不改。若确实要凭推断改架构，在代码注释里写明「此结论未经日志/实测证实」，下次的人才知道该验证什么。
 
+
+### ⭐ 9. 破坏性写操作前，先只读核对「目标对象身份」而非只看状态（2026-11-02）
+
+关 GitLab MR 前只读拉一次 `GET .../merge_requests/:iid`，核对**四项齐对**才允许写 `state_event=close`：`title` + `source_branch` + `sha` + `state=opened`。
+
+- 只看 `state=opened` 挡得住「已合并/已关闭被重复操作」，但挡不住「序号写错关到别的 MR」——后者的唯一防线是 title/branch/sha 三项匹配。
+- 写后同样只读回查：`state=closed`、`closed_at` 非空、`merged_at=null`，再补一条 `GET .../merge_requests?source_branch=<br>&state=opened` = 0 条，确认没有同源分支的其他 open MR 被连带影响。
+- 同理适用于「删分支 / 关 issue / 撤销部署」这类不可逆动作：**先证明对象是你以为的那一个**，再动手。

@@ -74,3 +74,10 @@ pnpm test      # 运行测试
 
 - 详细应用清单 / 线上域名见仓库 README「可部署应用」表。
 - 项目自带 `docs/` 与 `deploy/`。
+
+## 进行中（2026-11-02）PWA 冷启动补 IG 授权兜底
+
+- **背景**：冷启动 `checkSocialProxyAbnormal()` 有执行但没进 `checkSocialProxyPageAbnormal`，`abnormalByPlatform` 恒 `null`、也不弹授权悬浮窗。根因是解锁前在原生 Earn 绑定 IG 时，sticky `InsStateEvent` 被 `EarnMainActivity.onInsState()` 无条件 `removeStickyEvent` 消费掉，PWA 启动后收不到 `finishPWAInsTask` → `authEvidenceByPlatform` 为空 → 卡在门 B。取证与判据见 [sitin-pwa-sp-abnormal-null-on-coldstart](../30-Resources/troubleshooting/sitin-pwa-sp-abnormal-null-on-coldstart.md)。
+- **改动**：`packages/app-pwa/src/hooks/useInsTaskInit.ts`（+31/−6）。`!igAuthed && (hasBoundInstagram() || igCard === true)` 时补探一次；`await waitForBridge()` 防 -500；只有 `code===0 && type===0` 才补写 `setPlatformAuth` / `markAuthEvidence` / `setPlatformLoggedIn` / `setPlatformAbnormal(false)`，未授权且探测失败一律不写（避免手动用户名用户误弹 Reconnect）；兜底不置 `socialProxyChecking`。
+- **状态**：分支 `fix/pwa-coldstart-auth-fallback`（从 `feature/pwa` `845a2ed7f` 切出），commit `272ad2b7a`，已 push，MR [!1357](https://gitlab.sitinai.com/frontend/sitin-next/-/merge_requests/1357) → `feature/pwa`，`opened` / `can_be_merged`。eslint、`tsc -b`、`pnpm --filter @heyhru/app-pwa build` 均通过。
+- **未决**：线上实际卡门 A 还是门 B 判不了，需按日志对号 `[INS_BRIDGE] setPlatformAuth:`（`insStore.ts:97`）与 `[INS_BRIDGE] setPlatformAbnormal:`（`insStore.ts:125`）——有前无后 = 门 B，两条都无 = 非 APK / 门 A。native 侧更根治的修法是不在 PWA 未 attach 时移除 sticky，或 attach 后补投。
