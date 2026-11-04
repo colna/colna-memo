@@ -64,6 +64,7 @@ tags: project, monetization, freelance, evidence, negative-result, cash7d
 - 电鸭社区：`/api/post`、`/rss` 全 **404**，抓到空壳 → 本质是社区不是交易平台
 - 实现网：`/projects` **200 有真实中文需求正文**（含「桌面端 agent 开发」，要 TS/Node/Electron + Python/大模型 API/MCP + SketchUp Ruby，Windows 打包 + 交接文档），但列表不出预算、详情跳登录
 - PeoplePerHour：200 但前端渲染，正文无项目；Reddit / V2EX：「000」超时 / 连接重置；闲鱼 / 小红书：SPA + 登录墙
+- 「搜号」：`000` Connection refused（souhao.com），且未能定位到唯一站点 → **未评估**（不计入可用样本）
 
 **唯一可核对的费率结构（Freelancer `/feesandcharges/` 原文，2026-11-04T08:08:35Z）**：固定价抽成 **10% 或 $5 取高**；**投标免费**、免费会员 **6 标/月**；账户最低余额 **$20**；提现最低 **$50**、手续费 $1（电汇 $25）；**到账天数官方页未写明**；可选加价 Sponsored bid 0.3%×上限+$0.90（$1.90–$14.90）。
 
