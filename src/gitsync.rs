@@ -1,4 +1,4 @@
-//! P3:`colna add` / `colna sync` —— 封装 git add/commit/pull/push + 自动 reindex。
+//! P3:`colna add` / `colna sync` —— 封装 git add/commit/fetch/rebase/push + 自动 reindex。
 //!
 //! 真源是 memory/ 下的 Markdown(走 git 跨设备同步),本模块把
 //! “写笔记 / 跨设备同步” 的常用动作收成一条命令,顺手把本地 zvec 索引重建。
@@ -125,7 +125,7 @@ fn ensure_no_staged_changes_outside_memory(root: &Path) -> Result<()> {
 /// 步骤:
 ///   1. Git 状态与冲突标记守卫
 ///   2. git add memory/ + 有改动则 commit
-///   3. git pull --rebase --autostash origin main(显式上游,拉远端最新,真源对齐)
+///   3. git fetch origin main + git rebase --autostash origin/main(两步拉取,不读 FETCH_HEAD 多分支)
 ///   4. reindex(最终真源状态只处理一次)
 ///   5. git push
 fn run_sync(root: &Path, message: &str, reindex: &dyn Fn(&Path) -> Result<()>) -> Result<()> {
@@ -144,26 +144,61 @@ fn run_sync(root: &Path, message: &str, reindex: &dyn Fn(&Path) -> Result<()>) -
         git(root, &["commit", "-m", message])?;
     }
 
-    // 显式写上游 `origin main`:裸 `git pull --rebase` 在
-    // `remote.origin.fetch = +refs/heads/*:refs/remotes/origin/*` 的通配 refspec 下会按
-    // 整个 FETCH_HEAD 取上游,一旦 FETCH_HEAD 残留多行就报
-    // `fatal: Cannot rebase onto multiple branches.`(2026-11-04 实测一次性残留)。
-    // 本库约定分支为 main;显式指定后不再读 FETCH_HEAD 的多分支信息。
-    println!("⬇️  git pull --rebase --autostash origin main ...");
-    let pull = git(root, &["pull", "--rebase", "--autostash", "origin", "main"]).map_err(|e| {
-        anyhow!(
-            "pull --rebase 失败,已停止 reindex/push: {}",
-            first_line(&e.to_string())
-        )
-    })?;
-    if !pull.is_empty() {
-        println!("{}", pull);
+    // 两步拉取:先 `fetch origin main` 只抓单分支,再 `rebase --autostash origin/main`
+    // 把本地提交重放到 remote-tracking ref 上。**为什么不回到 `git pull --rebase`**:
+    // pull(即便显式写 `origin main`)按 `FETCH_HEAD` 里「可合并」的行数判定上游,并发
+    // fetch 写出两行即 `fatal: Cannot rebase onto multiple branches.`(2026-11-04 30/30
+    // 并发实测);rebase 到 `origin/main` 完全不读 `FETCH_HEAD`,故对多行残留免疫。
+    // 本库约定分支为 main;换分支的仓库需同步改这两行。
+    println!("⬇️  git fetch origin main ...");
+    let fetched = match git(root, &["fetch", "origin", "main"]) {
+        Ok(out) => out,
+        Err(error) => {
+            // 保留 git 原始 stderr 全量,不截首行;失败即停,不进入 rebase。
+            eprintln!("{}", error);
+            bail!("git fetch origin main 失败,已停止 rebase/reindex/push");
+        }
+    };
+    if !fetched.is_empty() {
+        println!("{}", fetched);
+    }
+
+    let head_before = git(root, &["rev-parse", "HEAD"])?;
+    println!("⬇️  git rebase --autostash origin/main ...");
+    if let Err(error) = git(root, &["rebase", "--autostash", "origin/main"]) {
+        eprintln!("{}", error);
+        let conflicts = git(root, &["diff", "--name-only", "--diff-filter=U"]).unwrap_or_default();
+        // 冲突现场一律保留:不自动 abort、不自动 continue。
+        if rebase_in_progress(root) {
+            bail!(
+                "rebase 冲突,已停止 reindex/push(未自动 abort/continue,现场保留):\n{}",
+                if conflicts.is_empty() { "(见 git status)" } else { conflicts.as_str() }
+            );
+        }
+        bail!(
+            "rebase --autostash 恢复失败,已停止 reindex/push: {}\n未合并文件:\n{}",
+            first_line(&error.to_string()),
+            if conflicts.is_empty() { "(见 git status)" } else { conflicts.as_str() }
+        );
+    }
+    let head_after = git(root, &["rev-parse", "HEAD"])?;
+    if head_after == head_before {
+        println!(
+            "✅ 已是最新:origin/main 无新提交,无需 rebase(HEAD {})",
+            short_sha(&head_before)
+        );
+    } else {
+        println!(
+            "✅ 已 rebase 到 origin/main:{} → {}",
+            short_sha(&head_before),
+            short_sha(&head_after)
+        );
     }
 
     ensure_no_git_operation(root)
-        .map_err(|error| anyhow!("pull 后 autostash 恢复未完成,已停止 reindex/push: {error}"))?;
+        .map_err(|error| anyhow!("rebase 后 autostash 恢复未完成,已停止 reindex/push: {error}"))?;
 
-    // commit + pull 完成后真源才稳定,只需重建一次。
+    // commit + rebase 完成后真源才稳定,只需重建一次。
     reindex(root)?;
 
     println!("⬆️  git push ...");
@@ -184,6 +219,21 @@ fn run_sync(root: &Path, message: &str, reindex: &dyn Fn(&Path) -> Result<()>) -
 /// 对外入口:见 run_sync。
 pub fn sync(root: &Path, message: &str, reindex: impl Fn(&Path) -> Result<()>) -> Result<()> {
     run_sync(root, message, &reindex)
+}
+
+/// rebase 是否仍在进行中(冲突未解决时 `.git/rebase-merge` / `rebase-apply` 存在)。
+fn rebase_in_progress(root: &Path) -> bool {
+    git(root, &["rev-parse", "--absolute-git-dir"])
+        .map(|dir| {
+            let dir = PathBuf::from(dir);
+            dir.join("rebase-merge").exists() || dir.join("rebase-apply").exists()
+        })
+        .unwrap_or(false)
+}
+
+/// 取 sha 前 7 位用于日志展示。
+fn short_sha(sha: &str) -> String {
+    sha.chars().take(7).collect()
 }
 
 /// 取错误信息首行,避免多行 stderr 刷屏。
@@ -352,7 +402,7 @@ mod tests {
     }
 
     #[test]
-    fn pull_failure_stops_before_reindex_and_push() {
+    fn fetch_failure_stops_before_rebase_reindex_and_push() {
         let repo = TestRepo::new();
         let missing_remote = repo.sandbox.join("missing.git");
         run_git(
@@ -368,7 +418,7 @@ mod tests {
         })
         .unwrap_err();
 
-        assert!(error.to_string().contains("已停止 reindex/push"));
+        assert!(error.to_string().contains("已停止 rebase/reindex/push"));
         assert_eq!(reindex_calls.get(), 0);
         assert_eq!(
             run_git(&repo.local, &["log", "-1", "--pretty=%s"]),
@@ -433,7 +483,7 @@ mod tests {
         })
         .unwrap_err();
 
-        assert!(error.to_string().contains("pull --rebase 失败"));
+        assert!(error.to_string().contains("rebase 冲突"));
         assert_eq!(reindex_calls.get(), 0);
         assert_eq!(
             run_git(&repo.local, &["diff", "--name-only", "--diff-filter=U"]),
