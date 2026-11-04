@@ -377,3 +377,13 @@ tags: project, monetization, freelance, evidence, negative-result, cash7d
 - [ ] 双目录文档（`MIRROR_SYNC_NOTE.md`、坑 6 表）里的**文件数/inode 已过期**，判据改用路径 + 单文件 mtime/sha（不再追数字）
 - [ ] `prereg_v3.json` 是否换线仍挂（默认 v3 不动、另开 v4；sha `16c777a6…` 未变）；语言可接性待用户拍；79 条无工期只能子集排序
 - [x] gate v2 规则已落盘并运行（`9c39718f…` 17:34:57 → `a9e77f29…` 17:35:33），v1 FAIL 仍为正式结论
+
+## 数字更正（18:12 复测；上游 18:11 修正单里的 4 个数已过期）
+
+> 来源：本机 `stat` / `find` / `diff -rq` / `shasum -a 256` 实测（18:11:50–18:12:30），不转录上游摘要。
+
+1. **REA 口径（本条新增，可引用）**：统一写「**有效 endpoint 0**（45 个节点全为 route/network 碎片）」，数据在 `REA_FEASIBILITY.md` §4 / §5 / §8；文件现 **6014 B / sha `d509163c…a95302` / mtime 17:39:44 / §1–§10（10 个 `#` 标题）** ✓ 与上游一致。
+2. **双目录数字又过期**：18:12 实测 A **650 文件 / inode 123972662**、B **630 文件 / inode 124067877**（B 目录 mtime 18:11:49）。上游单的 `548 / 529 / 124054170` 等于 `MIRROR_SYNC_NOTE.md` §1 的 **17:40 快照**，不是现值；该文档 §7 自记的 649 / 584（17:57）也已过期。→ 与 18:07 量到的 `124064096` 相比，**inode 5 分钟内又变**，坐实「镜像在重建、inode 不能当指纹」；本库不再引用任何文件总数作判据。
+3. **`diff -rq` 现值（同一时点成对）**：A 独有 **20**、B 独有 **0**、内容不同 **0**。上游单的「A 独有 19 / 内容不同 1（`REA_FEASIBILITY.md`）」是同步前时点；差异项现已归零 ✓，19→20 只差新增的 `raw_v3/xianyu_api/dom_rereadprobe7.log`。
+4. **`MIRROR_SYNC_NOTE.md` 的 sha 不是 `400289df…`**：实测 **`1511a5ae…b0e9231c`**（5200 B，mtime 17:57）。按文件 sha 记（同 18:07 那条 `GATE_XY_API.md` `289a0e28…` ≠ `09d50a6c…` 的处理）。
+5. **坑 7 / 坑 8 已在 `47c3e84` 落库**：`30-Resources/troubleshooting/xianyu-mtop-detail.md:94`（原地覆写截断）与 `:106`（路径拼接伪影），本单不重复写；本轮只补「镜像不止两份」——`homes/…/bots/<bot-id>/shared/cash7d` 另有每人一份子集副本（调度 1 文件、测试 18 文件），同名 tsv sha `b7445214…042773` 与 A 相同，无字节漂移但仍非权威路径。
