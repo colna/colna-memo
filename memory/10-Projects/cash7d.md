@@ -124,6 +124,8 @@ tags: project, monetization, freelance, evidence, negative-result, cash7d
 
 ## 中文平台取证（实现网 60 条 + 程序员客栈登录墙，2026-11-04 16:38 追加）
 
+> **路径注**：本文所有 `shared/cash7d/...` 均指**团队盘** `bots/../shared/cash7d/`（绝对路径 `/Users/colna/WORK/rakazo/data/desktop-computers/team-8f0a2a4300c87fca269da0a6e44db684/shared/cash7d/`）。`colna-memo` 仓库内与 `bots/cmvz6o8fupj8fdllbw14a1eda/shared/` 下**都没有** `shared/cash7d`（`find` 实测 `ls: shared: No such file or directory`），不要相对仓库找。
+
 上游任务单元：在「Freelancer 6 标/月是天花板」之外，判断中文接单平台能否作主攻。**判据（16:44 用户裁决定性）**：`published 30 天内 + 预算 ≥¥500 + bid_count ≤5 + remote_ok`，判 ≥3 主攻 / 1–2 窄门 / 0 出局。→ **A=3 的定性：上游口径下的结果，非可核验预登记**——判据来自上游对话（调度 16:2x 消息），`shared/cash7d/` 内**无本线 prereg 文件**；唯一 `prereg.json` 登记的是**闲鱼 SKU 线**（标价 ≥¥200 且想要数 ≥20），与本四条件无关。另：`remote_ok` 在本样本 **60/60 恒为「是」**（取自远程筛选列表页），该条件**无筛选作用**，四条件**实质是三条件**，引用时不得写成「四重筛选」。
 
 ### 产物与指纹（我逐个复核）
