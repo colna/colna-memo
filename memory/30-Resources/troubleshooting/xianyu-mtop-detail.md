@@ -118,6 +118,24 @@ tags: troubleshooting, xianyu, goofish, mtop, scraping, cash7d
 - 但它**不是权威路径、不许写入、也不许作为数据口径**；引用时必须显式标注「伪影快照」；
 - 识别法：路径里出现重复段 `…/team-xxxx/Users/colna/…`；目录 mtime 长时间不变、内容停在某一刻。
 
+### 坑 6 补充 ③ / 坑 8 补充（18:20 全量 `find`：团队里叫 `shared/cash7d` 的路径共 **8 条**，不是 2 条）
+
+| 路径（`…/rakazo/data/` 下，省略公共后缀 `/shared/cash7d`） | 文件数 | inode |
+|---|---|---|
+| `desktop-computers/team-8f0…/shared/cash7d`（**A，权威**） | **650** | 123972662 |
+| `homes/team-8f0…/shared/cash7d`（B 团队镜像） | 630 | 124067877 |
+| `desktop-computers/team-8f0…/bots/cmvz307…/`（调度） | 1 | 124019087 |
+| `desktop-computers/team-8f0…/bots/cmvz71z…/`（测试） | 18 | 124018104 |
+| `desktop-computers/team-8f0…/bots/cmvz6o8cw…/`（数据分析师） | 0 | 124020319 |
+| `homes/team-8f0…/bots/cmvz307…/`（调度，镜像侧） | 1 | 124067570 |
+| `homes/team-8f0…/bots/cmvz71z…/`（测试，镜像侧） | 18 | 124067613 |
+| `…/team-8f0…/Users/colna/WORK/rakazo/data/…/`（**坑 8 伪影，两侧各一份**） | 2 + 2 | 124052532 / 124067564 |
+
+- **每人一份的 `bots/<bot-id>/shared/cash7d` 是子集副本**（调度只放 `requirements_shixian.tsv`；测试放 capture 三件套 ×5 + `manifest.tsv` + `README.md` + 同一 tsv），不是镜像、不含 A 的多数产物 → 在它们上面「找不到文件」不构成「文件不存在」。
+- **坑 8 的伪影现在有孪生**：`desktop-computers/…/Users/colna/…` 与 `homes/…/Users/colna/…` 各 2 个文件。所以「全盘 `find -name gate.json` 命中就算数」更危险——伪影会一起命中。识别法仍是路径重复段 `…/team-xxxx/Users/colna/…`。
+- 另有 `~/Desktop/cash7d`（**18 文件**、inode 123988752）是个人工作副本，**不属于团队共享**，与 A 的 650 不是一套；拿它比字节会得出「少了 632 个」的假差异。
+- 纪律不变且更强：**只认 A 的绝对路径 + 单文件 mtime/sha**；文件数、inode、目录 mtime、bot 子集副本、伪影目录一律不作判据。
+
 ## 工具适用性：REA 不可用于抽 mtop endpoint（负向结论，2026-11-04 17:27–17:31 实跑）
 
 **结论**：REA 6.7.0 **不能**用作闲鱼 mtop 链路的独立验证源——它抽不到 endpoint。同输入下 `grep` 能拿到的 15（宽松 21）个 API id，REA 抽到 **0**。其他 route/URL 型 bundle 仍可用。
