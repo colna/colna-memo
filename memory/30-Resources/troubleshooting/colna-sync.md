@@ -219,3 +219,20 @@ git -c http.version=HTTP/1.1 push https://github.com/colna/colna-memo.git main
 2. 看到 `Changes must be made through a pull request.` **先看同一 push 的最后一行**：跟着 `x..y main -> main` 就是**绕过成功**；只有它是最后一行且带 `! [remote rejected]` 才是真被拦。
 3. **永远不要用 `--force` 推这个仓库**：`non_fast_forward` 会拒；且 sync 的设计本来就是 `fetch origin main` + `rebase --autostash origin/main`（见上文「定稿（17:12）」），分叉靠 rebase 对齐，不靠强推。
 4. 走 HTTPS 绕过网络问题时（见上一节），**这些规则一样生效**——换的是传输层，不是权限层。
+
+## GitHub 侧第三种瞬时错误：`fatal error in commit_refs_rules`（2026-11-04 18:13–18:15 实测）
+
+**症状链（同一提交 `49b21dd`，连续三次 push，全部走 HTTPS）**：
+
+1. `remote: Internal Server Error` + `Request ID 6B50:174634:…` + `Time 2026-11-04T10:14:02Z` → `! [remote rejected] main -> main (Internal Server Error)`。
+2. 重试 → `remote: fatal error in commit_refs_rules` → `! [remote rejected] main -> main (fatal error in commit_refs_rules)`。
+3. 再等 8 秒重试 → `remote: Bypassed rule violations for refs/heads/main:` + `- Changes must be made through a pull request.`，紧接着 `47c3e84..49b21dd  main -> main` ⇒ **成功**。
+
+**判断**：第 2 条不是本地问题，也不是规则真的拦你——是**服务端在评估 ruleset（见上一节 `main-owner-only-direct-push`）时自身报错**。它的措辞容易让人以为「规则升级了、得改走 PR」，但同一提交几秒后就被 owner bypass 放行。
+
+**处置**：
+
+- `Internal Server Error`、`fatal error in commit_refs_rules`、`Empty reply from server` 三种都按**可重试**处理，间隔 3–10 秒；
+- **不要**因此改走 PR、**不要** `--force`（`non_fast_forward` 必拒，且会把问题变成真失败）；
+- 成功判据只有一条：**push 后用 `git ls-remote <url> main` 比对 sha**，而不是看 push 输出里有没有 `-> main`（错误串里也会出现 `main -> main`）；
+- 失败尝试不改变远端：`ls-remote` 在三次尝试期间始终是 `47c3e84`，直到第 3 次才变成 `49b21dd` ⇒ 重试是安全的，不会产生半推状态。
