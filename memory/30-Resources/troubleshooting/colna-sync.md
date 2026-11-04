@@ -177,6 +177,9 @@ tags: troubleshooting, colna-memo, git
 1. `curl -sS -o /dev/null -w "%{http_code}" --max-time 8 https://ssh.github.com/` → 出 `SSL_ERROR_SYSCALL` / `code=000` = **网络层**，别再去折腾密钥或 `ssh-add`。
 2. 复核 22 端口：`ssh -p 22 -o HostName=github.com -T git@github.com`。秒回 `Permission denied` = 22 可用但 key 真不行；若也超时 = 整个 GitHub SSH 面被墙，直接走 HTTPS。
 
+**决定性反证（17:37 同一窗口内实测）**：在 `git fetch` / `git push` 连续报 `Permission denied (publickey)` 的**同一分钟**里，`ssh -T git@github.com` 返回 **`Hi colna! You've successfully authenticated, but GitHub does not provide shell access.`**、`git ls-remote origin` 也返回了正确的远端 sha。
+→ **密钥本身是好的**，「publickey 被拒」只是连接被中途打断后 ssh 报出来的**兜底错误**。看到 `Hi <user>!` 就不要再碰密钥、`ssh-add`、`known_hosts`、GitHub 后台 key 列表——那是纯网络间歇问题，等窗口或用 HTTPS 绕。
+
 **怎么绕（本次实测有效，且不改 `origin`）**：
 
 ```bash
