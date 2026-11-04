@@ -158,3 +158,38 @@ tags: troubleshooting, colna-memo, git
 - **回退**：`git revert 4708c03`；或把这两步还原成单条 `pull --rebase --autostash` 再 `cargo build`。全程**不动** `git config`（`remote.origin.fetch` 保持通配 `+refs/heads/*:refs/remotes/origin/*`）。
 - **代价 / 约束**：分支名 `main` 硬编码在两处调用里；换分支的仓库要同步改。`pull` 自带的「重抓一次」保护也没了 —— 但那份保护正是失败模式的一半（它的重抓与别的进程重叠时才写出两行），拆开后每次只抓单分支，反而确定。
 - **判据一句话**：看到 `Cannot rebase onto multiple branches` 先 `wc -l .git/FETCH_HEAD`；≥2 行就是并发撞的，**该换写法，不是改 config、也不是加显式分支**。
+
+## 坑：`Permission denied (publickey)` 可能是**网络层 TLS 被重置**的假象（2026-11-04 17:37–17:46 实测）
+
+**症状**：`./colna sync` 提交成功、卡在 fetch：`git fetch origin main 失败: git@ssh.github.com: Permission denied (publickey). fatal: Could not read from remote repository.` —— 看起来像 SSH key 丢了。
+
+**为什么容易误判**：`~/.ssh/config` 把 `github.com` 映射到 `ssh.github.com:443`（绕 22 端口的常见配法），所以报错主机名是 `ssh.github.com`。此时三条「正常检查」全会误导你：
+
+| 检查 | 结果 | 说明 |
+|---|---|---|
+| `ssh-add -l` | `The agent has no identities.` | **不是根因**——`id_rsa` 无 passphrase，本来就不依赖 agent |
+| `nc -z ssh.github.com 443` | **通** | TCP 能建连，所以「端口不通」这条路查不出来 |
+| `curl -sS https://ssh.github.com/` | **`SSL_ERROR_SYSCALL`** | **这才是真信号**：TLS 握手被中间网络重置 |
+
+**根因**：`ssh.github.com:443` 的 TLS 被重置，ssh 拿到半死连接 → 最终报成 `Permission denied (publickey)`。而且它是**间歇的**：同一分钟内 `git ls-remote` 偶发成功、`git fetch` 连续失败，制造「刚才还行现在不行」的错觉。
+
+**怎么判（两步定死）**：
+1. `curl -sS -o /dev/null -w "%{http_code}" --max-time 8 https://ssh.github.com/` → 出 `SSL_ERROR_SYSCALL` / `code=000` = **网络层**，别再去折腾密钥或 `ssh-add`。
+2. 复核 22 端口：`ssh -p 22 -o HostName=github.com -T git@github.com`。秒回 `Permission denied` = 22 可用但 key 真不行；若也超时 = 整个 GitHub SSH 面被墙，直接走 HTTPS。
+
+**怎么绕（本次实测有效，且不改 `origin`）**：
+
+```bash
+git -c http.version=HTTP/1.1 push https://github.com/colna/colna-memo.git main
+```
+
+- `credential.helper=osxkeychain` 已有凭据，**不需要新 token**。
+- **必须带 `-c http.version=HTTP/1.1`**：默认 HTTP/2 在这条链路上报 `Error in the HTTP2 framing layer`。
+- 可能收到 GitHub `remote: Internal Server Error`（服务端 500，**不是本地问题**），重试即可。
+- 重试时显示 **`Everything up-to-date`** 要读懂：说明**上一次其实已经推成功了**，不是「什么都没推」。
+- 推到显式 URL **不更新本地 `origin/main`**，`git status` 会继续显示 `ahead 1`。补一次 HTTPS fetch 修 tracking：`git fetch https://github.com/colna/colna-memo.git main:refs/remotes/origin/main`。
+- 权威确认远程：`git -c http.version=HTTP/1.1 ls-remote https://github.com/colna/colna-memo.git refs/heads/main`。
+
+**善后（容易漏）**：`colna sync` 在 fetch 一步退出，**后面的 reindex 不会执行** → 必须手动 `./colna index`，否则新写的笔记搜不到。本次实测：变更/新增 3、删除 0、upsert **126** 块，索引 **351 文件**。
+
+**判据一句话**：sync 报 `Permission denied (publickey)` 而 `ssh-add` 空、`nc` 通 → 先 `curl https://ssh.github.com/`；出 `SSL_ERROR_SYSCALL` 就是网络层，换 HTTPS 推 + 手动 reindex，别重配 key。
