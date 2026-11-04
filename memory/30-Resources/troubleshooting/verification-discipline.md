@@ -210,3 +210,15 @@ catch 加日志拿到 error.name → 定案
 - 只看 `state=opened` 挡得住「已合并/已关闭被重复操作」，但挡不住「序号写错关到别的 MR」——后者的唯一防线是 title/branch/sha 三项匹配。
 - 写后同样只读回查：`state=closed`、`closed_at` 非空、`merged_at=null`，再补一条 `GET .../merge_requests?source_branch=<br>&state=opened` = 0 条，确认没有同源分支的其他 open MR 被连带影响。
 - 同理适用于「删分支 / 关 issue / 撤销部署」这类不可逆动作：**先证明对象是你以为的那一个**，再动手。
+
+## 2026-11-04 补：测试全绿 ≠ 测试有效（变异测试 + `--no-fail-fast`）
+
+**背景**：quant-trading P0 的 D0 独立终验。仓库自报「32 tests 通过」，我先复跑确认，再做变异测试，才敢写「有效」。
+
+- **已复跑的基础态**：`cargo test --all --no-fail-fast` → **32 passed / 0 failed / EXIT=0**（cli bin 4 + `tests/verify_cli.rs` 4 + core 8 + risk 16）；`clippy --all-targets -- -D warnings` EXIT=0 / 0 warning；`fmt --check` EXIT=0；跑完 `git status` 仍空（`CARGO_TARGET_DIR` 指到 `/tmp`）。
+- **坑（本轮主要教训）**：单次 `cargo test --all` 在**第一个 target 失败即中止**（默认 fail-fast）。删掉 `main.rs` 里 `global = true` 这一处后，单跑看只挂 **1 条**；加 `--no-fail-fast` 重跑实际 **4 条断言失败**（bin 单测 + `--test verify_cli` 再暴露 2 条）。→ 「只挂 1 条」是 fail-fast 制造的假象，会让人把影响面估小 4 倍。
+- **根因**：把「通过数」当测试有效性的证据。通过数只能证明「现有断言没被违反」，证明不了「断言真能抓住 bug」。
+- **修法**：① 跑 `cargo test --all --no-fail-fast`，并写进 CI；② **变异测试当证据**——改一处关键代码，确认**对应断言真的 FAILED**（本轮：`clamp_exit(code).wrapping_mul(0)` → 3 条 FAILED；删 `global=true` → 4 条）；③ 变异在 `/tmp` clone 副本里做，原仓库 `git status` 保持空，避免把探针留在工作区。
+- **配套（lint 也证明不是装饰）**：副本内造 `unwrap` on Option / 浮点算术探针 → `clippy -D warnings` 必须 **EXIT=101**；8 个 crate 的 `deny` 头全覆盖才算数。
+- **同时暴露的缺口**（非阻断，但会漏判）：退出码 1/4/5 只有常量断言、无真实进程级验证；仓库无 CI 配置 → fmt/clippy/test 全靠手工，「本地跑过」不等于「每次都会跑」。
+- **来源**：2026-11-04 13:50 D0 终验（测试回执 + 我复跑/复算），详见 `10-Projects/quant-trading.md`「D0 独立终验」。

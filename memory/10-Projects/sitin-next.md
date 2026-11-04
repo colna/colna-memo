@@ -113,3 +113,16 @@ pnpm test      # 运行测试
 - [ ] PWA 冷启动实际卡门 A 还是门 B：对号 `[INS_BRIDGE] setPlatformAuth:`（`insStore.ts:97`）与 `[INS_BRIDGE] setPlatformAbnormal:`（`insStore.ts:125`）。
 - [ ] `bridge.ts` 的 `checkInsPageAbnormal` 二级降级在端能力侧新旧 APK 是否存在（2026-11-02 21:15 专家回报被截断，无结论）。
 - [ ] 权限授予后「Allow System Access」弹窗不自动关闭（建议 `InsAuthPermissionModal.tsx:133` granted 后自动 close）。
+
+## 进行中（2026-11-04）IG clickMute 改纯 API 静音
+
+- **背景**：旧 `packages/app-ins-scripts/src/instagram/methods/clickMute.js` 走 DOM 流程（主页「发消息」→ 会话信息 → 开关 → 时长弹窗），依赖 3 段易变 DOM 且必须进聊天页；CE 交换后立刻静音时页面状态不稳定。改纯接口后不依赖导航，直接用后端已下发的 handle。
+- **实现**（分支 `feature/sp-ins-click-mute-api`）：`web_profile_info` 取 `userId` → `direct_v2/threads/get_by_participants` 取/建 `threadId` → `POST threads/{id}/mute/` → 回读 `thread.muted` 校验。入参兼容后端 `MUTE_USER` 下发的 `manSocialId` / `userIgHandle` / `manSocialNickname`；无参时回退解析当前 profile URL 的 username。已把 `clickMute` 加入 `executeAction.js` 的 `SESSION_ONLY_ACTIONS`。
+- **分支 / MR**：`4fad0451b feat(app-ins-scripts): clickMute 改为纯 API 静音` + `8890e2328 chore: 忽略 colna fastembed 缓存` → **MR [!1381](https://gitlab.sitinai.com/frontend/sitin-next/-/merge_requests/1381)**（→ `feature/sp`，push option 建 MR，`remove_source_branch`），已 push。
+- **验证（已做）**：`node scripts/build.mjs` 通过；Node + `vm` 模拟 `insGraphql.rest` 跑 **7 个用例**全过（正常静音 / 已静音短路 / 校验仍 false / mute 接口失败 / 用户不存在 / 无会话 / 非 profile 页传参）。未改 `dist`（gitignore）。
+- **未验 / 待确认**：
+  - `get_by_participants` 在**无历史会话**时是否自动建 thread——私有接口未文档化，需真机或网页实测。
+  - `thread.muted` 回读字段若变更，会走 `verified:null` 的成功分支（静默降级）。
+  - **真机联调仍被 IG 风控阻塞**：`update_risky_contactpoint`，MR 描述已注明。
+  - `packages/business-pwa-proto/proto` 子模块指针未提交，未纳入该 MR。
+- **踩坑**：首次 push 被 pre-push 全量 hook 拦（`business-minerva-ug-core` 缺依赖）→ `pnpm install --frozen-lockfile` 后 71 tasks 全过，详见 [sitin-next-push-prepush](../30-Resources/troubleshooting/sitin-next-push-prepush.md)。

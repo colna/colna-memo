@@ -74,3 +74,11 @@ git checkout <base> && npx turbo run build --filter=<失败的包> --force
 - **判定**:与本次改动零交集(personal 分支同改动全绿)→ 按既有授权惯例 `--no-verify` push。
 - **注意**:别用 `grep | head` 数失败数(当时先报 2 个,全量看是 6 个)。
 - **影响**:该分支后续 push 均需绕过或修复;建议相关同学清理或加 jest ignore。
+
+## 2026-11-04：新 clone / 未装依赖 → 全量 hook 挂在**无关包**，`pnpm install --frozen-lockfile` 即过
+
+- **现象**：`packages/app-ins-scripts` 分支 push（clickMute 纯 API 改造），pre-push 全量 hook 在 `business-minerva-ug-core` 等包报 `Cannot find package '@heyhru/server-plugin-pg'` / 解析失败 → push 被拒。本人只改了 `app-ins-scripts` 的角度看完全无关。
+- **根因**：与本文件既有结论同族——pre-push 是**全量** `pnpm test` + `build`，只要有一个 workspace 包缺 `node_modules` 就挡整次 push。本例不是 Nexus 连不上，而是**该工作副本没装过依赖**（`packages/*/node_modules` 缺失）。
+- **修法**：`pnpm install --frozen-lockfile` → 重跑 hook **全过**（71 tasks，含 test/build/coverage）→ push 成功，随后 MR 正常创建。这条**优先于 `--no-verify`**：本机缺依赖是可修的，不属于「与改动无关的存量失败」。
+- **判据**：报错包名是否出现在 `git diff --name-only` 里？不在 → 先怀疑「依赖没装/锁文件没同步」，不要先怀疑自己的改动。
+- **来源**：2026-11-04 15:00 IG clickMute push 实录（`feature/sp-ins-click-mute-api` → MR !1381）。

@@ -226,3 +226,15 @@ tags: project, rust, knowledge-base, zvec, embedding, mcp, para
 - 索引加固:把 `.colna/index.lock` 单文件改成 `.colna/index.lock.d/` 目录(按 PID 判活,`rm -f index.lock` 不再能误删);
   此前并行 `colna sync` 删除锁文件后与长索引并发,把 `scalar.0.ipc` 写成 0,已复现并修复。
 - 未验证:`--rerank`(需下载 BGE reranker 模型)、age 加密(本机无 age)、whisper 转写(本机无 whisper)。
+
+## 2026-11-04 gitsync 拉取改两步：`fetch origin main` + `rebase --autostash origin/main`
+
+- **问题**：`./colna sync` 偶发 `fatal: Cannot rebase onto multiple branches.`（退出码 128）。根因不是 config、也不是「没写显式上游」：**并发 fetch 会稳定写出 2 行 `.git/FETCH_HEAD`**（30/30 实测），而 `pull --rebase` 按 `FETCH_HEAD` 里「可合并」行数判上游，>1 即 die。
+- **演进（两版，第一版已被推翻）**：
+  1. `2daca29`（16:52，用户 16:44 授权）：把裸 `git pull --rebase --autostash` 改成显式 `... origin main`。**只是消除「按默认 refspec 推断上游」这条路径，行数 >1 时照死**——17:00 受控复现出反例，同日即撤回该表述。
+  2. `4708c03`（17:12，用户 17:05 授权）：拆成 `git fetch origin main` → `git rebase --autostash origin/main`（读 remote-tracking ref，**完全不读 `FETCH_HEAD`**）。`src/gitsync.rs` **+71/−21**、`src/main.rs` **+1/−1**。
+- **验证**：受控免疫复现（包装 `git` 在 fetch 后追加一行造 2 行 `FETCH_HEAD`）→ `SYNC_EXIT=0`，日志 `✅ 已 rebase 到 origin/main:<a> → <b>`；同一 2 行状态下 `git pull --rebase --autostash origin main main` → 128 作对照；`cargo test gitsync` **5/5 PASS**；`strings target/debug/colna` 已无 `pull` 子命令串，新增 `git fetch origin main ...`。
+- **错误语义（照此实现）**：fetch 失败 → 打原始 stderr + 非零，**不进 rebase**；rebase 冲突 → 打冲突文件清单 + 非零，**不自动 abort / 不自动 continue**；无新提交 → `✅ 已是最新` 后继续 reindex；`rebase_in_progress()` 区分「rebase 冲突」与「autostash 恢复冲突」。
+- **回退**：`git revert 4708c03`（或把两步还原成单条 `pull --rebase --autostash`）后 `cargo build`。
+- **约束**：分支名 `main` 硬编码在 `:153/:167` 两处，换分支的仓库要同步改；全程**不动 `git config`**（`remote.origin.fetch` 仍是通配）。
+- **同日沉淀的其它 sync 判据**（都在 `30-Resources/troubleshooting/colna-sync.md`，此处只留索引）：SSH 443 TLS 被重置 → `Permission denied (publickey)` 是假象（`5c14e3d`）；`main` 有 ruleset `main-owner-only-direct-push`、直推靠 owner bypass、禁强推（`08a2c39`）；`fatal error in commit_refs_rules` 属可重试瞬时错误（`3bd42d9`）；被锁拦下的 `index` 是**零写入**、验收判据看 `.colna/state.json` 逐文件 sha 而非 `✅ 无变化`，检索 top-1 常是无关旧文固定 `0.7000`（`d78f8e9`、`51f5989`）。
