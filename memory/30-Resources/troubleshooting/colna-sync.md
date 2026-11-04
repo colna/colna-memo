@@ -127,7 +127,7 @@ tags: troubleshooting, colna-memo, git
 
 - **现象**：`colna sync` 的 pull 步报 `fatal: Cannot rebase onto multiple branches.`（当日一次中断后遗留 `FETCH_HEAD` 多行），commit 已完成、reindex / push 未做。
 - **根因**：`remote.origin.fetch = +refs/heads/*:refs/remotes/origin/*` 是**通配 refspec**，裸 `git pull --rebase` 不指定上游时会按**整个 `FETCH_HEAD`** 推断上游；一旦 `FETCH_HEAD` 残留多行，就变成「多个上游分支」而中止。**不是配置损坏**：`.git/config` mtime `Aug 5 16:04`（当日无人改动），`git fetch` 后 `FETCH_HEAD` 只有一条 `branch 'main'`，错误即消失（一次性残留）。
-- **修法**（`src/gitsync.rs:147-158`，2026-11-04 用户批准）：pull 显式写上游 `git pull --rebase --autostash origin main`，不再读 `FETCH_HEAD` 的多分支信息；`src/main.rs:232` 的 `Sync` 文档注释同步更新。回归 `cargo test gitsync` → **5/5 PASS**（含 `pull_failure_stops_before_reindex_and_push`、`sync_preserves_local_dirty_source_and_integrates_remote_memory`）。
+- **修法（历史注记，已被 17:12 的定稿取代，勿照抄）**（`src/gitsync.rs:147-158`，2026-11-04 16:44 用户批准）：当时把 pull 显式写上游 `git pull --rebase --autostash origin main`；后续实测证明这只是**过渡修法，不免疫**多行 `FETCH_HEAD`（见下文「更正」与「定稿」），现已换成 `fetch + rebase --autostash origin/main`。
 - **回退**：把 `src/gitsync.rs:154` 的 `["pull","--rebase","--autostash","origin","main"]` 去掉末尾两个元素、`src/gitsync.rs:153` 的提示串还原为 `git pull --rebase --autostash ...`，再 `cargo build`；全程不改 `git config`（`remote.origin.fetch` 保持通配原样）。
 - **代价**：分支名 `main` 被硬编码；本库与测试仓库都约定 `main`，换分支的仓库需同步改这一行。
 - **教训**：`FETCH_HEAD` 是每次 fetch 覆盖的临时文件，但残留会污染「不指定上游」的 pull；跨设备同步脚本应显式声明上游，别依赖推断。
@@ -148,3 +148,13 @@ tags: troubleshooting, colna-memo, git
 - **触发条件就是并发**：两次 fetch / pull 重叠即可写出两行。两条防线：① **串行化**（不要并行跑 `sync` / `index`，与下一条撞锁同源）；② 要彻底免疫就把 sync 的 pull 换成 `fetch + rebase origin/main`。
 - **判据一句话**：看到这条报错先 `wc -l .git/FETCH_HEAD`——是 1 行，查其它原因；是 2 行以上，就是并发 fetch 撞的，改写法而不是改 config。
 - **量化补充（2026-11-04 17:05，`/tmp` 裸仓库）**：同一脚本并发跑两次 `git fetch origin main`，连续 **30 轮 → 30/30** 全部得到 **2 行 `FETCH_HEAD`**。即「两行」不是偶发残留，而是**并发 fetch 的稳定结果**；只有串行执行时才是 1 行。故归因写成「**并发 fetch → 多行 FETCH_HEAD → `--rebase` 型 pull 必 die**」，「一次性残留」只是它在**事后**的表现（进程早已退出，行还留着）。
+
+## 定稿（2026-11-04 17:12，用户 17:05 授权）：免疫写法 = `fetch origin main` + `rebase --autostash origin/main`
+
+- **定稿结论**：**并发 fetch → 多行 `FETCH_HEAD` → `--rebase` 型 pull 必 die**。免疫写法是把拉取拆两步：`git fetch origin main`（只抓单分支）→ `git rebase --autostash origin/main`（重放到 remote-tracking ref，**完全不读 `FETCH_HEAD`**）。
+- **证据 1（并发量化，17:05）**：同一 `/tmp` 裸仓库并发跑两次 `git fetch origin main`，连续 **30 轮 → 30/30** 得到 2 行 `FETCH_HEAD`；串行只有 1 行。
+- **证据 2（受控复现，17:12）**：`git pull --rebase --autostash origin main main`（2 个 head、同一 commit = `FETCH_HEAD` 2 行可合并）→ `fatal: Cannot rebase onto multiple branches.`，**退出码 128**；同一状态下改后代码路径（`colna sync`：fetch 后台再造一行 → 2 行 `FETCH_HEAD`）→ **`SYNC_EXIT=0`**，日志 `⬇️ git fetch origin main ...` / `⬇️ git rebase --autostash origin/main ...` / `✅ 已 rebase 到 origin/main:7e05937 → 74efd8f` / `✅ 同步完成。`
+- **实现**（`src/gitsync.rs:147-197`，提交 `4708c03`，`src/gitsync.rs` **+71/−21**、`src/main.rs` **+1/−1**）：fetch 失败 → 打印 git 原始 stderr（不截首行）+ 非零退出，不进入 rebase；rebase 冲突 → 打印冲突文件清单 + 非零退出，**不自动 abort / 不自动 continue**（现场保留）；rebase 无新提交 → 输出 `✅ 已是最新:origin/main …(HEAD <sha>)` 再继续 reindex；`rebase_in_progress()`（`:225`）区分「rebase 冲突」与「autostash 恢复冲突」两种报错。回归 `cargo test gitsync` → **5/5 PASS**。
+- **回退**：`git revert 4708c03`；或把这两步还原成单条 `pull --rebase --autostash` 再 `cargo build`。全程**不动** `git config`（`remote.origin.fetch` 保持通配 `+refs/heads/*:refs/remotes/origin/*`）。
+- **代价 / 约束**：分支名 `main` 硬编码在两处调用里；换分支的仓库要同步改。`pull` 自带的「重抓一次」保护也没了 —— 但那份保护正是失败模式的一半（它的重抓与别的进程重叠时才写出两行），拆开后每次只抓单分支，反而确定。
+- **判据一句话**：看到 `Cannot rebase onto multiple branches` 先 `wc -l .git/FETCH_HEAD`；≥2 行就是并发撞的，**该换写法，不是改 config、也不是加显式分支**。
