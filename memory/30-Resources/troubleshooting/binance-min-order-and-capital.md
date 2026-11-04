@@ -63,3 +63,4 @@ Delta 中性要求双腿名义相等：现货 N 全额 + 永续腿保证金 N÷L
 ## 相关
 
 - [10-Projects/quant-trading.md](../../10-Projects/quant-trading.md)（P0-A / G0-a 判定全文）
+- [binance-leverage-fee-and-alpha.md](binance-leverage-fee-and-alpha.md)（同一项目的下一块：杠杆越高，手续费占本金 ∝ L、打平所需 alpha ∝ L）
