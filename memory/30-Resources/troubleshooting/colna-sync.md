@@ -138,3 +138,12 @@ tags: troubleshooting, colna-memo, git
 - **根因**：同一 `.colna/index.zvec` 库的排他锁被前一条命令持有 → 两条重叠即撞锁。**不是并发残留锁**：`.colna/index.zvec/LOCK` 是 `Oct 30 18:46` 的**陈旧空文件**，锁目录 `index.lock.d` 当时不存在，持锁进程也已不存在。
 - **判据 / 修法**：先 `pgrep -fl "colna (sync|index)"` 确认有两条命令在跑（而不是一条健康进程在持锁），然后**串行**重跑；不要为这条报错去删 `LOCK` 或 `index.lock.d`。
 - **教训**：别把 `sync` 和 `index` 并排丢进同一个 shell（`cmd1 & cmd2` 或两行同时发）；`LOCK` 存在本身不代表有进程持锁，要看进程。
+
+## 更正（2026-11-04 16:56 实测）：显式 `origin main` **并不能**根治上面那条报错
+
+- **反例**：同一台机器上 `git pull --rebase --autostash origin main` 报 `fatal: Cannot rebase onto multiple branches.`，`PULL_EXIT=128`，当时 `wc -l .git/FETCH_HEAD` = **2**。触发条件是我**两条 git 命令重叠**（前一条 `git fetch --update-head-ok origin main` 还在跑），两次 fetch 各写一行 → `FETCH_HEAD` 两行。
+- **受控复现**（git **2.54.0** Apple Git-157，`/tmp` 裸仓库）：`git pull --rebase --autostash origin main main`（两个 head，**指向同一个 commit**）→ `fatal: Cannot rebase onto multiple branches.`，退出码 **128**；同样的命令换成单 head → `Already up to date.`。
+- **结论修正**：`pull --rebase` 判定上游靠的是 **`FETCH_HEAD` 里「可合并」（未被 `not-for-merge` 标记）的行数**；显式写 `origin main` 只消除了「按默认 refspec 推断上游」这条路径，**行数 >1 时照 die**，与两条是不是同一个分支/同一 commit 无关。故上一条「显式 `origin main` 可根治」的表述**撤回**，正确说法是「消除推断路径，消除不了多行 `FETCH_HEAD`」。
+- **根治写法（实测不读 `FETCH_HEAD`）**：`git fetch origin main && git rebase --autostash origin/main` —— 在同一份「人为造出的 2 行 `FETCH_HEAD`」状态下退出码 **0**，因为它 rebase 到 remote-tracking ref。代价是把一步 pull 拆成两步，且 rebase 失败时 autostash 恢复语义要自己守住（现有 `ensure_no_git_operation` 守卫仍适用）。
+- **触发条件就是并发**：两次 fetch / pull 重叠即可写出两行。两条防线：① **串行化**（不要并行跑 `sync` / `index`，与下一条撞锁同源）；② 要彻底免疫就把 sync 的 pull 换成 `fetch + rebase origin/main`。
+- **判据一句话**：看到这条报错先 `wc -l .git/FETCH_HEAD`——是 1 行，查其它原因；是 2 行以上，就是并发 fetch 撞的，改写法而不是改 config。
