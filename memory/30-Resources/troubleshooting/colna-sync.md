@@ -152,6 +152,7 @@ for p in ['30-Resources/troubleshooting/xianyu-mtop-detail.md','50-Daily/2026-11
     print(p, f.get(p)==hashlib.sha256(open('memory/'+p,'rb').read()).hexdigest())"
   ```
   两个都 `True` 才说明索引吃到了最新字节；再补一条语义抽查（`./colna search "<新段落里的独特短语>"` 命中该块）。
+- **检索抽查别只看 top-1（本轮 3 次实测）**：`./colna search` 的 `#1` 多次是**无关旧文**且固定打 `score 0.7000`（例：查本轮新加的“被锁拦下的那次 index 零写入”“锁冲突 静默慢一个提交”，`#1` 都是 2026-09 的某篇 Daily）。判据应是**目标块出现在前 5**（本轮两次都出现在 `#2`），`#1` 是谁不作数。→ 所以「索引是否最新」的权威判据只有 `state.json` 的逐文件 sha 比对；检索只用来确认「能取回」，不用来判新旧。
 - **规矩**：`sync` 在 fetch 步失败 → 手动 `index`；**只要 `index` 报过锁冲突，就必须复跑一次并做上面的 sha 比对**，不能凭 `✅ 无变化` 收工。
 
 ## 更正（2026-11-04 16:56 实测）：显式 `origin main` **并不能**根治上面那条报错
