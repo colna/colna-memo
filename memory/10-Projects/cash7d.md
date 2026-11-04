@@ -347,3 +347,33 @@ tags: project, monetization, freelance, evidence, negative-result, cash7d
 ### 附带发现（文档仍未刷新）
 
 `GATE_XY_API.md` §2「当前状态（17:15）」仍写着 `replays 2 / verdict INCOMPLETE / exit 2`，与 `gate.json`（全量 FAIL 78/93）和 `gate_v2.json` 都不一致；新增的 `GATE_V2.md`（17:36，内容与实测一致）是唯一准确的状态页。**本库以 `gate.json` / `gate_v2.json` 为准。**
+
+## 终态补记（18:06 上游交付；18:07 我复验）
+
+> 来源：`GATE_XY_API.md` §0/§2-R、`REPORT_V3.md` §12.5、`RECEIPT_XY_9NUM.md`、`MIRROR_SYNC_NOTE.md`、`REA_FEASIBILITY.md` §8–§10。下表数字是本机 `stat` / `shasum` / 直读 JSON 复算的，不是转录。
+
+### 实测（可复核）
+
+| 项 | 实测值 |
+|---|---|
+| v1 `gate.json`（正式结论，未变） | sha `6ebdea89…b344c920`、mtime **17:30:10**、4917 B；price **148/148**、want **78/93**、`delivery_filled` **69**、`mismatches` 15、verdict **FAIL** |
+| v2 `gate_v2.json` | sha `a9e77f29…d16c8c67`、2455 B、mtime **17:35:33**；`verdict FAIL`、`supersedes_v1 false`；C1 148/148 pass；C2 93/93 pass（`negative_delta_ids` 空）；C3 covered **15** / equal 15 / mismatch **0**；C4 **false**；`missing_now_read_ids` **78**；`now_dom_reads_on_disk` **20**；窗口 `09:20:19Z–09:25:47Z` = 17:20–17:25 CST |
+| 判据先落盘 | `gate_v2_rule.md` 2037 B、sha `9c39718f…`、mtime **17:34:57**（比结果早 36s） |
+| §2 状态页已修 | `GATE_XY_API.md` 现有 **§0 当前状态（17:47）** 与 **§2-R 终态（17:38:28）**，历史 §2 的 `INCOMPLETE 2/148` **保留未删**，且 §0 自注「§2 只代表 17:15」；文件 sha **`09d50a6c…`** |
+| 价格伪影 id | `REPORT_V3.md` §12.5 已列 3 条：**1003028897404**（79.20 vs 88，原价 360）/ **1076124974178**（2.00 vs 5，9.99）/ **1094806266690**（8.50 vs 10，666） |
+| REA 文档已修复 | `REA_FEASIBILITY.md` **6014 B**、sha **`d509163c…a95302`**、mtime 17:39:44、§1–§10（§8 根因、§9 mtime 校准、§10 修复记录） |
+| 新交付文件 | `RECEIPT_XY_9NUM.md` **94 行**、sha `f35808fa…`；`MIRROR_SYNC_NOTE.md` 5200 B、sha `1511a5ae…` |
+| 调用量 | `run_full_log.jsonl` **146** 行；`replay_*.json` **148** 个（≠调用次数，收尾那条覆盖写同一文件） |
+
+### 两处上游数字需纠正（不影响结论）
+
+1. **双目录文件数 / inode 再次过期**：18:07 实测 A **650 文件** / inode 123972662，B **630 文件** / inode **124064096**（`MIRROR_SYNC_NOTE.md` 里的 548 / 529 也已过期）；`diff -rq` = A 独有 **20**（18 个 `*.log` + `__pycache__/` + `ocr_text/`）、B 独有 **0**、内容不同 **0**。→ 判同一目录只看路径，判新旧只看单文件 mtime/sha（详见 troubleshooting 坑 6 补充）。
+2. **`GATE_XY_API.md` 的 sha**：交付写 `289a0e28d0a5`，本机文件 sha 为 `09d50a6c…1d75e12`；按文件 sha 记（`289a0e28` 可能是某段落/历史版本哈希）。
+3. **口径边界**：`gate_v2.json` **没有 `exit_code` 字段**，「exit 1」是脚本返回值，不是文件里记录的事实。
+
+### 未解决（本轮更新）
+
+- [ ] C3 余 **78** 条现读 DOM 未补（= 78 次只读 detail POST）→ v2 在证据覆盖上无法 PASS；待用户批
+- [ ] 双目录文档（`MIRROR_SYNC_NOTE.md`、坑 6 表）里的**文件数/inode 已过期**，判据改用路径 + 单文件 mtime/sha（不再追数字）
+- [ ] `prereg_v3.json` 是否换线仍挂（默认 v3 不动、另开 v4；sha `16c777a6…` 未变）；语言可接性待用户拍；79 条无工期只能子集排序
+- [x] gate v2 规则已落盘并运行（`9c39718f…` 17:34:57 → `a9e77f29…` 17:35:33），v1 FAIL 仍为正式结论
