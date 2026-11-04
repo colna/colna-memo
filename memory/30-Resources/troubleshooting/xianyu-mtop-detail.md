@@ -55,6 +55,17 @@ tags: troubleshooting, xianyu, goofish, mtop, scraping, cash7d
 - **根因**：类目/卖家未填该属性，API 就没有该字段；148/148 均 `SUCCESS::调用成功`，不是抓取失败。
 - **修法**：工期类结论只能在**子集**上排序，不能覆盖全量；缺失机制（卖家未填 vs 类目无此属性）不做因果解读。
 
+## 工具适用性：REA 不可用于抽 mtop endpoint（负向结论，2026-11-04 17:27–17:31 实跑）
+
+**结论**：REA 6.7.0 **不能**用作闲鱼 mtop 链路的独立验证源——它抽不到 endpoint。同输入下 `grep` 能拿到的 15（宽松 21）个 API id，REA 抽到 **0**。其他 route/URL 型 bundle 仍可用。
+
+- **输入**：`https://www.goofish.com/` 首页里的 3 个静态 bundle（`g.alicdn.com/idle-pc/xy-site/0.0.179/js/{p_layout,p_index,main}.js`，共 **2,194,823 B**：1,365,072 / 425,937 / 403,814）。命令 `rea analyze-javascript-application ./app --format json --max-semantic-nodes 200000` → **exit 0**，29.4s，输出 **140,168,529 B**（140 MB），`parse_failures 0`、`visited_ast_nodes 648,123`、`modules 1,284`、`findings 4,617`。（对照：我更早一次限节点跑 3 JS / 302k AST / 713 findings / endpoint 0，结论一致。）
+- **真值（本地 grep，0 平台请求）**：`api:"mtop.*"` 字面量调用点 **23 处**（`p_layout` 19 / `p_index` 4 / `main` 0），union distinct **15 个**（14 + 2，重叠 1）；放宽到任意 `mtop.*` 字面量 → distinct **30**，剔除 `mtop.config.*` / `mtop.request` / `mtop.middlewares` 后 **21 个真实 API id**。典型形态：`(0,D.G)({api:"mtop.taobao.idlehome.home.webpc.feed", v:"1.0", data:{itemId:"", pageSize:30}})`。
+- **REA 召回**：证据体里 `mtop.taobao` **0** 次、`h5api` **0** 次、`idlehome` **0** 次，`mtop` 仅 **31** 次且**全部**出现在 `limitations`；endpoint 节点虽有 45 个，但清一色是 route/network 碎片（`route: /, account, account/api, *`；`network: a, b, c, q, ee, eE, hover, spm…`）。→ **recall 0/15（宽松 0/21）**。
+- **根因**：REA 的 endpoint 抽取走 property-path / route 启发式，**不覆盖「字符串字面量作对象字段、由库函数消费」的 mtop 形态**。同一次运行的 coverage 是 `status=partial, truncated=true`，`omitted_unknown_occurrences`：`call-flow/dynamic-call 35,872`、`object-flow/ambiguous-target 32,131`、`object-flow/dynamic-property 5,521`、`data-flow/dynamic-scope 3`、`timer 81`（每文件节点上限 20,000）——mtop 调用点正好落在被省掉的 dynamic-call 里。REA 自己给的是：`Static read/write property /lib/mtop/… has unknown-coverage presence; its receiver is unresolved or not a retained container`。
+- **纪律**：全程只读本地文件，**0 次 mtop/h5api 请求**、未登录、未装依赖、未跑 `rea setup`、未写 memory、未改 prereg。原始证据：`…/shared/cash7d/REA_FEASIBILITY.md` §4（四个数）/ §5（grep 对照）/ §7（产物 `/tmp/rea_xy/app/*`、`/tmp/rea_xy/rea_out.json`）。
+- **复用方式**：判定一个 bundle 能否用 REA 当验证源，先看 API 名是「完整 URL/路径字面量」还是「mtop 式字段拼接」——后者直接放弃 REA，改用 grep + 运行时抓包。
+
 ## 复跑（0 请求，可复核每个数字）
 
 ```bash
