@@ -196,3 +196,26 @@ git -c http.version=HTTP/1.1 push https://github.com/colna/colna-memo.git main
 **善后（容易漏）**：`colna sync` 在 fetch 一步退出，**后面的 reindex 不会执行** → 必须手动 `./colna index`，否则新写的笔记搜不到。本次实测：变更/新增 3、删除 0、upsert **126** 块，索引 **351 文件**。
 
 **判据一句话**：sync 报 `Permission denied (publickey)` 而 `ssh-add` 空、`nc` 通 → 先 `curl https://ssh.github.com/`；出 `SSL_ERROR_SYSCALL` 就是网络层，换 HTTPS 推 + 手动 reindex，别重配 key。
+
+## `main` 有 ruleset（owner 可绕过直推），`colna sync` 的 push 依赖这条豁免（2026-11-04 17:57 查证）
+
+**起因**：17:42 走 HTTPS 推 `a853345` 时，GitHub 在**最终成功**的那次仍回了三行：`remote: - Changes must be made through a pull request.` 但同一个 push 接着打印 `7f7a709..a853345 main -> main`（成功）。「要求走 PR，却又推上去了」必须查清，否则哪天静默失效。
+
+**查证结果**（`gh api`，均为只读）：
+
+- `repos/colna/colna-memo/branches/main/protection` → **404 `Branch not protected`**。所以**不是**传统 branch protection，别去那儿找。
+- `repos/colna/colna-memo/rulesets` → 命中仓库级 ruleset **`main-owner-only-direct-push`**（id `18914839`，`enforcement: active`，`target: branch`，建于 **2026-07-14**）。
+- `repos/colna/colna-memo/rules/branches/main` → 三条规则：
+  | 规则 | 含义 | 对 sync 的影响 |
+  |---|---|---|
+  | `pull_request` | 要求走 PR（`required_approving_review_count: 0`） | owner 有 **bypass**，直推仍成功；那三行是**提示，不是拒绝** |
+  | `non_fast_forward` | 禁强推 / 禁回退 | rebase 后正常 push 是 fast-forward，没问题；**任何 `--force` 必被拒** |
+  | `deletion` | 禁删分支 | 无害 |
+- 仓库 `permissions.admin: true`（本人是 owner/admin）→ 直推靠的是**管理员 bypass**。
+
+**结论 / 约束**：
+
+1. **`./colna sync` 能直推 `main`，靠的是 owner bypass，不是仓库允许**。owner 身份或 bypass 一旦变化，sync 的 push 会变成 403，需要改走 PR 流程。
+2. 看到 `Changes must be made through a pull request.` **先看同一 push 的最后一行**：跟着 `x..y main -> main` 就是**绕过成功**；只有它是最后一行且带 `! [remote rejected]` 才是真被拦。
+3. **永远不要用 `--force` 推这个仓库**：`non_fast_forward` 会拒；且 sync 的设计本来就是 `fetch origin main` + `rebase --autostash origin/main`（见上文「定稿（17:12）」），分叉靠 rebase 对齐，不靠强推。
+4. 走 HTTPS 绕过网络问题时（见上一节），**这些规则一样生效**——换的是传输层，不是权限层。
