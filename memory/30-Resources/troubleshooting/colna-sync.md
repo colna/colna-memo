@@ -147,3 +147,4 @@ tags: troubleshooting, colna-memo, git
 - **根治写法（实测不读 `FETCH_HEAD`）**：`git fetch origin main && git rebase --autostash origin/main` —— 在同一份「人为造出的 2 行 `FETCH_HEAD`」状态下退出码 **0**，因为它 rebase 到 remote-tracking ref。代价是把一步 pull 拆成两步，且 rebase 失败时 autostash 恢复语义要自己守住（现有 `ensure_no_git_operation` 守卫仍适用）。
 - **触发条件就是并发**：两次 fetch / pull 重叠即可写出两行。两条防线：① **串行化**（不要并行跑 `sync` / `index`，与下一条撞锁同源）；② 要彻底免疫就把 sync 的 pull 换成 `fetch + rebase origin/main`。
 - **判据一句话**：看到这条报错先 `wc -l .git/FETCH_HEAD`——是 1 行，查其它原因；是 2 行以上，就是并发 fetch 撞的，改写法而不是改 config。
+- **量化补充（2026-11-04 17:05，`/tmp` 裸仓库）**：同一脚本并发跑两次 `git fetch origin main`，连续 **30 轮 → 30/30** 全部得到 **2 行 `FETCH_HEAD`**。即「两行」不是偶发残留，而是**并发 fetch 的稳定结果**；只有串行执行时才是 1 行。故归因写成「**并发 fetch → 多行 FETCH_HEAD → `--rebase` 型 pull 必 die**」，「一次性残留」只是它在**事后**的表现（进程早已退出，行还留着）。
