@@ -299,6 +299,51 @@ tags: project, monetization, freelance, evidence, negative-result, cash7d
 
 - [ ] gate v2 规则待落盘并运行（拟：price 严格 148/148 + wantCnt 单调不减 + 现读 DOM 逐条相等，覆盖 93/93）；v1 FAIL 保留
 - [ ] POST 次数 150 vs 152 待分析师对齐本地日志（期间 0 新请求）
+  > **更正（2026-11-04 17:37）**：POST 唯一数应为 **154**（见文末「POST 计数更正」），本条 150/152 已作废；**原文保留不删**。
 - [ ] 79 条无工期 → 工期相关结论只能子集排序
 - [ ] 语言可接性待用户拍（调度转述：印尼语 5 / 阿尔巴尼亚语 2 / 法语 2 / 土耳其语 1）
 - [ ] `prereg_v3.json` 是否替换原四条件线仍挂（按 17:05 口径默认 v3 不动、另开 v4；本小节不裁决）
+
+## gate v2 结果（17:35 运行；17:37 我直读 JSON 复核）+ POST 计数更正
+
+> 来源：`shared/cash7d/GATE_V2.md`、`raw_v3/xianyu_api/gate_v2.json`、`gate_v2_rule.md`。下列数字是我在本机**直接读 JSON / `stat` / `shasum`** 复算的，不是转录摘要。本库内**无代码提交**（数据与证据都在团队共享目录）。授权：调度转上游要求落库。
+
+### 时序（先落盘、后运行，可复核）
+
+| 步骤 | 文件 | mtime (CST) | sha256 |
+|---|---|---|---|
+| ① 判据落盘 | `raw_v3/xianyu_api/gate_v2_rule.md` | **17:34:57** | `9c39718f…0c4bcd99`（我实测全 64 位与 `gate_v2.json.rule_sha256_file` 一致） |
+| ② 运行产出 | `gate_v2.json`（`verify_xy_api_v2.py`，7,061 B） | **17:35:33** | 内含 `rule_sha256_file` / `rule_sha256_body` |
+| ③ v1 原样 | `gate.json` | 17:30:10 | `6ebdea89…b344c920`；与 `gate_v1.json` **字节完全相同**（`cmp` 通过） |
+
+差 **36 秒**，且判据文件哈希被写进结果 → 「跑完再调参数」在证据上不成立。
+
+### v2 结果：FAIL, exit 1
+
+| 条件 | 分母 | 实测 | 判定 |
+|---|---|---|---|
+| C1 价格严格相等 | 148 | compared 148 / equal **148** / `fail_ids` 空 | **PASS** |
+| C2 wantCnt 单调不减 | 93 | compared 93 / ok **93** / `negative_delta_ids` **空** | **PASS** |
+| C3 现读 DOM 逐条等值 | 93 | covered **15** / equal **15** / `mismatch_ids` **空** | **FAIL（覆盖不足）** |
+| C4 覆盖 93/93 | — | `false`（15/93） | **FAIL** |
+
+- `now_dom_reads_on_disk` **20**（= 15 漂移复读 + 5 抽样）；现读时间窗 `09:20:19Z–09:25:47Z` = **17:20–17:25 CST**；`missing_now_read_ids` **78** 条。
+- `supersedes_v1: false`；`fail_reason` 两条都是 C3/C4 的**覆盖**，不是「值不相等」。
+- **口径**：v2 的 FAIL **不是数据矛盾**——C1/C2 全过，C3 已覆盖的 15 条 **0 条不等** → 卡在「只有 15/93 有带时间戳的现读 DOM」这个证据缺口。补齐余下 78 条现读（= 78 次只读 detail POST）才可能 PASS；**本轮 0 请求**。
+- **v1 仍是正式结论**：`gate.json` FAIL exit 1（price 148/148、want 78/93、`delivery_filled` 69）未被 v2 替代，也未改字节。
+
+### POST 唯一数更正为 **154**（150 / 152 作废，原文保留）
+
+| 组成 | 条数 | 我的核验状态 |
+|---|---|---|
+| round-1 全量 `run_full_log.jsonl` | **146** | **已核**（`wc -l` = 146） |
+| 探针 | **5** | 上游口径，我未逐条核 |
+| 早前 | **2** | 上游口径 |
+| 收尾复跑 | **1** | 上游口径 |
+| **合计** | **154** | — |
+
+上文「数据现状（17:15）」表格里的 **150** 与「未解决」第 2 条（150 vs 152 待对齐）**已作废，但原文保留不删**，各加了更正标注；该待办**关闭**。诚实边界：我只独立核到基座 **146** 行，5/2/1 的拆分来自上游与 `GATE_V2.md`，标「上游口径」。
+
+### 附带发现（文档仍未刷新）
+
+`GATE_XY_API.md` §2「当前状态（17:15）」仍写着 `replays 2 / verdict INCOMPLETE / exit 2`，与 `gate.json`（全量 FAIL 78/93）和 `gate_v2.json` 都不一致；新增的 `GATE_V2.md`（17:36，内容与实测一致）是唯一准确的状态页。**本库以 `gate.json` / `gate_v2.json` 为准。**

@@ -55,6 +55,31 @@ tags: troubleshooting, xianyu, goofish, mtop, scraping, cash7d
 - **根因**：类目/卖家未填该属性，API 就没有该字段；148/148 均 `SUCCESS::调用成功`，不是抓取失败。
 - **修法**：工期类结论只能在**子集**上排序，不能覆盖全量；缺失机制（卖家未填 vs 类目无此属性）不做因果解读。
 
+## 坑 6：团队有两个 `shared/cash7d`，读到 `homes/` 那份等于读旧镜像
+
+**症状**：同一脚本在不同时间报的「文件数 / 最新 mtime / gate 结果」互相打架，或算出来的数比上游摘要旧一截；日志类产物「凭空不见了」。
+
+**两个目录**（同一账号 `colna`，都在 `…/rakazo/data/` 下）：
+
+| 路径 | 角色 |
+|---|---|
+| `desktop-computers/team-8f0a2a4300c87fca269da0a6e44db684/shared/cash7d` | **活动目录**，所有写入落这里 |
+| `homes/team-8f0a2a4300c87fca269da0a6e44db684/shared/cash7d` | **镜像**，只读用，带过滤器 |
+
+**根因**：镜像侧有过滤器，**排除 `*.log` 与 `__pycache__/`**；而且镜像**持续刷新**，所以 inode 与文件数都是**移动靶**，不能当「是不是同一个目录」的判据。
+
+**实测（2026-11-04 17:36–17:37，两次 `stat` 间隔 3 分钟）**：
+
+- 活动目录：inode **123972662**、**547** 文件（两次一致）。
+- 镜像：inode **124054170**、**528** 文件、**528 个文件的 mtime 全部 = 17:36:34**（随时被重写）。上游摘要给的 `124051099 / 521 / 17:27` 是更早一刻的快照，**已过期**。
+- 差集：镜像少 **20** 个 = 11 个 `fetch_*.log` + `numbers_final.log` + `verify_v3.log` + `xy_collect.log` + `raw_v3/fetch_fl_v3.log` + `raw_v3/fetch_parallel.log` + `raw_v3/xianyu_api/gate_dryrun.log` + 3 个 `__pycache__/*.pyc`；**多 1** 个 `selftest/tools/ocr`。
+
+**修法**：
+
+1. 路径**固定写 `desktop-computers/…` 绝对路径**；`homes/…` 只当只读镜像，**不在上面判「有没有新产物」，也不复用它算数**。
+2. 判「产物新不新」看**文件 mtime**，不看目录 inode / 文件总数（镜像会重写）。
+3. 任何「日志全不全」的核对**必须在活动目录做**——镜像里天然没有 `*.log`（例：`gate_dryrun.log` 只在活动目录存在）。
+
 ## 工具适用性：REA 不可用于抽 mtop endpoint（负向结论，2026-11-04 17:27–17:31 实跑）
 
 **结论**：REA 6.7.0 **不能**用作闲鱼 mtop 链路的独立验证源——它抽不到 endpoint。同输入下 `grep` 能拿到的 15（宽松 21）个 API id，REA 抽到 **0**。其他 route/URL 型 bundle 仍可用。
