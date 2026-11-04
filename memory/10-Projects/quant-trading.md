@@ -49,6 +49,94 @@ tags: project, quant, trading, rust, binance, p0
 - 币安 API 在大陆网络通常不可达。
 - 实测进行中（后端资深专家负责），截至 2026-11-04 12:47 **未回报结论**。
 
+## P0-C 连通性实测（2026-11-04 12:47）
+
+> 本节结论**取代**上文「硬约束三：本机网络（待验证，未回）」与「未解决项」第 8 条的状态。那两处原文保留不改（保持当日快照可追溯），以本节为准。
+> 来源：后端资深专家实测回报，经调度 2026-11-04 12:47 转述；我本人未复跑命令，数值为转述值。
+
+### 探测目标与采样
+
+5 个域名：`api.binance.com`、`api1.binance.com`、`fapi.binance.com`、`stream.binance.com:9443`、`testnet.binance.vision`。**三次独立采样结果一致。**
+
+### 主站四域名：全部不可达
+
+| 指标 | 观测值 |
+|---|---|
+| curl 退出码 | `28`（Connection timed out） |
+| HTTP code | `000` |
+| `time_connect` | `0.000s` |
+| `time_appconnect` | `0.000s` |
+| `time_total` | ≈`8.00s`（`--max-time 8`） |
+
+- `time_connect` 恒为 `0.000s` → **可排除偶发抖动**（从未建立连接，而非连上后超时）。
+
+### DNS 污染证据（关键）
+
+本机 resolver 返回的地址全在不相关网段：
+
+| 域名 | 本机解析 | 该 IP 归属 |
+|---|---|---|
+| `api.binance.com` | `162.125.7.1`（另有 AAAA `2001::9df0:1412`） | Dropbox 网段 |
+| `api1.binance.com` | `31.13.83.34` | Facebook |
+| `fapi.binance.com` | `128.242.240.155` | Verizon |
+| `stream.binance.com` | `199.59.149.207` | — |
+
+同一时刻用 `dig @8.8.8.8` 得到真实答案：
+
+| 域名 | 8.8.8.8 解析 | CNAME |
+|---|---|---|
+| `api.binance.com` | `99.84.42.165` | `d3h36i1mno13q3.cloudfront.net` |
+| `fapi.binance.com` | `18.164.154.x` | `d2ukl3c6tymv7q.cloudfront.net` |
+| `stream.binance.com` | `18.178.115.58` | 日本 AWS |
+
+→ **域名未被封死，是本机 DNS 污染导致连错 IP。**
+
+### testnet.binance.vision：可达但业务拒绝
+
+- DNS：`3.161.82.60` / `.12` / `.116` / `.55`（AWS 东京，**真实 IP**）
+- HTTP code：**451**（三次采样全部 451）
+- `time_connect`：`0.345–0.455s`；TLS（`time_appconnect`）：`0.693–0.806s`；`time_total`：≈`1.04s`
+- body：`Service unavailable from a restricted location` / `restricted location according to 'b. Eligibility'`
+
+### 出口归属
+
+- 出口 IP 归属：**US / Los Angeles, California / AS62610 Zenlayer Inc**（`ipinfo.io` 与 `ip.sb` 一致）。
+- 直接原因：本机系统代理开启 `127.0.0.1:7897`（`scutil --proxy` 显示 `HTTPEnable 1` / `HTTPSEnable 1` / `SOCKSEnable 1`）。
+- 币安主站（`binance.com`，非 `binance.us`）本身禁止美国 IP，属 `b. Eligibility` 条款。
+
+### 时间偏移
+
+- **≈ 0 ms**。
+- 依据：cloudflare `cdn-cgi/trace` 的 `ts=1793767607.000` 与本机 `date +%s` 相同（精度 1s）；`ipinfo` 的 `date: Wed, 04 Nov 2026 04:46:41 GMT` 交叉吻合。
+- `worldtimeapi.org` 空响应，不可用（不计入证据）。
+
+### 判定三态
+
+| 目标 | 判定 |
+|---|---|
+| `api.binance.com` / `api1.binance.com` / `fapi.binance.com` / `stream.binance.com:9443` | **不可达** |
+| `testnet.binance.vision` | **可达但被地域拒绝（451）** |
+
+### 架构结论（调度判定）
+
+- **本机无法支撑实盘。**
+- 实盘链路**必须境外 VPS**，且落地地区**须避开美国**（美国 IP 即使 DNS 修好仍 451，且可能触发账户风控 / 资产冻结）。
+- 本机保留为**开发与回测端**。
+- **不得用「本机 + 代理」当实盘链路。**
+
+### 证据瑕疵（自标注，防止后人误读）
+
+后端专家自报一处脚本缺陷，已确认**不影响结论**：
+
+- 输出中挂在 `stream.binance.com:9443` 下面的那段 451 JSON **并非 stream 的响应体**，而是旧脚本按 `$$` 命名临时文件导致的 `/tmp/o1` 文件复用残留。**stream 真实响应体为空**（TLS 未建立、code=000）。
+- 同一缺陷还导致输出末尾出现 `zsh:1: no matches found: *.txt` 与 `head: No such file or directory`。
+
+→ 结论「四域名不可达」依据的是 curl 退出码 / `time_connect=0.000` / HTTP 000，**不依赖任何响应体**。
+
+### 边界
+
+全程只读：未装软件、未注册、未建 API key、未下单、未改 DNS / 代理 / 系统配置、未用代理绕过地域限制。curl 输出文件落在 `/tmp`。
+
 ## 策略裁剪结论（调度给出）
 
 - **资金费率中性套利**：10 USDT 下「两腿各 ≥5 USDT + 合约最小下单量」很可能**物理上打不开**（BTCUSDT 永续 minQty 约 0.001 BTC，**待 exchangeInfo 实测**），降级为纯研究。
