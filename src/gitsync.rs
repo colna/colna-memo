@@ -125,7 +125,7 @@ fn ensure_no_staged_changes_outside_memory(root: &Path) -> Result<()> {
 /// 步骤:
 ///   1. Git 状态与冲突标记守卫
 ///   2. git add memory/ + 有改动则 commit
-///   3. git pull --rebase --autostash(拉远端最新,真源对齐)
+///   3. git pull --rebase --autostash origin main(显式上游,拉远端最新,真源对齐)
 ///   4. reindex(最终真源状态只处理一次)
 ///   5. git push
 fn run_sync(root: &Path, message: &str, reindex: &dyn Fn(&Path) -> Result<()>) -> Result<()> {
@@ -144,8 +144,13 @@ fn run_sync(root: &Path, message: &str, reindex: &dyn Fn(&Path) -> Result<()>) -
         git(root, &["commit", "-m", message])?;
     }
 
-    println!("⬇️  git pull --rebase --autostash ...");
-    let pull = git(root, &["pull", "--rebase", "--autostash"]).map_err(|e| {
+    // 显式写上游 `origin main`:裸 `git pull --rebase` 在
+    // `remote.origin.fetch = +refs/heads/*:refs/remotes/origin/*` 的通配 refspec 下会按
+    // 整个 FETCH_HEAD 取上游,一旦 FETCH_HEAD 残留多行就报
+    // `fatal: Cannot rebase onto multiple branches.`(2026-11-04 实测一次性残留)。
+    // 本库约定分支为 main;显式指定后不再读 FETCH_HEAD 的多分支信息。
+    println!("⬇️  git pull --rebase --autostash origin main ...");
+    let pull = git(root, &["pull", "--rebase", "--autostash", "origin", "main"]).map_err(|e| {
         anyhow!(
             "pull --rebase 失败,已停止 reindex/push: {}",
             first_line(&e.to_string())

@@ -229,7 +229,7 @@ enum Command {
         #[arg(short, long, default_value = "")]
         tags: String,
     },
-    /// 跨设备同步:commit memory → pull --rebase --autostash → reindex → push
+    /// 跨设备同步:commit memory → pull --rebase --autostash origin main → reindex → push
     Sync {
         #[arg(short, long, default_value = "colna sync")]
         message: String,
