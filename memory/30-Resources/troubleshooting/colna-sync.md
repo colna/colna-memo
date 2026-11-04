@@ -122,3 +122,19 @@ tags: troubleshooting, colna-memo, git
   - 持锁者**僵尸/孤儿**(CPU 空转、batch 不动):按上一条 kill 后单进程重跑。
 - **另一条实用结论**:`colna sync` 的顺序是 `add+commit → pull → reindex → push`。reindex 是全流程最长的一步,agent 工具超时 kill 后,**commit 已经产生但 push 还没发** —— 表现为「本地 ahead 若干个 `colna sync` 提交」。补推只需在 KB 根 `git push origin main`(已实测 7 个积压提交一次推完)。
 - **教训**:判断 `colna` 死活看**输出速率**而不是「有没有输出」;看到 ahead 一堆 `colna sync` 提交,八成是历次 sync 都死在 reindex 上。
+
+## `git pull --rebase` 报 `Cannot rebase onto multiple branches`（2026-11-04 实测）
+
+- **现象**：`colna sync` 的 pull 步报 `fatal: Cannot rebase onto multiple branches.`（当日一次中断后遗留 `FETCH_HEAD` 多行），commit 已完成、reindex / push 未做。
+- **根因**：`remote.origin.fetch = +refs/heads/*:refs/remotes/origin/*` 是**通配 refspec**，裸 `git pull --rebase` 不指定上游时会按**整个 `FETCH_HEAD`** 推断上游；一旦 `FETCH_HEAD` 残留多行，就变成「多个上游分支」而中止。**不是配置损坏**：`.git/config` mtime `Aug 5 16:04`（当日无人改动），`git fetch` 后 `FETCH_HEAD` 只有一条 `branch 'main'`，错误即消失（一次性残留）。
+- **修法**（`src/gitsync.rs:147-158`，2026-11-04 用户批准）：pull 显式写上游 `git pull --rebase --autostash origin main`，不再读 `FETCH_HEAD` 的多分支信息；`src/main.rs:232` 的 `Sync` 文档注释同步更新。回归 `cargo test gitsync` → **5/5 PASS**（含 `pull_failure_stops_before_reindex_and_push`、`sync_preserves_local_dirty_source_and_integrates_remote_memory`）。
+- **回退**：把 `src/gitsync.rs:154` 的 `["pull","--rebase","--autostash","origin","main"]` 去掉末尾两个元素、`src/gitsync.rs:153` 的提示串还原为 `git pull --rebase --autostash ...`，再 `cargo build`；全程不改 `git config`（`remote.origin.fetch` 保持通配原样）。
+- **代价**：分支名 `main` 被硬编码；本库与测试仓库都约定 `main`，换分支的仓库需同步改这一行。
+- **教训**：`FETCH_HEAD` 是每次 fetch 覆盖的临时文件，但残留会污染「不指定上游」的 pull；跨设备同步脚本应显式声明上游，别依赖推断。
+
+## `Can't lock read-write collection`：两条 colna 命令重叠（2026-11-04 16:44 实测）
+
+- **现象**：`sync` 还在跑时又起了一条 `index`，后一条报 `Can't lock read-write collection`；下一条命令自愈。
+- **根因**：同一 `.colna/index.zvec` 库的排他锁被前一条命令持有 → 两条重叠即撞锁。**不是并发残留锁**：`.colna/index.zvec/LOCK` 是 `Oct 30 18:46` 的**陈旧空文件**，锁目录 `index.lock.d` 当时不存在，持锁进程也已不存在。
+- **判据 / 修法**：先 `pgrep -fl "colna (sync|index)"` 确认有两条命令在跑（而不是一条健康进程在持锁），然后**串行**重跑；不要为这条报错去删 `LOCK` 或 `index.lock.d`。
+- **教训**：别把 `sync` 和 `index` 并排丢进同一个 shell（`cmd1 & cmd2` 或两行同时发）；`LOCK` 存在本身不代表有进程持锁，要看进程。

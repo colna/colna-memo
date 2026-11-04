@@ -65,3 +65,8 @@ tags: troubleshooting, scraping, login-wall, evidence, freelance, verification
 2. 统计样本前先排除 `fixtures/`、`selftest/`、`testdata/`；**文件名里的平台名不算样本证据**，样本只认 `capture/` 下真渲染的三件套。
 3. 「想要数 / 投标数」按平台分列，禁止合并成单一「竞争度」列。
 4. 结论里「不可评估」必须与「需用户 30 秒登录」成对出现，否则下一个人只会读到「平台不行」。
+
+## 16:41 补记重申的两条说法：仍未存档（2026-11-04 16:48 复查）
+
+- 上游补记再次出现「`/wd/list` **302**→`/user/notlogin`」与「robots **Disallow `/wd/*`**」。复查 `shared/cash7d/*.log`（只有 200 `/`、404 `/projects`、404 `/wanted`，无 `/wd/list` 状态行）与 `grep -ri robots`（logs / manifest / evidence）**0 命中** → 两条**继续标未验证**。
+- 要转正需要的东西：`302` 要响应头或抓取日志里的状态码行；`robots` 要 `https://www.proginn.com/robots.txt` 的原文存档。**补记重复提及不构成证据**——这是本条最该保留的判据。
