@@ -139,6 +139,21 @@ tags: troubleshooting, colna-memo, git
 - **判据 / 修法**：先 `pgrep -fl "colna (sync|index)"` 确认有两条命令在跑（而不是一条健康进程在持锁），然后**串行**重跑；不要为这条报错去删 `LOCK` 或 `index.lock.d`。
 - **教训**：别把 `sync` 和 `index` 并排丢进同一个 shell（`cmd1 & cmd2` 或两行同时发）；`LOCK` 存在本身不代表有进程持锁，要看进程。
 
+### 补充（2026-11-04 18:22 实测）：被锁拦下的那次 `index` **什么都没写**，会静默慢一个提交
+
+- **现象**：`e892966` 推完后手动 `./colna index` 报 `Can't lock read-write collection`（前一条命令的收尾进程还持锁）。等锁释放后**再跑**，输出 `✅ upsert 102 块`——而当时我以为「只差两个文件、约 25 块」。→ **被锁拦下的那次是零写入，不是部分写入**；两次输出（26 块 / 102 块）都不能当作「应该只有这么多」的基线。
+- **危害**：`colna index` 的健康态输出是 **`✅ 无变化,索引已是最新(351 个文件)`**，与「刚跑完一次成功增量」长得一样。**光看这一行无法区分「已索引」和「上次被锁拦掉、这次误判无变化」**（文件数 351 恒定，只增块）。
+- **离线权威判据（不依赖网络、不依赖计数）**：拿 `.colna/state.json` 里该文件的 sha 与磁盘字节比对——
+  ```bash
+  python3 -c "
+import json,hashlib
+f=json.load(open('.colna/state.json')).get('files') or json.load(open('.colna/state.json'))
+for p in ['30-Resources/troubleshooting/xianyu-mtop-detail.md','50-Daily/2026-11-04.md']:
+    print(p, f.get(p)==hashlib.sha256(open('memory/'+p,'rb').read()).hexdigest())"
+  ```
+  两个都 `True` 才说明索引吃到了最新字节；再补一条语义抽查（`./colna search "<新段落里的独特短语>"` 命中该块）。
+- **规矩**：`sync` 在 fetch 步失败 → 手动 `index`；**只要 `index` 报过锁冲突，就必须复跑一次并做上面的 sha 比对**，不能凭 `✅ 无变化` 收工。
+
 ## 更正（2026-11-04 16:56 实测）：显式 `origin main` **并不能**根治上面那条报错
 
 - **反例**：同一台机器上 `git pull --rebase --autostash origin main` 报 `fatal: Cannot rebase onto multiple branches.`，`PULL_EXIT=128`，当时 `wc -l .git/FETCH_HEAD` = **2**。触发条件是我**两条 git 命令重叠**（前一条 `git fetch --update-head-ok origin main` 还在跑），两次 fetch 各写一行 → `FETCH_HEAD` 两行。
