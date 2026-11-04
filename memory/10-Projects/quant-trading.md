@@ -479,4 +479,6 @@ zsh verify_checksum.sh   # files=72 sha256_ok=72 sha256_bad=0 csv_diff=0
 
 ## 相关
 
+- [crypto-ai-methods.md](crypto-ai-methods.md)（同用户、同 10 USDT 额度，但**另一条线**：「AI 炒币」方式全景 + 可行性，2026-11-04 14:30 交付，结论为 8 类在 10 U 下无一能摊平成本。**两条线的结论不可互引为证据**：那条评的是「方式是否可行」，本条评的是「一次性翻倍要不要下注」）
+- [troubleshooting/waf-202-challenge-not-success.md](../30-Resources/troubleshooting/waf-202-challenge-not-success.md)（`202` + `x-amzn-waf-action` 判读，与本文 451 的区别）
 - [troubleshooting/rust-tips.md](../30-Resources/troubleshooting/rust-tips.md)（Rust 语言层小记，可复用）
