@@ -6,6 +6,8 @@ tags: [project, x, twitter, automation, content, monetization]
 
 # x-operator（Colna | Creator Change Log）
 
+> **2026-11-05 状态**：已停用为 @colna_zheng 的发布管道。GitHub Actions（post / generate / metrics / image-test）已 disable；仓库保留。新赛道见 [colna-x（Creator Ops）](colna-x.md)。
+
 ## 目标
 
 英文 X 个人 IP 账号 Colna，主打 Creator Change Log 系列，0 粉起步，全自动运营，面向欧美创作者/社媒运营。个人是脸和语气，Creator Change Log 是内容主线。无 Premium；X API 为 pay-per-use，最低买一次 credits 拿 $20 赠送额度，90 天测试约 $3/月。不做 X 广告分成，变现路径为创作者工具联盟 → newsletter → 赞助/数字产品。
