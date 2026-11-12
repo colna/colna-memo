@@ -195,3 +195,26 @@ After（doc `29162554043360959`）：同 shape，把 `newer_than_message_id` 设
 - 全部只读；不要调用 `useIGDMarkThreadAsReadMutation`、不要发消息。
 - 分页/轮询加 1–2s 抖动；不要高频刷 inbox。
 - doc_id 随构建轮换；上线做契约探测 + DOM fallback。
+
+## 2026-11-12 补充：全量会话/全量消息与 EIMU 坑
+
+### 全量会话列表（thread list 分页）
+
+- 首屏：`PolarisDirectInboxQuery`（28881837051457834）返回前 15 个 thread + `get_slide_mailbox_for_iris_subscription.id`（SlideMailbox id，实测 = viewer 的 `interop_messaging_user_fbid` / EIMU）。
+- 翻页：`IGDThreadListOffMsysPaginationQuery`，doc_id **29461858216751557**（非专业账号）。variables：
+  `{ id: <mailbox.id/EIMU>, count: 15, cursor: <上一页 page_info.end_cursor>, folder: "INBOX", newer_than_timestamp_ms: null, __relay_internal__pv__IGDPinnedThreadsRenderEnabledGKrelayprovider:false, __relay_internal__pv__IGDMaxUnreadMessagesCountrelayprovider:5, __relay_internal__pv__IGDThreadListActionsEnabledGKrelayprovider:false }`
+  响应：`data.fetch__SlideMailbox.threads_by_folder.edges[]` + `page_info`；`has_next_page` 为 true 时用 `end_cursor` 继续。
+- 专业账号：`IGDThreadListProfessionalOffMsysPaginationQuery` 28833611742996989 / `IGDThreadListProfessionalOffMsysThreadsBySystemFolderPaginationQuery` 28892059663797409（未实测）。
+
+### 全量消息（单 thread）
+
+- `IGDThreadDetailQuery` 取最近 20 条 + `page_info.start_cursor`。
+- Before：`IGDMessageListAnchorMessageRangeBeforeOffMsysQuery`，`id=thread_fbid`、`older_than_message_id=当前最老 mid`、`include_edge_message=false`；每次返回的 edges 最老一条成为下一次 anchor；edges 为空即到底。
+- 长会话按页循环，建议 1–2s 抖动 + 页数/时间预算（脚本默认 50 页 / 240s）。
+
+### 关键坑：outgoing sender_fbid 是 EIMU，不是 ds_user_id
+
+- thread detail 的 `viewer.id` = `ds_user_id`（如 26460493204），但消息 `sender_fbid` 用的是 `viewer.interop_messaging_user_fbid`（EIMU，如 18109385050885205）。
+- 判断 `sender: "me"/"them"` 必须用 `thread.viewer.interop_messaging_user_fbid`；用 `viewer_id` 会把「自己发的」误判成对方，服务端可能对自己的消息自动回复。
+- 已修：`insGraphql.getContext()` 增加 `viewerEIMU`（`CurrentUser.getEIMU()`）；`getChatMessages` 用 `thread.viewer.interop_messaging_user_fbid`；`startDMListener` 通过 context → sessionStorage → inbox query（`mailbox.id`）解析 EIMU，再过滤 outgoing。
+- 实时 `newMessage` 事件同样用 EIMU 过滤；`listener status` 现在返回 `viewerEimu`。
