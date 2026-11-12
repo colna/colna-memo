@@ -15,6 +15,7 @@ tags: project, onia, social-proxy, architecture, instagram, dm, pipeline
 3. **监听到的事件必须变成 `signal.report`，再由 Policy 产出 Todo。** 有平台 `message_id` 的实时事件报 `DM_RECEIVED`（幂等键 `platform + message_id`），本阶段策略产出 `pull_thread`，**不**产出回复。只有红点或会话列表、没有可靠 `message_id` 时，报已有的 `INBOX_ACTIVITY` → `PULL_INBOX`。Behavior 里不要写死「拉完再回复」。
 4. **脚本不得在注入约 20 秒后自行启动监听。** 这会绕过 Todo / Scheduler。需要监听时，由服务端经管线下达 `start_dm_listener`；脚本重注入后若监听丢失，也由管线再下发，而不是页面定时器自启动。
 5. **落地先升级 `pull_thread`，再接通监听与事件上报。** 自动回复 / Agent 先审后发仍是后续，本轮不把发送做成必须项。
+6. **所有 Instagram 接口调用必须由设备客户端发出**（WebView 内脚本或宿主在本机发起），覆盖全量 / 增量拉会话和监听新消息两条路径。Onia 服务端只做调度、游标、校验，以及收 `behavior.result` / `signal.report`。不得由服务端代发或反向代理 Instagram GraphQL / 私有接口 / 媒体地址，也不得持有 cookie 或 session 去打 Instagram。目的是避免这类请求的出口 IP 都落在同一台服务器上。
 
 ## 假设
 
@@ -28,8 +29,19 @@ tags: project, onia, social-proxy, architecture, instagram, dm, pipeline
 ## 与既有文档的关系
 
 - [architecture.md](architecture.md) 的分层继续有效：执行必须经 Todo → Scheduler → Behavior；设备事实走 `signal.report`（`device_id` 以会话为准）；「拉完再回复」要先形成新的 Signal，再交给 Policy，禁止在 Behavior 服务里写死下一步。
-- [instagram-actions-pipeline.md](instagram-actions-pipeline.md) 已把 `getChatMessages` 映射为 `pull_thread`，并规定游标落 PostgreSQL、消息走 `behavior.result`。本文是该动作的 **GraphQL 全量 / 增量升级**，以及监听这条新能力的接入；不是另开一套动作名，也不推翻信封。
+- [instagram-actions-pipeline.md](instagram-actions-pipeline.md) 已把 `getChatMessages` 映射为 `pull_thread`，并规定游标落 PostgreSQL、消息走 `behavior.result`。本文是该动作的 **GraphQL 全量 / 增量升级**，以及监听这条新能力的接入；不是另开一套动作名，也不推翻信封。其中「媒体分片失败后由服务端 Range 回退去拉 URL」与下文硬约束冲突，**本方案覆盖该回退**：Instagram 及 CDN 地址只允许设备本机拉取，服务端不再代取。
 - [signal-multi-action-impl.md](signal-multi-action-impl.md) 继续约束多步 Signal：一条 N 步定义展开为 N 条有序 Todo；`pull_thread` 只是其中一步。截断续跑不得偷偷给同一条手动 Signal 追加隐藏步骤。
+
+## 硬约束：Instagram 请求只出设备
+
+拉会话（含 GraphQL 全量 / 增量、Direct v2 或 DOM 回退）和监听新消息（含探测 `getIGDNotificationEventEmitter`、收件箱列表、底栏红点，以及随后因此触发的 `pull_thread` / `pull_inbox`）都必须遵守：
+
+- 凡是打向 Instagram 域或其 CDN 的请求，只允许从**该设备**上的 WebView 脚本或宿主发出，使用页面已有的登录态。出口 IP 是设备当前网络，不是 Onia 服务器。
+- 服务端职责仅限于：调度（Signal / Todo / Behavior）、游标与别名、参数校验、收 `behavior.result` 与 `signal.report`、以及把期望监听状态再经管线下达。服务端可以把游标写回下次 `pull_thread` 的 params，但**不能**拿着这些参数自己去拉消息。
+- 禁止：服务端持 cookie / `sessionid` / `fb_dtsg` 等会话材料；服务端或边缘节点反向代理 `/api/graphql`、`/api/v1/direct_v2/` 等私有接口；为了「统一出口」或省掉客户端实现而加的服务端拉取。
+- 消息结果里可以带附件 URL，作为设备侧元数据。若媒体需要落 Onia 对象存储：由**客户端在本机拉取**后再上传到 Onia；服务端只收设备上传的对象，不得拿 Instagram URL 去代下。本轮若还不做对象存储，就只在 `behavior.result` 里保留 URL 与文本，仍然不要让服务端去取这些地址。
+
+与先前方案的冲突检查：本文本身没有建议服务端代打 GraphQL。唯一需要对齐的，是 [instagram-actions-pipeline.md](instagram-actions-pipeline.md) 里媒体 `media.range_download.v1` 的「宿主本机直连失败后，服务端 Range 回退」。宿主本机直连仍然允许，也是推荐路径；**服务端再去拉 Instagram / CDN URL 不再采用**。设备侧 HTTP 桥若只在本机用 WebView Cookie 发请求（既有发帖口径），仍算客户端发出，不是服务端代发；本轮不顺手改发帖。
 
 ## 对照来源：保留什么、改掉什么
 
@@ -96,7 +108,7 @@ API 失败才回退 DOM。回退时同样遵守服务端游标，不得再读 An
 
 ### 结果与游标回写
 
-`behavior.result` 至少包含：规范 `thread_id`、`thread_key`、`ig_direct_thread_id`（能拿到的）、`target_handle`、`messages[]`（`message_id`、`direction`：`in` / `out` / `unknown`，方向用 `viewerEIMU` 比 `sender_fbid`、正文、时间、可选附件 URL）、`last_message_id`（本批最新）、`oldest_message_id`、`full_sync_done`、`truncated`、`mode`（`full` / `incremental` / `resume`）、`transport`（`api` / `dom`）。不要在结果里塞媒体二进制。
+`behavior.result` 至少包含：规范 `thread_id`、`thread_key`、`ig_direct_thread_id`（能拿到的）、`target_handle`、`messages[]`（`message_id`、`direction`：`in` / `out` / `unknown`，方向用 `viewerEIMU` 比 `sender_fbid`、正文、时间、可选附件 URL）、`last_message_id`（本批最新）、`oldest_message_id`、`full_sync_done`、`truncated`、`mode`（`full` / `incremental` / `resume`）、`transport`（`api` / `dom`）。不要在结果里塞媒体二进制。附件若要进对象存储，由设备本机拉取后再上传，服务端不得根据这些 URL 去 Instagram 代下。
 
 服务端只在 `ok = true` 时 upsert 游标：
 
@@ -143,7 +155,7 @@ Behavior 超时只约束 start / stop / status 这一次短调用，不约束之
 
 ## 宿主要补的桥，以及不迁什么
 
-现有 `OniaBridge.postMessage` 已承担脚本 RPC 回包、`pending`、媒体分片和 SPA 导航。监听事件是**无请求号的上送**，需要新增一种宿主消息（建议 `type: "signal_report"`），由 Flutter 转成 WebSocket `signal.report`。不要在脚本里复刻名为 `emitScriptEvent` 的公司接口，也不要让脚本自己打 Onia HTTP。
+现有 `OniaBridge.postMessage` 已承担脚本 RPC 回包、`pending`、媒体分片和 SPA 导航。监听事件是**无请求号的上送**，需要新增一种宿主消息（建议 `type: "signal_report"`），由 Flutter 转成 WebSocket `signal.report`。不要在脚本里复刻名为 `emitScriptEvent` 的公司接口，也不要让脚本自己打 Onia HTTP。媒体分片只允许宿主在本机直连下载；不要再走服务端 Range 去取 Instagram 地址。
 
 `HostContext` 可以提供 `reportSignal(type, payload)` 供脚本调用，内部仍走上述桥。`device_id`、身份字段由宿主 / 会话补齐。日志继续走现有宿主日志，不必迁公司 `eventTrack`。
 
@@ -155,6 +167,7 @@ Behavior 超时只约束 start / stop / status 这一次短调用，不约束之
 - `packages/business-pwa-proto` 及本次子模块指针变更
 - 脚本加载后 20 秒自动 `startDMListener`
 - 把 `ds_user_id` 当作 DM 发送者身份
+- 服务端持会话或反向代理去调用 Instagram GraphQL / 私有接口 / 媒体 CDN
 
 ## 与 `pull_inbox`、多步 Signal、发令页的关系
 
@@ -173,7 +186,7 @@ Behavior 超时只约束 start / stop / status 这一次短调用，不约束之
 
 ## 实现时建议改动的位置
 
-实现等本方案确认后再开始。不要先改信封字段名，不要新增绕过 Todo 的直派接口。
+实现等本方案确认后再开始。不要先改信封字段名，不要新增绕过 Todo 的直派接口，也不要新增服务端代打 Instagram 的接口。
 
 1. `crates/onia-protocol`：`pull_thread` 结果扩展；游标续跑字段；新动作 / 能力 / Todo 类型；`THREAD_SYNC_CONTINUE`（若采用）。`just gen`。
 2. 迁移：`thread_cursors` 增加续跑锚点与别名，只向前兼容。旧行不要擅自当规范键覆盖掉。
