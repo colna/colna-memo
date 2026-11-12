@@ -11,3 +11,4 @@ tags: project, onia, social-proxy, architecture, rust, flutter, monorepo, agent,
 - 技术架构：[architecture.md](architecture.md)
 - 文档只写在 colna-memo，不使用飞书。
 - 当前进展：[status.md](status.md)
+- Instagram 动作与 Pipeline 方案：[instagram-actions-pipeline.md](instagram-actions-pipeline.md)
