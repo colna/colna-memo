@@ -217,3 +217,10 @@ SP 脚本用与服务端共享的 HS256 密钥签发短效 JWT 去调媒体分�
 7. 更新 `apps/client/README.md` 与根 README 中与发令、打包脚本相关的说明。
 
 实现完成后把进度和如何复现直接告诉用户。不要 commit / push，仓库与 MR 交给 Git 助手。随后的代码评审交给 Code Reviewer，本方案不代替评审。
+
+## 与后一阶段的关系
+
+本文仍是单动作发令、脚本内 pipeline 和动作契约的实现方案。「服务端不下发 `executePipeline` 步骤数组、一次 Behavior 只执行一个动作」继续成立。
+
+自 [signal-multi-action.md](signal-multi-action.md) 起的下一阶段，一条 `MANUAL_ACTION` 可以包含多个动作，展开为多条有序 Todo；`manual` 包不再按 Todo 类型用 `already_open` 吞掉同序列或新的手动 Todo。实现见 [signal-multi-action-impl.md](signal-multi-action-impl.md)。本文其它约定不被那一阶段作废。
+
