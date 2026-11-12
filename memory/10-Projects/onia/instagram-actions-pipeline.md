@@ -224,3 +224,5 @@ SP 脚本用与服务端共享的 HS256 密钥签发短效 JWT 去调媒体分�
 
 自 [signal-multi-action.md](signal-multi-action.md) 起的下一阶段，一条 `MANUAL_ACTION` 可以包含多个动作，展开为多条有序 Todo；`manual` 包不再按 Todo 类型用 `already_open` 吞掉同序列或新的手动 Todo。实现见 [signal-multi-action-impl.md](signal-multi-action-impl.md)。本文其它约定不被那一阶段作废。
 
+本文对 `pull_thread` 的「选填目标、游标落 PostgreSQL、消息走 `behavior.result`」仍然有效。将该动作升级为 GraphQL 全量 / 增量，以及把页面内长驻监听接入 `signal.report`，见 [instagram-dm-sync.md](instagram-dm-sync.md)。不要把源脚本的 AndroidBridge 游标或 20 秒自动启动写回本方案。
+
