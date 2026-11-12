@@ -60,6 +60,15 @@ Python `urllib`（gen_image.py 走的库）默认读 `HTTP_PROXY` / `HTTPS_PROXY
 183s / 277s）。多版出图的正确姿势：写多个 `--prompt-file`，**一条命令里 `&&` 串行**，
 不要用 `&` 并发；失败那两条自动重试时也不用改 prompt（不是 prompt 的问题）。
 
+## gpt-image-2.6 可用性（2026-11-12 实测）
+
+- `/v1/models` 已列出 `gpt-image-2.6` / `-sunburst` / `-flare`（created 2026-11-05），但目录列表 ≠ 账号分组可用。
+- 本机 key 实测：
+  - `gpt-image-2.6` → 502 `system service temporarily unavailable`，重试后 400 `当前模型在所选系统分组中不可用`；加 `quality=high` 仍是 502。
+  - `gpt-image-2.6-sunburst` / `-flare` → 连续 502 `system request failed`。
+  - 同 key 的 `gpt-image-2` / `gpt-image-2.5-sunburst` → 400 分组不可用。
+- 结论：当前 key 分组未启用 2.6（甚至没有可用图像模型），或上游 2.6 不稳定；**image2.6 暂时不能出图**。先找管理员把 2.6 加入分组，或改用 AIGC 2.5。
+
 ## 相关
 
 - [image-gen 参考图怎么选、prompt 怎么配套](image-gen-reference-image.md)

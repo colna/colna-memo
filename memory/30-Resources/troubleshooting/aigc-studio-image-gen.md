@@ -110,3 +110,9 @@ CLAUDE.md 说输出文件放 `$OUTPUTS_DIR`,但**实测该变量没导出到 she
 
 **判断某个中转支不支持**:发一次带 `background: "transparent"` 的请求,
 看响应 JSON 的 `background` 字段和产物的 PIL `mode`(要 `RGBA`)+ alpha extrema(最小值要为 0)。
+
+## 2.6 模型状态（2026-11-12 实测）
+
+- `gpt-image-2.6` / `gpt-image-2.6-sunburst` / `gpt-image-2.6-flare` / `image2.6` 全部 400 `{"error":"未知模型：..."}`。
+- 当前 AIGC 可用仍是 `gpt-image-2` / `gpt-image-2.5-sunburst` / `gpt-image-2.5-flare` / `gpt-image-2-all`。
+- 同日 `gpt-image-2.5-sunburst` + 1024×1024 实测 35s 出 PNG 正常。
