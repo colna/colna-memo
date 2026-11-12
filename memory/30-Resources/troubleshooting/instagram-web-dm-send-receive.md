@@ -218,3 +218,32 @@ After（doc `29162554043360959`）：同 shape，把 `newer_than_message_id` 设
 - 判断 `sender: "me"/"them"` 必须用 `thread.viewer.interop_messaging_user_fbid`；用 `viewer_id` 会把「自己发的」误判成对方，服务端可能对自己的消息自动回复。
 - 已修：`insGraphql.getContext()` 增加 `viewerEIMU`（`CurrentUser.getEIMU()`）；`getChatMessages` 用 `thread.viewer.interop_messaging_user_fbid`；`startDMListener` 通过 context → sessionStorage → inbox query（`mailbox.id`）解析 EIMU，再过滤 outgoing。
 - 实时 `newMessage` 事件同样用 EIMU 过滤；`listener status` 现在返回 `viewerEimu`。
+
+## 2026-11-12 补充：静默发消息（IGDirectTextSendMutation 当前构建）
+
+- 当前 doc_id：**28737274835943013**（旧的 26911679871773184 已轮换）。
+- **变量是扁平的，不是 `{ data: { ... } }`**。这是本次最大的坑：包 `data` 会返回 `missing_required_variable_value`。
+- 实测可用的 variables：
+
+```json
+{
+  "commands": null,
+  "forwarded_from_thread_id": null,
+  "ig_thread_igid": "<thread_fbid>",
+  "is_forwarded_from_own_message": null,
+  "mentioned_user_ids": null,
+  "mentions": null,
+  "offline_threading_id": "<Date.now()+6位随机>",
+  "recipient_igids": null,
+  "replied_to_item_id": null,
+  "reply_to_message_id": null,
+  "send_attribution": "igd_web_chat_tab:in_thread",
+  "text": { "sensitive_string_value": "<文本>" }
+}
+```
+
+- 响应：`data.xig_direct_text_send_with_slide_messaging_response: { message_id, timestamp_ms, id }`。
+- `thread_fbid` 可用 URL 的 `thread_key` 先过 `IGDThreadDetailQuery` 解析；也可从 inbox query 按 username 找。
+- 实测发送成功：`silent-send-test` → `mid.$cAH8z98-EC3WoAOKHtRjnSjEeEVbf`（thread 2123654601589298）。发送后 thread detail 中该消息 `sender_fbid = viewer.interop_messaging_user_fbid`（EIMU），不是 ds_user_id。
+- 实现：`sendMessage` 在路由前先走 API；解析不到 thread/insGraphql 不可用才回退 DOM。API 成功后不导航、不做 DOM post-check，回复由 DM listener 实时捕获。
+- console：`__IG_DM.send(threadFbid, text)`。
