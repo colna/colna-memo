@@ -66,3 +66,28 @@ tags: project, onia, status, testing
 - 修一对一会话因 `is_group` 为空而跳过草稿的问题；并查清旧消息被当成最新入站、以及 `send_reply` 误走绑定/用户名探测错误的原因。
 - 再打同签名包覆盖安装，复测自动回复出站和设备侧 API 发送。
 - 仓库 commit / push 与 MR 仍走 Git 助手。
+
+## 2026-11-13 16:52 本版本改动（WebView 即听 + 任意入站自动回复修复）
+
+用户新要求：任意账号给 App 内账号发消息后自动回复；listener 在 WebView 启动时注入并开始监听。本条记录本机 `/Users/colna/WORK/onia` 的未提交改动，方案正文不变。
+
+### 已改动
+
+- **WebView 即听**：bundle 在页面加载注入并确认 Instagram 登录后，`InstagramSession` 自动调用页面内 `SocialProxy.startListener`。不再依赖服务端先下发 `start_dm_listener` 才启动；SPA 路由由脚本内 URL watcher 续挂。显式执行 `stop_dm_listener` 成功时，本 App 会话不再自动拉起（重启 App 后恢复默认自动监听）。
+- **`pull_thread` 线程类型**：全量、增量、续拉结果统一补 `is_group` / `participant_count`；线程元数据缺失时按消息 sender 推断。修复增量路径因 `is_group` 为空触发 `REPLY_DRAFT_SKIPPED` / `thread_kind_unknown`。
+- **`send_reply` 身份校验**：允许「已登录但暂时读不到用户名」的会话继续发送（只校验 account_id）；发送前 Direct v2 锚点检查继续优先用绑定 account_id，缺失时回退 viewerEIMU。
+- **旧消息误判**：`DM_RECEIVED` 产出的 `pull_thread` 参数增加 `inbound_message_id`；服务端只在「该会话最新一条消息是对方入站」时生成草稿，`THREAD_SYNC_CONTINUE` 只补历史、不重新生成回复，避免旧 mid 被当成最新入站。
+- **监听兜底**：实时事件拿不到 viewerEIMU 时改报 `INBOX_ACTIVITY`，不伪造 `DM_RECEIVED`。
+
+### 验证
+
+- `pnpm --filter @onia/scripts typecheck` 通过；单测 127 通过（新增 2 条 `pull_thread` kind 回归）。
+- `cargo test --workspace` 通过（onia-server 22、onia-policy 27 等）。
+- `flutter analyze` 无问题。
+- 脚本产物 `apps/client/assets/scripts/social_proxy.js` 更新为 229,228 字节，SHA-256 `b4ca5ac26fe80d5d647bb898d67fdc4df451a106257e272c31e2ef7d8cdf80db`。
+
+### 仍需真机验证
+
+- 用包含本轮脚本的新签名包覆盖安装，确认 WebView 一启动 `DM_LISTENER_STATUS` 即为 running。
+- 用 `colna.null` 或任意新账号发新私信，确认 `pull_thread` 带回 `is_group=false`，草稿生成后按账号模式（测试账号 `auto`）出站。
+- 其它账号默认仍是 `review`；若要让所有绑定账号默认自动发送，需要另改产品默认或逐账号配置。
