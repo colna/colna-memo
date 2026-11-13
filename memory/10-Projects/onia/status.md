@@ -98,3 +98,13 @@ tags: project, onia, status, testing
 - 任意账号（测试用 `colna.null`）新私信「你在干什么」触发完整链路：`INBOX_ACTIVITY`（navbar badge 1）→ `pull_inbox`（unread=1）→ `THREAD_PULL_NEEDED` → `pull_thread`（incremental，`is_group=false`）→ `THREAD_CONTEXT_READY` → `REPLY_DRAFT_READY`（`how are u`，auto/approved）→ `send_reply` 成功。
 - 发送走 GraphQL `IGDirectTextSendMutation`，`transport=api`，返回平台 `message_id` `mid.$cAH8_LSLLovaoBWmv1hjnj0fZlAxZ`；出站消息已写入 `thread_messages`，草稿状态 `sent`。用户确认对端收到。
 - 备注：旧入站的一条 08:05 approved 草稿仍保留（未发送），不阻塞或重复回复新入站。
+
+## 2026-11-13 19:20 Kotlin 聊天 Agent（C1）已接入
+
+- 新服务：`apps/chat-agent/`，Kotlin 2.1 + Ktor 3（本机 JDK 17，JVM target 17；文档建议 21 受环境限制）。
+- 契约：`POST /v1/replies/generate`（同步，只生成草稿）、`GET /health`、`GET /v1/traces/{traceId}`；共享密钥头 `X-Onia-Agent-Secret`。
+- 运行时：AgentLoop + Pre hooks（一对一、入站锚点、历史过滤、Persona YAML）+ `commit_draft` + 输出安全 + 按 account+thread 的 Lane（作废旧轮次）+ 内存 trace。
+- Mock 文案仍用当前更长的 4 条中文（优先用户最新要求，覆盖文档里的 4 条短字符串）；真实模型只替换 `LlmPort`。
+- Rust：`onia-agent` 新增 `HttpChatAgent`，`onia-server` 通过 `ONIA_CHAT_AGENT_URL/SECRET/TIMEOUT_MS` 选择远程服务；URL 为空时保留进程内 Mock。`classify_draft` 已区分 `failed_safety` / `failed_generate`。
+- 本地启动：`just chat-agent`（会加载仓库 `.env`）；Kotlin 单测 `just chat-agent-test`。当前 Kotlin 服务在 `127.0.0.1:8090` 运行，Rust server 已配置并重启。
+- 验证：Kotlin 5 测试通过；`cargo test --workspace` 通过；Kotlin `/health` 与 `generate` 直调返回 `mock_v1` 草稿。真机端到端待下一条消息确认。
