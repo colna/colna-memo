@@ -1,12 +1,12 @@
 ---
 title: Onia 技术架构
-date: 2026-11-11
+date: 2026-11-13
 tags: project, onia, social-proxy, architecture, rust, flutter, monorepo, agent, protocol
 ---
 
 # Onia 技术架构
 
-本文是 Onia 的架构成稿。管线继承现有 SP 的 **Signal（事实）→ Todo（决策）→ Behavior（执行）**，但把协议、分层和模块边界收紧：一份契约、一层只做一层的事、模块职责互不穿透。文档只维护在 colna-memo，不使用飞书。不复用、不迁入公司私有代码或内部接口。
+本文是 Onia 的架构成稿。管线继承现有 SP 的 **Signal（事实）→ Todo（决策）→ Behavior（执行）**，但把协议、分层和模块边界收紧：一份契约、一层只做一层的事、模块职责互不穿透。文档只维护在 colna-memo，不使用飞书。不复用、不迁入公司私有代码或内部接口。收到消息后自动回复的阶段 C 实现方案见 [instagram-auto-reply.md](instagram-auto-reply.md)；其中「谁产出 `send_reply`」以该文为准，本文已按同一口径修正 Agent 职责表述。
 
 ## 已定决策
 
@@ -151,7 +151,7 @@ flowchart TB
 | **Event** | 审计与观测 | 心跳快照、任务完成附记、告警 | 不进入 Policy，不能被「创建 Signal」入口派发 |
 | **Todo** | 决策后的待办 | `type`、`signal_id`、`playbook`、优先级、截止、状态、`attempt`、载荷 | 不与设备通话 |
 | **Behavior** | 一次设备执行 | `todo_id`、`device_id`、`action`（= 脚本动作名）、`params`、结果 | 不决定下一步 Todo |
-| **ReplyDraft** | Agent 草稿 | `inbound_signal_id`、文案、模式、提示词版本 | 确认后才生成发送类 Todo |
+| **ReplyDraft** | Agent 草稿 | `inbound_signal_id`、文案、模式、提示词版本 | Agent 只写草稿；是否生成发送类 Todo 由 Policy 在 `REPLY_DRAFT_READY` / `REPLY_DRAFT_APPROVED` 之后决定 |
 
 Todo 状态：`pending` / `promoted` / `running` / `succeeded` / `failed` / `cancelled`。取消必须带原因（过期、人工、无能力、已被接管），**设备离线不是失败**。
 
@@ -175,12 +175,12 @@ Signal 类型平台中立，首期最小集：
 | **Todo** | 持久化计划、状态机、幂等、重试与放弃 | 不推设备、不改 Signal 语义 |
 | **Scheduler** | 按优先级、截止、设备在线与能力，把 Todo 晋升为 Behavior；到期取消 | 不编写业务 if-else（那些在 Policy） |
 | **Behavior** | 按 1:1 动作下发、收集结果、写回 Todo 终态 | 不根据结果再「临时决定」新业务动作；若需要下一步，应产生新的 Signal 或交回 Policy |
-| **Agent** | 过滤入站、组装上下文、调模型、产出草稿、按模式决定是待审还是生成 Todo | 不持有社媒会话、不直接发消息、不操作 WebView |
+| **Agent** | 过滤入站、组装上下文、调模型、产出草稿并写入 `reply_drafts` | 不持有社媒会话、不直接发消息、不操作 WebView、不创建 Todo；是否发送由 Policy 按模式决定 |
 | **ScriptRelease** | 清单、签名、灰度、回滚、下发 | 不执行脚本 |
 | **DeviceSession** | 握手、能力画像、心跳、推送、断线恢复、叫醒 | 不解释脚本、不跑策略 |
 | **Media** | 鉴权后的分片回退，URL 白名单 | 不开放任意 URL 拉取 |
 
-模块之间只传递协议对象。例如 Behavior 完成后若要「拉完新消息再回复」，正确路径是：Behavior 结果 → 产生 `DM_RECEIVED`（或更新会话视图）→ Policy 再产出 `REPLY_DM` Todo；而不是在 Behavior 服务里写死下一步。
+模块之间只传递协议对象。例如 Behavior 完成后若要「拉完新消息再回复」，正确路径是：Behavior 结果 → 更新会话视图并 ingest 系统 Signal → Policy 再产出 `send_reply` Todo；而不是在 Behavior 服务里写死下一步，也不是由 Agent 直接创建发送 Todo。
 
 ### 策略包（Policy）
 
@@ -188,21 +188,21 @@ Signal 类型平台中立，首期最小集：
 
 1. **获客包**：漏斗完成 → 有序列 Todo（例如回关、静音、开场私信），优先级在包内声明。
 2. **收件箱包**：`INBOX_ACTIVITY` → `PULL_INBOX`。
-3. **回复包**：`DM_RECEIVED` →（可选门控 Todo）→ Agent 生成草稿或 `SEND_REPLY` Todo。默认模式 `review`。
+3. **回复包**：`DM_RECEIVED` → `pull_thread` → 会话视图更新 → Agent 写草稿 → `REPLY_DRAFT_READY` → Policy 按模式决定是否产出 `SEND_REPLY`。默认模式 `review`。细节见 [instagram-auto-reply.md](instagram-auto-reply.md)。
 
 新增业务先加策略包，不改 Scheduler、不改设备协议。
 
 ### Agent
 
-仍是「决策辅助」，不是执行器。链路保持精简：
+仍是「决策辅助」，不是执行器。Agent 只产出草稿；是否生成 `SEND_REPLY` Todo 由 Policy 在收到 `REPLY_DRAFT_READY` 或 `REPLY_DRAFT_APPROVED` 之后按模式决定。链路保持精简：
 
-1. 设备上报入站事实（`DM_RECEIVED`，幂等键 = `platform + message_id`）。
-2. 回复包调用 Agent：过滤自己发出的、已回复的、接管中的、超限的。
+1. 设备上报入站事实（`DM_RECEIVED`，幂等键 = `platform + message_id`）。阶段 B 仍先产出 `pull_thread`，拉回正文并写入会话视图后再进入回复包。
+2. 编排层过滤后调用 Agent：过滤自己发出的、已回复的、接管中的。Agent 只写入 `reply_drafts`，不创建 Todo。
 3. 用版本化人设 + 安全策略 + 会话摘要调用 LLM（OpenAI 兼容，密钥只在服务端）。入站文本当数据字段，不拼进系统指令。首期 **无工具调用**，只输出结构化草稿。
-4. `review`：推待审；通过或改写后再建 `SEND_REPLY` Todo。`auto`：过安全检查后建 Todo。`suggest`：只留草稿。
+4. 系统 ingest `REPLY_DRAFT_READY` 后，由 **Policy** 按模式决定：`review` 保持待审，批准或改写后再 ingest `REPLY_DRAFT_APPROVED` 才产 `SEND_REPLY`；`auto` 且安全通过、有非空正文时产 `SEND_REPLY`；`suggest` 只留草稿。无正文的生成或安全失败不得变成可批准草稿。
 5. 人工接管或发送失败（会话/风控）：取消未发出的发送 Todo，该会话不再自动发。
 
-模型失败不向对方发空白或错误文案；`auto` 遇安全/解析失败降级为待审。
+模型失败不向对方发空白或错误文案。`auto` 在已有非空正文但需人工确认时降级为待审；生成失败或无正文时标记失败，不进入待审。
 
 ## 应用层与适配层
 
