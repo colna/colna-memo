@@ -46,7 +46,7 @@ tags: project, onia, social-proxy, architecture, instagram, scripts, admin, pipe
 | `createPost` | `create_post` | `media.create_post.v1` + `media.range_download.v1` | `CREATE_POST` | 发帖依赖分片下载能力 |
 | `createStory` | `create_story` | `media.create_story.v1` + `media.range_download.v1` | `CREATE_STORY` | 发快拍同上 |
 
-架构里已预留的 `inbox.send_reply.v1` **本轮不实现、不在控制台出现**，留给后续 Agent 先审后发。不要和 `send_message` 混成一个动作，以免回复草稿和运营发令抢同一套参数。
+架构里已预留的 `inbox.send_reply.v1` 在本文范围内仍不实现、不在控制台出现；阶段 C 的接通方案见 [instagram-auto-reply.md](instagram-auto-reply.md)。不要和 `send_message` 混成一个动作，以免回复草稿和运营发令抢同一套参数。
 
 身份字段不用 SP 的 `manSocialId` / `womanSocialId` / `creatorId`：
 

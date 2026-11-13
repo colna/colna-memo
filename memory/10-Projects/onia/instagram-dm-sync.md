@@ -14,7 +14,7 @@ tags: project, onia, social-proxy, architecture, instagram, dm, pipeline
 2. **游标和消息正文只走 PostgreSQL 与 `behavior.result`。** 不迁 `AndroidBridge`（`getLastMessageId` / `isFullSyncDone` / `uploadMessages`），不发明脚本直传业务库的旁路。服务端按绑定账号维护游标；截断（`truncated`）时不得把 `full_sync_done` 标真，且必须可续跑。
 3. **监听到的事件必须变成 `signal.report`，再由 Policy 产出 Todo。** 有平台 `message_id` 的实时事件报 `DM_RECEIVED`（幂等键 `platform + message_id`），本阶段策略产出 `pull_thread`，**不**产出回复。只有红点或会话列表、没有可靠 `message_id` 时，报已有的 `INBOX_ACTIVITY` → `PULL_INBOX`。Behavior 里不要写死「拉完再回复」。
 4. **脚本不得在注入约 20 秒后自行启动监听。** 这会绕过 Todo / Scheduler。需要监听时，由服务端经管线下达 `start_dm_listener`；脚本重注入后若监听丢失，也由管线再下发，而不是页面定时器自启动。
-5. **落地先升级 `pull_thread`，再接通监听与事件上报。** 自动回复 / Agent 先审后发仍是后续，本轮不把发送做成必须项。
+5. **落地先升级 `pull_thread`，再接通监听与事件上报。** 自动回复 / Agent 先审后发是阶段 C，方案见 [instagram-auto-reply.md](instagram-auto-reply.md)；本文阶段 A/B 仍不把发送做成必须项。
 6. **所有 Instagram 接口调用必须由设备客户端发出**（WebView 内脚本或宿主在本机发起），覆盖全量 / 增量拉会话和监听新消息两条路径。Onia 服务端只做调度、游标、校验，以及收 `behavior.result` / `signal.report`。不得由服务端代发或反向代理 Instagram GraphQL / 私有接口 / 媒体地址，也不得持有 cookie 或 session 去打 Instagram。目的是避免这类请求的出口 IP 都落在同一台服务器上。
 
 ## 假设
@@ -24,7 +24,7 @@ tags: project, onia, social-proxy, architecture, instagram, dm, pipeline
 3. sitin-next 分支 `feature/sp-ig-dm-api` 的 HEAD 与 `feature/sp` 同为 `f31b49a77`，能力在未提交工作树。本文只吸收可复用的页面内算法与 GraphQL 形状，不迁公司业务协议。
 4. `packages/business-pwa-proto/proto` 子模块指针从 `43db9d6f` 变为 `7af7c6e8`（合入 `feature/list-distribution-server` 到 `release/test`，以及 SITIN 4.4 用户 / 内容等协议）。该 diff 与这三份脚本无关，**不作为本方案的一部分**，也不迁入 Onia。
 5. 下文出现的 `PAGE_SIZE = 20`、`MAX_PAGES = 50`、总时长预算 `240s`、自动启动延迟 `20s`、熔断连续失败 5 次 / 冷却 `300s`、以及宿主脚本 RPC 默认等待 `45s`，都是对照来源或本机代码里的既有常量，只用于说明如何对齐超时与续跑，**不是**容量或性能承诺。实现时可沿用这些脚本内部上限，但不要把它们写成系统 SLA。
-6. 本阶段平台仅 Instagram。自动回复、`send_reply`、Agent 先审后发、脚本 OTA 不在本轮必须范围。
+6. 本文（阶段 A/B）平台仅 Instagram。自动回复、`send_reply`、Agent 先审后发见阶段 C 方案 [instagram-auto-reply.md](instagram-auto-reply.md)；脚本 OTA 仍不在必须范围。
 
 ## 与既有文档的关系
 
@@ -182,7 +182,7 @@ Behavior 超时只约束 start / stop / status 这一次短调用，不约束之
 
 **阶段 B：** 宿主 `signal_report` 通道；start / stop / status 动作与期望状态；禁止自动启动；`DM_RECEIVED` → `pull_thread`，弱事件走 `INBOX_ACTIVITY` → `PULL_INBOX`。在真机 WebView 上验证 realtime 是否能取到页面模块；取不到则 inbox / navbar 回退，不得假装已经在听 realtime。
 
-**阶段 C（后续，不在本轮必须）：** 回复包 / Agent 先审后发；按未读列表自动拆多条 `pull_thread`；「设备上线即听」若产品要做，也只通过 hello 后的管线下达。
+**阶段 C（已单独成稿，见 [instagram-auto-reply.md](instagram-auto-reply.md)）：** 回复包 / Agent；本版本用 mock 跑通发送闭环，并保留先审后发。按未读列表拆 `pull_thread` 作为弱事件衔接写入该方案。「设备上线即听」若产品要做，也只通过 hello 后的管线下达。
 
 ## 实现时建议改动的位置
 

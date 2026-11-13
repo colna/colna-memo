@@ -1,6 +1,6 @@
 ---
 title: Onia
-date: 2026-11-12
+date: 2026-11-13
 tags: project, onia, social-proxy, architecture, rust, flutter, monorepo, agent, protocol
 ---
 
@@ -15,3 +15,4 @@ tags: project, onia, social-proxy, architecture, rust, flutter, monorepo, agent,
 - Signal 多动作串行与编辑页（产品口径）：[signal-multi-action.md](signal-multi-action.md)
 - Signal 多动作串行与编辑页（实现方案）：[signal-multi-action-impl.md](signal-multi-action-impl.md)
 - Instagram 聊天记录与新消息监听接入：[instagram-dm-sync.md](instagram-dm-sync.md)
+- Instagram 收到消息后自动回复（阶段 C）：[instagram-auto-reply.md](instagram-auto-reply.md)
