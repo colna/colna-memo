@@ -91,3 +91,10 @@ tags: project, onia, status, testing
 - 用包含本轮脚本的新签名包覆盖安装，确认 WebView 一启动 `DM_LISTENER_STATUS` 即为 running。
 - 用 `colna.null` 或任意新账号发新私信，确认 `pull_thread` 带回 `is_group=false`，草稿生成后按账号模式（测试账号 `auto`）出站。
 - 其它账号默认仍是 `review`；若要让所有绑定账号默认自动发送，需要另改产品默认或逐账号配置。
+
+### 2026-11-13 17:03 真机验证结果（通过）
+
+- 覆盖安装本轮 release APK（同签名，保留数据与 IG 登录）后，WebView 启动即听：`DM_LISTENER_STATUS running=true, mode=navbar`。
+- 任意账号（测试用 `colna.null`）新私信「你在干什么」触发完整链路：`INBOX_ACTIVITY`（navbar badge 1）→ `pull_inbox`（unread=1）→ `THREAD_PULL_NEEDED` → `pull_thread`（incremental，`is_group=false`）→ `THREAD_CONTEXT_READY` → `REPLY_DRAFT_READY`（`how are u`，auto/approved）→ `send_reply` 成功。
+- 发送走 GraphQL `IGDirectTextSendMutation`，`transport=api`，返回平台 `message_id` `mid.$cAH8_LSLLovaoBWmv1hjnj0fZlAxZ`；出站消息已写入 `thread_messages`，草稿状态 `sent`。用户确认对端收到。
+- 备注：旧入站的一条 08:05 approved 草稿仍保留（未发送），不阻塞或重复回复新入站。
