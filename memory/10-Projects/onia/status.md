@@ -108,3 +108,11 @@ tags: project, onia, status, testing
 - Rust：`onia-agent` 新增 `HttpChatAgent`，`onia-server` 通过 `ONIA_CHAT_AGENT_URL/SECRET/TIMEOUT_MS` 选择远程服务；URL 为空时保留进程内 Mock。`classify_draft` 已区分 `failed_safety` / `failed_generate`。
 - 本地启动：`just chat-agent`（会加载仓库 `.env`）；Kotlin 单测 `just chat-agent-test`。当前 Kotlin 服务在 `127.0.0.1:8090` 运行，Rust server 已配置并重启。
 - 验证：Kotlin 5 测试通过；`cargo test --workspace` 通过；Kotlin `/health` 与 `generate` 直调返回 `mock_v1` 草稿。真机端到端待下一条消息确认。
+
+### 2026-11-13 19:42 Agent 能力补齐（aichat-v2 方向）
+
+- Kotlin Agent 已有 AIPolice：硬正则 + DeepSeek 分类 + 最多 2 次自然语言重写 + 重复检测；违规仍存在则失败不发送。
+- Prompt 边界已覆盖：AI 身份/技术痕迹、联系方式、线下见面、平台付费、编造经历/地点、语言/长度、重复开头。
+- RAG：Rust server 从 `thread_messages` 检索早于当前窗口的相关历史（ASCII 词 + 中文 bigram，top5/回落 3 条），通过 `rag_context` 传给 Kotlin Agent，注入 system 的“相关过去对话”段。
+- 真实 DeepSeek `deepseek-flash` 已验证：带 RAG 的猫咪上下文能被正确引用；trace 记录 policeVerdict/regenCount/ragItems。
+- 仍未做：aichat-v2 的跨用户重复缓存（Redis）、全量 Prompt 模块、LLM 分类器专用小模型、RAG 向量检索；当前是本地关键词 RAG。
