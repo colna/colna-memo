@@ -116,3 +116,9 @@ tags: project, onia, status, testing
 - RAG：Rust server 从 `thread_messages` 检索早于当前窗口的相关历史（ASCII 词 + 中文 bigram，top5/回落 3 条），通过 `rag_context` 传给 Kotlin Agent，注入 system 的“相关过去对话”段。
 - 真实 DeepSeek `deepseek-flash` 已验证：带 RAG 的猫咪上下文能被正确引用；trace 记录 policeVerdict/regenCount/ragItems。
 - 仍未做：aichat-v2 的跨用户重复缓存（Redis）、全量 Prompt 模块、LLM 分类器专用小模型、RAG 向量检索；当前是本地关键词 RAG。
+
+### 2026-11-13 20:14 跨会话重复缓存已接
+
+- 两种口径一起做：`peer_outbound`（同 peer、当前窗口之外，40 条）和 `account_outbound`（同账号跨会话，80 条）。
+- 规则：同 peer 任意同开头即重写；同账号同开头出现 ≥2 次才重写；trigram 阈值 0.55；纯问候豁免。
+- 数据由 Rust server 从 `thread_messages` 查询后随请求传给 Kotlin Agent；未引入 Redis。
