@@ -12,7 +12,7 @@ tags: project, onia, status, testing
 - Kotlin chat-agent：启动必须提供 `ONIA_CHAT_AGENT_SECRET`，`/v1/replies`、`/v1/greetings`、`/v1/traces` 均校验 `X-Onia-Agent-Secret`。
 - `.env.example` 改为安全默认；本机 `.env` 保留两个 dev 开关，本地开发不受影响。
 - 验证：server `cargo check` + 6 个 config 单测通过；chat-agent `gradlew test` 通过，无密钥接口实测 401。
-- 遗留：本地全量启动被既有 migration 7 checksum 冲突拦住，需单独处理 `0007_automation_settings.sql`。
+- migration 7 checksum 冲突已处理：核对结构一致后校准 `_sqlx_migrations`，本地启动与 `/health`、401 验证通过。
 
 更新于 2026-11-13 16:14（亚洲/上海）。文档只写在 colna-memo，不使用飞书。相关代码在本机 `/Users/colna/WORK/onia`，GitHub 私有仓库 [colna/onia](https://github.com/colna/onia)。方案真源见同目录 [architecture.md](architecture.md)、[instagram-dm-sync.md](instagram-dm-sync.md)、[instagram-auto-reply.md](instagram-auto-reply.md)（自动回复方案文件级提交 `ed8fc486`）。本条只同步实现与复测进展，不改方案正文。
 
