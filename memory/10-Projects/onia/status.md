@@ -152,3 +152,11 @@ tags: project, onia, status, testing
 - 超级管理员「访问 App 所有功能」= 正常登录 App，使用普通用户可用的全部功能；不做跨用户查看/代操作。
 - 超级管理员的额外权限只体现在 `admin.onia.asia`：全量后台数据 + 用户/角色管理。
 - 因此 App 不需要新增跨用户管理 UI；后台统一 admin.onia.asia，按 role 分流。
+
+## 2026-11-17 定时 Signal 与内容发布
+
+- Signal 定义新增目标设备/账号与定时计划（一次性/周期），迁移 `0010_signal_definition_schedule.sql`；服务端新增 `schedule.rs` 每 15s 扫描到期定义，用 `source=cron` 创建 MANUAL_ACTION 实例，幂等键按 `definition_id + scheduled_for`；周期任务跳过错过的时段；归档会停用定时。
+- 管理后台：定义编辑器新增定时面板、定义列表新增「定时」列；新增 `/publish` 内容发布页（发帖/发快拍，立即下发或保存为一次性/周期计划），导航位于「编排与执行」。
+- 权限：定时目标设备校验归属；普通用户只能绑定自己的设备，super_admin 可跨用户选择设备。
+- 验证：`cargo test --workspace` 全过（server 37，含真实 DB 定时下发测试）；admin build 通过；scripts 133 tests、dev-device/web typecheck 通过；本地迁移 0010 已应用；API 冒烟创建定时定义返回 target/schedule。
+- 边界：live `create_post` / `create_story` 上传仍未在脚本打通，发布页和节点保留「上传未打通」警告；定时定义要求步骤参数完整，否则保存被拒。
