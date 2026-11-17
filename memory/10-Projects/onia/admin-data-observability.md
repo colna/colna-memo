@@ -44,4 +44,4 @@ tags: project, onia, admin, profiles, chat, rbac
 ## 备注
 
 - 当前列表上限：资料 200（最多 500）、会话 100（最多 300）、消息 500（最多 1000）；后续可加分页/筛选。
-- 服务端和后台改动已部署，但尚未 commit/push（规范模式，待确认）。
+- 已提交并推送：`e6f0dbf fix(scripts): push active release updates to online devices`、`40803c5 feat(admin): add scoped profile and chat observability`；`main == origin/main`。
