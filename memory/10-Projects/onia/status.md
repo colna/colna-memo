@@ -160,3 +160,10 @@ tags: project, onia, status, testing
 - 权限：定时目标设备校验归属；普通用户只能绑定自己的设备，super_admin 可跨用户选择设备。
 - 验证：`cargo test --workspace` 全过（server 37，含真实 DB 定时下发测试）；admin build 通过；scripts 133 tests、dev-device/web typecheck 通过；本地迁移 0010 已应用；API 冒烟创建定时定义返回 target/schedule。
 - 边界：live `create_post` / `create_story` 上传仍未在脚本打通，发布页和节点保留「上传未打通」警告；定时定义要求步骤参数完整，否则保存被拒。
+
+## 2026-11-17 18:30 生产部署（定时 Signal + 内容发布）
+
+- server 镜像与 admin dist 已部署到 `47.250.210.196`；迁移 0010（signal definition schedule）与 0011（script releases）均已执行。
+- 线上验证：`https://api.onia.asia/health` ok；`https://admin.onia.asia/` 200，线上 index.html 与本地构建 sha256 一致（`umi.3c1f391f.js`）；`/publish` 与发布 chunk 200。
+- 生产冒烟：插入一条 due 的 `pull_inbox` 定义，worker 在 15s 内生成 `source=cron` signal + pending Todo（`wait_reason=offline`），一次性计划自动停用且记录 last_run、无 error；测试数据已清理。
+- 部署按“当前工作树全部”执行，包含并发中的 profile media / script releases / TaskOrchestration 等未提交改动；server 重启后定时循环已生效。
