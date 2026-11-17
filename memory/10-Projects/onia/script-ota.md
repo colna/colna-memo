@@ -74,3 +74,10 @@ tags: project, onia, social-proxy, scripts, ota, hot-update
 - 真机 OTA 热更新没有在现有生产 App 上实测：需要把 App 指向本地 API 并重新登录，或部署服务端到生产后再测；客户端下载/应用逻辑和 WS 推送已分别单测/本地验证。
 - 当前只校验 SHA-256 + TLS + 设备 token，未做 Ed25519 签名；如需防服务端被篡改，再加签名。
 - `gray` 字段尚未使用；后续可做按设备/用户灰度。
+
+## 生产部署与验证（2026-11-17 19:10）
+
+- 提交 `2a8148c` 已推送并部署到 `47.250.210.196`；`api.onia.asia/health`、`admin.onia.asia/`、`/scripts` 均 200；迁移 `0011` 已执行。
+- 生产曾上传 `0.1.1` 测试 marker（sha `eb54953c...`，含 `// OTA_TEST_20261117`），并从独立 WS 客户端验证服务端在 `device.welcome` 后推送 `script.update`；App 仍显示设备 offline，未收到 OTA。
+- 已上传并激活干净版本 `0.1.2`（sha `db291b46127c...`，content 282635），`0.1.1` 置为 inactive；`/v1/devices/scripts/current` 返回 `0.1.2`。生产不再有测试 marker 处于 active。
+- 待办：让测试 App 重新上线（重连/重新登录 Onia）后验证 `script.update` 下载 `0.1.2`、校验 SHA-256 并热刷新；当前设备 `7ee68a62...` 最后在线 17:23，服务端 WS 路由从设备 curl 可达（101），问题在 App 连接/会话侧。

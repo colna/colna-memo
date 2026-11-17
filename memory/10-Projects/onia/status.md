@@ -167,3 +167,9 @@ tags: project, onia, status, testing
 - 线上验证：`https://api.onia.asia/health` ok；`https://admin.onia.asia/` 200，线上 index.html 与本地构建 sha256 一致（`umi.3c1f391f.js`）；`/publish` 与发布 chunk 200。
 - 生产冒烟：插入一条 due 的 `pull_inbox` 定义，worker 在 15s 内生成 `source=cron` signal + pending Todo（`wait_reason=offline`），一次性计划自动停用且记录 last_run、无 error；测试数据已清理。
 - 部署按“当前工作树全部”执行，包含并发中的 profile media / script releases / TaskOrchestration 等未提交改动；server 重启后定时循环已生效。
+
+## 2026-11-17 19:05 push 与最终部署
+
+- 当前工作树已统一提交并推送：`2a8148c feat: land profile media, script OTA, and scheduled signals`，本地 `HEAD == origin/main`。
+- 生产已按该提交重新构建并部署：`onia-server:latest`（19:03）与 admin `dist` 已更新；迁移 9/10/11 均为 success。
+- 线上验证：`https://api.onia.asia/health` ok；`https://admin.onia.asia/`、`/publish`、`/scripts` 均 200；publish / scripts chunk 均 200；服务启动日志无 error/panic。
