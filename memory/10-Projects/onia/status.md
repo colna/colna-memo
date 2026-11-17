@@ -131,3 +131,10 @@ tags: project, onia, status, testing
 - 两种口径一起做：`peer_outbound`（同 peer、当前窗口之外，40 条）和 `account_outbound`（同账号跨会话，80 条）。
 - 规则：同 peer 任意同开头即重写；同账号同开头出现 ≥2 次才重写；trigram 阈值 0.55；纯问候豁免。
 - 数据由 Rust server 从 `thread_messages` 查询后随请求传给 Kotlin Agent；未引入 Redis。
+
+## 2026-11-17 客户端双端同步约定
+
+- 以后所有 Onia App（`apps/client` Flutter）的修改，默认 Android + iOS 双端一起改、一起验证；不得只改一端。
+- 每一步至少确认：`flutter analyze`、相关测试、Android dev/prod 构建、iOS release/simulator 构建（或明确说明无法验证的原因）。
+- 平台差异（WebView、权限、签名、通知、后台）单独记录，但共享 Dart/UI/协议/i18n 代码必须同步。
+- dev-only 能力（如服务器地址输入）通过编译开关控制，Android/iOS 的 dev/prod 配置保持一致。
