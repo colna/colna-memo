@@ -81,3 +81,13 @@ tags: project, onia, social-proxy, scripts, ota, hot-update
 - 生产曾上传 `0.1.1` 测试 marker（sha `eb54953c...`，含 `// OTA_TEST_20261117`），并从独立 WS 客户端验证服务端在 `device.welcome` 后推送 `script.update`；App 仍显示设备 offline，未收到 OTA。
 - 已上传并激活干净版本 `0.1.2`（sha `db291b46127c...`，content 282635），`0.1.1` 置为 inactive；`/v1/devices/scripts/current` 返回 `0.1.2`。生产不再有测试 marker 处于 active。
 - 待办：让测试 App 重新上线（重连/重新登录 Onia）后验证 `script.update` 下载 `0.1.2`、校验 SHA-256 并热刷新；当前设备 `7ee68a62...` 最后在线 17:23，服务端 WS 路由从设备 curl 可达（101），问题在 App 连接/会话侧。
+
+## 端到端热更新验证（2026-11-17 19:52）
+
+- **离线根因**：设备上的 APK 编译时未传 `ONIA_API_BASE`，实际使用默认 `http://192.168.3.24:8080`，并非生产；重新登录打到旧/本地服务，所以出现 `device_id already bound to another user`。用 `--dart-define-from-file` 指定 `https://api.onia.asia` 重装并重新登录后，设备恢复 `online`。
+- **服务端补强**：新增激活即推送——`Hub::device_ids()` + `scripts::push_release_to_online()`；`script_release.create`（active）和 `script_release.activate` 成功后向所有在线设备广播 `script.update`，不再等下一次 hello。新增单测 `activation_push_reaches_registered_devices`；`cargo test -p onia-server` 40 passed。
+- **生产验证**：
+  - 上传并激活 `0.1.3`（sha `8db26672...`，含 `// OTA_E2E_MARKER_20261117`）；App 在线时立即收到推送，CDP 读取注入的 `social_proxy.js` 源码包含 marker，长度 282662。
+  - 上传并激活干净 `0.1.4`（sha `db291b46...`，长度 282635）；App 再次热刷新，CDP 读取源码 marker=false。
+  - 当前生产 active 为 `0.1.4`，`0.1.3`/`0.1.2`/`0.1.1` 均 inactive；设备 `7ee68a62...` online。
+- **代码状态**：服务端广播改动位于 `crates/onia-server/src/{state.rs,scripts.rs,http/scripts.rs}`，已部署但尚未 commit/push（规范模式，待用户确认）。
