@@ -138,3 +138,17 @@ tags: project, onia, status, testing
 - 每一步至少确认：`flutter analyze`、相关测试、Android dev/prod 构建、iOS release/simulator 构建（或明确说明无法验证的原因）。
 - 平台差异（WebView、权限、签名、通知、后台）单独记录，但共享 Dart/UI/协议/i18n 代码必须同步。
 - dev-only 能力（如服务器地址输入）通过编译开关控制，Android/iOS 的 dev/prod 配置保持一致。
+
+## 2026-11-17 账号与后台权限决策（待实现）
+
+- 统一使用 `admin.onia.asia`，不拆分用户后台域名；登录后按角色分流。
+- 普通 `user` 只能看到自己的控制台：自己的设备、账号绑定、Signals/Trace、草稿、自动化设置、账号设置。
+- `super_admin` 可看全量后台数据，并拥有后台用户/角色管理；现有 `admin` 角色迁移为 `super_admin`。
+- 注册接口只创建 `user`；注册用户需要邮箱验证后才能访问后台/App 功能（验证方式待定）。
+- 超级管理员是否需要在 App 内跨用户操作仍未确认；默认理解为正常登录 App 使用全部功能，不做跨用户静默代操作。
+
+## 2026-11-17 超级管理员 App 权限澄清
+
+- 超级管理员「访问 App 所有功能」= 正常登录 App，使用普通用户可用的全部功能；不做跨用户查看/代操作。
+- 超级管理员的额外权限只体现在 `admin.onia.asia`：全量后台数据 + 用户/角色管理。
+- 因此 App 不需要新增跨用户管理 UI；后台统一 admin.onia.asia，按 role 分流。
