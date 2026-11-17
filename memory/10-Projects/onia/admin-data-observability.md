@@ -45,3 +45,11 @@ tags: project, onia, admin, profiles, chat, rbac
 
 - 当前列表上限：资料 200（最多 500）、会话 100（最多 300）、消息 500（最多 1000）；后续可加分页/筛选。
 - 已提交并推送：`e6f0dbf fix(scripts): push active release updates to online devices`、`40803c5 feat(admin): add scoped profile and chat observability`；`main == origin/main`。
+
+## 表格筛选与 CSV（2026-11-17 21:15）
+
+- `/profiles` 与 `/chats` 改用 `@ant-design/pro-components` 的 `ProTable`（`2.8.10`）。
+- 回关资料筛选：目标账号/显示名、抓取状态（完整/部分）、获取日期范围；聊天记录筛选：对方 handle/thread_id、会话类型（私聊/群聊）、最近日期范围。
+- 两个页面均有账号选择（普通用户仅自己的账号，超管默认全部）；筛选在 ProTable request 内按当前账号过滤。
+- 工具栏「导出 CSV」导出当前筛选结果，UTF-8 BOM + CRLF，字段含目标/账号/用户邮箱/粉丝关注帖子/媒体计数/状态/时间，以及聊天记录的账号、对方、类型、消息数、最近消息与时间。
+- 验证：本地 ProTable CDP 实测筛选 `target_one` 只保留一行；导出文件 `onia-profiles-*.csv` 内容与 BOM 正确；`pnpm --filter @onia/admin typecheck && build` 通过；admin dist 已部署到生产。
