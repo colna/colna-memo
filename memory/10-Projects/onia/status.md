@@ -173,3 +173,10 @@ tags: project, onia, status, testing
 - 当前工作树已统一提交并推送：`2a8148c feat: land profile media, script OTA, and scheduled signals`，本地 `HEAD == origin/main`。
 - 生产已按该提交重新构建并部署：`onia-server:latest`（19:03）与 admin `dist` 已更新；迁移 9/10/11 均为 success。
 - 线上验证：`https://api.onia.asia/health` ok；`https://admin.onia.asia/`、`/publish`、`/scripts` 均 200；publish / scripts chunk 均 200；服务启动日志无 error/panic。
+
+## 2026-11-17 21:30 数据 tab（P0/P1/P2）上线
+
+- 三 tab（工作台/数据/我的）；数据页：范围 today/7d/30d、账号筛选、KPI 2×2、动作分布、自绘柱图、最近 10 条执行、漏斗、上周周报（WS 推送 `stats.weekly.push`，按 week_start 去重）、CSV 导出（剪贴板）；「我的」去 teal/purple 卡。
+- 服务端：`/v1/me/stats/{summary,weekly,export}`，todos/behaviors 索引（0012），`weekly_report_deliveries`（0013）；回关口径 = succeeded `follow_user` 且 `params.source=new_follower` 的 distinct handle；day bucket 按设备 tz_offset。
+- 提交/部署：`ae87193` 已推 origin/main；生产 `onia-server:latest` 更新（`ce8250ff…`），迁移 12/13 应用；health ok。
+- 遗留：主工作树并发未提交改动（client IG 状态卡、admin csv）需 rebase 合并；周报推送仅在 hello/heartbeat 时机投递（无独立定时任务）。
