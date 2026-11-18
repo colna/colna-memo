@@ -50,7 +50,7 @@ pnpm build
 - 初始提交：`22becdf feat: scaffold commerce frontend monorepo`。
 - admin Umi 迁移：`4edefd9 refactor(admin): migrate to umi max`。
 - 测试：shared 2、sp-scripts 5、admin 2，共 9 passed。
-- GitLab pipeline `8271` pending，等待可用 runner。
+- GitLab pipeline `8335` 已 success（main，含 SP 脚本迁移与 release 部署 CI）。
 - SP 脚本迁移与部署链路已在本地完成验证，待接口确认后提交/推送。
 - 尚未接真实后端、登录态、权限与部署。
 
