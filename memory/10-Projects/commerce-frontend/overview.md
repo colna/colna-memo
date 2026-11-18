@@ -44,6 +44,7 @@ pnpm build
 - SP 脚本部署只上传 esbuild 产物，使用 `SP_DEPLOY_API_URL` 调用上传接口；接口待定，当前 multipart 字段为 `file` + `metadata`。
 - 包 scope 统一 `@ecommerce/*`。
 - CI 分 `verify → build → deploy`：任意分支跑 verify；`release/test-sp` / `release/online-sp` 合入后自动部署 SP 脚本；admin 目前是 demo，不接部署。
+- CI 缓存：pnpm store 通过 `GIT_CLEAN_FLAGS` 留在 runner 工作区；Turbo cache 按 `pnpm-lock.yaml` 共享，命中后 verify 可降到约 14s。
 
 ## 当前状态
 
