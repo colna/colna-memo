@@ -17,7 +17,7 @@ E-commerce 前端 monorepo，2026-11-18 创建。
 
 ```text
 apps/admin/            # 管理后台（React 19 + AntD 5 + Umi Max）
-apps/sp-scripts/       # Social Proxy 注入脚本（TS + esbuild）
+apps/sp-scripts/       # Instagram 自动化脚本（esbuild 构建 + 上传部署）
 packages/shared/       # 跨端类型与工具
 ```
 
@@ -40,6 +40,8 @@ pnpm build
 - admin 用 Umi Max + React 19 + AntD 5，路由和运行时约定与 sitin-next 对齐。
 - SP 脚本同时产出 `dist/sp.iife.js`（页面注入）和 `dist/sp.mjs`（ESM 消费）。
 - `apps/sp-scripts` 与 admin 同级，作为独立 app 管理。
+- Instagram 脚本同步自 `sitin-next` `feature/sp`，当前基线 `70e6ad68`，构建产物为 `dist/instagram/{automation,bootstrap,login}.js`。
+- SP 脚本部署只上传 esbuild 产物，使用 `SP_DEPLOY_API_URL` 调用上传接口；接口待定，当前 multipart 字段为 `file` + `metadata`。
 - 包 scope 统一 `@ecommerce/*`。
 - CI 只做 `install → lint → typecheck → test → build`，部署流水线后续再接。
 
@@ -49,6 +51,7 @@ pnpm build
 - admin Umi 迁移：`4edefd9 refactor(admin): migrate to umi max`。
 - 测试：shared 2、sp-scripts 5、admin 2，共 9 passed。
 - GitLab pipeline `8271` pending，等待可用 runner。
+- SP 脚本迁移与部署链路已在本地完成验证，待接口确认后提交/推送。
 - 尚未接真实后端、登录态、权限与部署。
 
 ## 下一步
