@@ -59,6 +59,8 @@ tags: onia, google, oauth, auth, android, flutter
 
 - `.env` 的 `ONIA_EMAIL_FROM=Onia <no-reply@onia.asia>` 未加引号，`dotenvy::from_path` 解析失败（main.rs 忽略了错误），导致该行之后的变量（含 `ONIA_GOOGLE_CLIENT_IDS`）都不加载。已改为带引号。详见 [dotenvy-unquoted-value-stops-loading.md](../../30-Resources/troubleshooting/dotenvy-unquoted-value-stops-loading.md)。
 - Chrome 控制台页面用无障碍树操作时，保存后 webarea 会从树里消失、窗口 inventory 也会不稳定；改用 Chrome AppleScript `execute javascript` 直接操作 DOM 才稳定完成创建 client。
+- 国内本机 server 拉 Google JWKS 需代理：直连超时会导致 `could not fetch google certificates` → 401 `invalid google token`。本地启动加 `HTTPS_PROXY=http://127.0.0.1:7897`；生产（马来西亚）直连 Google 正常。详见 [reqwest-google-jwks-proxy.md](../../30-Resources/troubleshooting/reqwest-google-jwks-proxy.md)。
+- Android 的 Google 登录是系统 Credential Manager 原生弹窗（账号选择），不是浏览器跳转；浏览器跳转属于 OAuth authorization code 流程，当前不需要。
 
 ## 待办
 
