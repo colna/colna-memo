@@ -43,7 +43,7 @@ pnpm build
 - Instagram 脚本同步自 `sitin-next` `feature/sp`，当前基线 `70e6ad68`，构建产物为 `dist/instagram/{automation,bootstrap,login}.js`。
 - SP 脚本部署只上传 esbuild 产物，使用 `SP_DEPLOY_API_URL` 调用上传接口；接口待定，当前 multipart 字段为 `file` + `metadata`。
 - 包 scope 统一 `@ecommerce/*`。
-- CI 只做 `install → lint → typecheck → test → build`，部署流水线后续再接。
+- CI 分 `verify → build → deploy`：任意分支跑 verify；`release/test-sp` / `release/online-sp` 合入后自动部署 SP 脚本；admin 目前是 demo，不接部署。
 
 ## 当前状态
 
@@ -59,4 +59,4 @@ pnpm build
 1. 接电商后端 API 与登录/鉴权。
 2. 补 admin 的商品/订单真实 CRUD。
 3. 把具体的 SP 平台 action 按目录落到 `packages/sp-scripts/src`。
-4. 配 CI runner 与静态资源部署。
+4. 确认 SP 上传接口并配置 `SP_DEPLOY_API_URL` / `SP_DEPLOY_TOKEN`。
