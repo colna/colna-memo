@@ -16,7 +16,7 @@ E-commerce 前端 monorepo，2026-11-18 创建。
 ## 目录
 
 ```text
-apps/admin/            # 管理后台（React 19 + AntD 5 + Vite 7）
+apps/admin/            # 管理后台（React 19 + AntD 5 + Umi Max）
 apps/sp-scripts/       # Social Proxy 注入脚本（TS + esbuild）
 packages/shared/       # 跨端类型与工具
 ```
@@ -32,12 +32,12 @@ pnpm test
 pnpm build
 ```
 
-后台默认 <http://127.0.0.1:5173>，API base 用 `VITE_API_BASE` 配置。
+后台默认 <http://127.0.0.1:5173>，API base 用 `UMI_APP_API_BASE` 配置。
 
 ## 设计决策
 
 - 参考 `sitin-next`：pnpm workspace + Turborepo + 共享包。
-- admin 用 Vite + React 19 + AntD 5，不引入 Umi，保持轻量。
+- admin 用 Umi Max + React 19 + AntD 5，路由和运行时约定与 sitin-next 对齐。
 - SP 脚本同时产出 `dist/sp.iife.js`（页面注入）和 `dist/sp.mjs`（ESM 消费）。
 - `apps/sp-scripts` 与 admin 同级，作为独立 app 管理。
 - 包 scope 统一 `@ecommerce/*`。
@@ -46,6 +46,7 @@ pnpm build
 ## 当前状态
 
 - 初始提交：`22becdf feat: scaffold commerce frontend monorepo`。
+- admin Umi 迁移：`4edefd9 refactor(admin): migrate to umi max`。
 - 测试：shared 2、sp-scripts 5、admin 2，共 9 passed。
 - GitLab pipeline `8271` pending，等待可用 runner。
 - 尚未接真实后端、登录态、权限与部署。
