@@ -50,6 +50,14 @@ tags: onia, google, oauth, auth, android, flutter
 - 客户端：`flutter analyze` 干净；`flutter test` 113 passed；dev debug APK 已用带 client ID 的 `config/dev.json` 重新构建。
 - 本地 dev API：`http://192.168.3.24:8080`；手机 serial `f7031061` 在线。
 
+## 官网 Google 注册（2026-11-18 19:11）
+
+- `https://onia.asia/register` 增加官方 Google 按钮（Google Identity Services，`google.accounts.id.renderButton`，`text=signup_with`，outline/pill），按钮下方是“使用 Google 注册即表示同意服务条款与隐私政策”+「或」分隔线，再往下是原邮箱注册表单。
+- 回调拿 `credential`（ID token）后调用 `POST /v1/auth/google`（复用服务端端点），成功后展示成功页：Google 用户隐藏「打开后台」按钮，提示用同一 Google 账号在 App 登录（Google 账号没有密码，后台仍走邮箱密码）。
+- 前端实现：`apps/web/src/api.ts` 新增 `registerWithGoogle`；`Register.tsx` 动态加载 `https://accounts.google.com/gsi/client`，按当前语言初始化/渲染按钮；`google-identity.d.ts` 补最小类型；`copy.ts` 中英文案；`styles.css` 新增 Google/分隔线样式。
+- client ID：复用 Web client `328960377279-salium6oef7gll6qkibqm62n99qcibcc`（可用 `VITE_GOOGLE_CLIENT_ID` 覆盖）。已授权 JS 来源含 `https://onia.asia`，现场按钮正常渲染；`http://localhost:5174` 未加入授权来源，本地 dev 若要测需先在控制台加。
+- 验证：`pnpm --filter @onia/web typecheck` + `build` 通过；rsync `dist/` 到生产 `/opt/onia/web`；headless Chrome 实测线上 `/register` 出现 GIS iframe（client_id 正确）且布局正常。
+
 ## 生产部署（2026-11-18 17:56）
 
 - 本地 `docker buildx --platform linux/amd64 --pull=false` 构建 `onia-server:latest`（image id `7f1a00e7866d`，37.7MB gz），临时 context 只含 Cargo.toml/Cargo.lock/crates/apps/server + 临时 Dockerfile（rust:1.85-bookworm → debian:12-slim）。
