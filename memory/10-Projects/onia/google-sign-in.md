@@ -1,8 +1,10 @@
 ---
-title: "Onia Google Sign-In 接入"
+title: Onia Google Sign-In 接入
 date: 2026-11-18
 tags: onia, google, oauth, auth, android, flutter
 ---
+
+# Onia Google Sign-In 接入
 
 日期：2026-11-18。状态：代码已实现（未提交 / 服务端未部署 / 未真机联调），控制台侧还差 Branding、转 Production、测试用户和调试包 Android client。
 
