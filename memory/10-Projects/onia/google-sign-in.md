@@ -6,7 +6,7 @@ tags: onia, google, oauth, auth, android, flutter
 
 # Onia Google Sign-In 接入
 
-日期：2026-11-18。状态：控制台已配置完成（正式版），代码已实现并在本地打通（bogus token 实测 401），生产服务端未部署、未 commit、未真机点登录。
+日期：2026-11-18。状态：控制台已配置完成（正式版），代码已实现，本地与生产服务端均已打通（bogus token 实测 401），生产已部署；dev APK 已装到真机，等用户解锁后点 Google 登录验证。代码未 commit。
 
 ## 控制台（Google Auth Platform）— 已完成
 
@@ -47,6 +47,13 @@ tags: onia, google, oauth, auth, android, flutter
 - 客户端：`flutter analyze` 干净；`flutter test` 113 passed；dev debug APK 已用带 client ID 的 `config/dev.json` 重新构建。
 - 本地 dev API：`http://192.168.3.24:8080`；手机 serial `f7031061` 在线。
 
+## 生产部署（2026-11-18 17:56）
+
+- 本地 `docker buildx --platform linux/amd64 --pull=false` 构建 `onia-server:latest`（image id `7f1a00e7866d`，37.7MB gz），临时 context 只含 Cargo.toml/Cargo.lock/crates/apps/server + 临时 Dockerfile（rust:1.85-bookworm → debian:12-slim）。
+- SSH 到 47.250.210.196 间歇性 KEX 超时；用 macOS 自带 rsync 的 `--partial --append` 重试 4 次传完，sha256 一致；用 `aliyun swas-open RunCommand` 校验 + `docker load` + 改 `/opt/onia/.env` + `docker compose up -d --force-recreate onia-server`。
+- 迁移 `0014` success；`users.google_sub` 存在；`https://api.onia.asia/v1/auth/google` 假 token 返回 401 `invalid google token`；`/health` ok。
+- 坑：macOS 自带 rsync 2.6.9 不支持 `--append-verify`，用 `--append`。
+
 ## 踩坑
 
 - `.env` 的 `ONIA_EMAIL_FROM=Onia <no-reply@onia.asia>` 未加引号，`dotenvy::from_path` 解析失败（main.rs 忽略了错误），导致该行之后的变量（含 `ONIA_GOOGLE_CLIENT_IDS`）都不加载。已改为带引号。详见 [dotenvy-unquoted-value-stops-loading.md](../../30-Resources/troubleshooting/dotenvy-unquoted-value-stops-loading.md)。
@@ -54,6 +61,6 @@ tags: onia, google, oauth, auth, android, flutter
 
 ## 待办
 
-- 生产服务端：构建新镜像（含 `/v1/auth/google`）+ 迁移 0014 + 生产 `.env` 设 `ONIA_GOOGLE_CLIENT_IDS` + 重启；未执行。
-- 真机：安装新 dev APK，用 Google 账号点「使用 Google 继续」，确认能建号/登录并进入工作台。
+- 真机：dev APK 已安装并启动（serial `f7031061`，Wi-Fi `presence-5g` 192.168.3.146，同网段可达 192.168.3.24:8080）；等用户解锁手机后点「使用 Google 继续」，确认能建号/登录并进入工作台。
 - 代码未 commit；iOS 需要单独的 iOS OAuth client + URL scheme。
+- 备注：dev 包指向本地 `http://192.168.3.24:8080`；prod 包指向 `https://api.onia.asia`。生产环境未配置 chat agent（mock），与本次无关。

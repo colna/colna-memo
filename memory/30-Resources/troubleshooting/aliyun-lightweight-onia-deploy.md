@@ -56,6 +56,14 @@ rsync -az --delete -e "ssh -i ~/.ssh/key" apps/admin/dist/ root@IP:/opt/onia/adm
 - 2C2G 不要在服务器上 `cargo build`（慢 + 易 OOM）；本地 buildx 交叉编译 3 分钟内完成。
 - Caddy WebSocket 无需额外配置，`reverse_proxy` 自动升级；可用 `curl -H 'Upgrade: websocket' ...` 看是否返回 101。
 
+## SSH 间歇性 KEX 超时时的部署
+
+2026-11-18 遇到：TCP 22 可连，但 SSH KEX 阶段频繁超时（约一半概率），短命令多试几次能过，大文件管道不可靠。
+
+- 传镜像：先 `docker save | gzip -1 > /tmp/img.tar.gz`，用 macOS 自带 rsync 2.6.9 的 `rsync -az --partial --append --timeout=60 -e "ssh ..."` 循环重试；2.6.9 **不支持** `--append-verify`。
+- 远端操作走 `aliyun --profile onia swas-open RunCommand`（不受 SSH 影响）：校验 sha256、`docker load`、改 `.env`、`docker compose up -d --force-recreate`；结果用 `DescribeInvocationResult` 取 base64 `Output` 解码。
+- 确认镜像含新代码：`docker cp <容器>:/usr/local/bin/onia-server` 出来 `strings | grep` 新路由/配置字符串。
+
 ## 验证
 
 ```bash
