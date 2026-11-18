@@ -17,7 +17,7 @@ E-commerce 前端 monorepo，2026-11-18 创建。
 
 ```text
 apps/admin/            # 管理后台（React 19 + AntD 5 + Vite 7）
-packages/sp-scripts/   # Social Proxy 注入脚本（TS + esbuild）
+apps/sp-scripts/       # Social Proxy 注入脚本（TS + esbuild）
 packages/shared/       # 跨端类型与工具
 ```
 
@@ -39,6 +39,7 @@ pnpm build
 - 参考 `sitin-next`：pnpm workspace + Turborepo + 共享包。
 - admin 用 Vite + React 19 + AntD 5，不引入 Umi，保持轻量。
 - SP 脚本同时产出 `dist/sp.iife.js`（页面注入）和 `dist/sp.mjs`（ESM 消费）。
+- `apps/sp-scripts` 与 admin 同级，作为独立 app 管理。
 - 包 scope 统一 `@ecommerce/*`。
 - CI 只做 `install → lint → typecheck → test → build`，部署流水线后续再接。
 
