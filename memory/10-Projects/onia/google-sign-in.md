@@ -58,6 +58,13 @@ tags: onia, google, oauth, auth, android, flutter
 - client ID：复用 Web client `328960377279-salium6oef7gll6qkibqm62n99qcibcc`（可用 `VITE_GOOGLE_CLIENT_ID` 覆盖）。已授权 JS 来源含 `https://onia.asia`，现场按钮正常渲染；`http://localhost:5174` 未加入授权来源，本地 dev 若要测需先在控制台加。
 - 验证：`pnpm --filter @onia/web typecheck` + `build` 通过；rsync `dist/` 到生产 `/opt/onia/web`；headless Chrome 实测线上 `/register` 出现 GIS iframe（client_id 正确）且布局正常。
 
+## 控制台 Google 登录 + 改名（2026-11-18 19:52）
+
+- 后台改名为「控制台」：网站 nav/footer/注册页文案（EN Console / ZH 控制台）、后台文档标题与 Umi title（`Onia 控制台` / `Onia Console`）、登录页文案、导航 aria-label、发布页文案、网站与 App 法律文本（`admin console` → `console`，`管理后台` → `控制台`）。域名 `admin.onia.asia` 与代码标识符不变。
+- 控制台登录页支持 Google：邮箱密码表单下方「或」+ 官方 GIS 登录按钮（`text=signin_with`，Web client ID，locale 跟随控制台语言），回调 `POST /v1/auth/google` 后 `saveSession` 并跳 `/overview`；不经过邮箱验证码步骤。
+- 验证：admin `umi build` + `tsc --noEmit` 通过；dist rsync 到 `/opt/onia/admin`；headless Chrome 确认 `https://admin.onia.asia/login` 渲染 GIS iframe（client_id 正确）、标题 `Onia 控制台`，截图布局正常。
+- 备注：admin 部署使用了当前工作树，包含另一会话未提交的 TaskWorkflow / 筛选等改动；如需干净发布可回退重发。App 法律文案已同步改「控制台」，APK 已重建但设备断开未安装。
+
 ## 生产部署（2026-11-18 17:56）
 
 - 本地 `docker buildx --platform linux/amd64 --pull=false` 构建 `onia-server:latest`（image id `7f1a00e7866d`，37.7MB gz），临时 context 只含 Cargo.toml/Cargo.lock/crates/apps/server + 临时 Dockerfile（rust:1.85-bookworm → debian:12-slim）。
