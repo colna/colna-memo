@@ -39,6 +39,8 @@ tags: onia, google, oauth, auth, android, flutter
   - `runtime/google_auth.dart`：`initialize(serverClientId:)` + `authenticate()`，取消返回 null。
   - `session.loginWithGoogle` → `auth.google`。
   - 登录页改为 Google 优先：默认只显示「使用 Google 继续」+「使用其他方式登录」+「创建账户」；点前者展开邮箱/密码表单（服务地址也只在展开后显示），并有「返回 Google 登录」收回。新增 1 个 widget 测试覆盖默认/切换。
+  - 登录页合法链接固定底部：服务条款/隐私政策从滚动内容移到页面底部，`SafeArea(top: false)` + 12px 最小底部间距。
+  - 手动输入时整屏上移：键盘弹出且处于邮箱/密码模式时，`AnimatedSize` 把顶部 Hero 收到 0 高度，表单获得整屏空间；收起键盘恢复，底部合法链接在输入时隐藏。
 
 ## 验证
 
