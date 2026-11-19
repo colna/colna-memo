@@ -10,5 +10,5 @@ tags: project, vela, product, live-assist, tts, voice-clone, architecture
 
 - 产品文档：[vela-prd.md](vela-prd.md)
 - 技术方案：[vela-architecture.md](vela-architecture.md)
-- 项目名决策见 2026-11-19 Daily 18:10；VoiceStudio 可行性评估见同日 18:04；产品文档见同日 18:21。
+- 项目名决策见 2026-11-19 Daily 18:10；VoiceStudio 可行性评估见同日 18:04；产品文档初稿见同日 18:21，完整逆向报告补全修订见同日 19:20。
 - 本阶段先出产品文档与技术方案，**不开发**。
