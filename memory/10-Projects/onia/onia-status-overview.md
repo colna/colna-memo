@@ -244,3 +244,17 @@ Colna Bot 提供的 11-13 记忆在当时正确，但之后 memo/仓库已前进
 - 控制台 `/official`：通道 CRUD、token 加密存储/轮换（不回显）、Mode A/B 切换、入站/Private Reply 开关、`INBOX_ACTIVITY` 兜底开关、实验性官方会话历史读取、关键词 + media_id 规则、最近 Webhook 与官方发送审计。新建通道默认 `inbox_activity_fallback_enabled=false`，官方 Webhook 为权威来源。
 - 环境：`ONIA_META_APP_SECRET`、`ONIA_META_WEBHOOK_VERIFY_TOKEN`、`ONIA_OFFICIAL_TOKEN_KEY`、`ONIA_GRAPH_BASE_URL`。Webhook 路径 `/v1/official/instagram/webhook`。
 - 仍未做：Flow 可视化、Handover Protocol、Story/mention 完整产品化、转化看板。Mode B 的 peer IGSID 依赖 Webhook 或最近一次设备/官方会话消息；对不上时只记录事实，不静默降级到设备。官方会话历史读取为实验开关（`conversation_read_enabled`），失败时只用 Webhook 单条消息。
+
+---
+
+## 10. 商业化增量（2026-11-19）
+
+- **套餐与计费域**：协议 `crates/onia-protocol/src/billing.rs`（`plan.get` / `plan.purchase`、PlanLimits/PlanUsage/PlanSubscription/PlanCatalogItem）；服务端 `billing.rs` + 迁移 `0015_plans_and_usage.sql`（`user_subscriptions`、`plan_orders`、`usage_counters`）。
+- **档位**（代码常量，改价改代码）：Free $0（1 设备/1 账号、50 草稿/月、仅 review/suggest）；Solo $15（$150/年，2/2、500、数据导出）；Pro $35（$350/年，5/5、2,000、auto、官方触发开关）；Studio $79（$790/年，10/10、5,000、优先支持）。年付按 10 个月。
+- **限额执行**：`device.bind` 设备上限、`account.bind` 账号上限、`account_reply_settings.set` 的 `auto` 需 Pro（降级后旧 auto 在草稿生成时自动按 review 处理）、真实 ChatAgent 草稿/招呼按次扣月度额度（Mock 不扣、失败退还）、`stats.export` 需 Solo+；`super_admin` 内部账号豁免。
+- **购买**：当前为**模拟购买即时生效**（写 `plan_orders` 状态 `simulated_paid`，不扣款）；接入 PSP 时替换 checkout 适配层，订阅/权益模型不变。
+- **官网**：新增 `/pricing` 独立页与首页 `#pricing` 区块（`apps/web/src/Pricing.tsx`），nav/footer 入口，月/年切换与四档能力对比；Pro 的官方触发标注「Meta App Review 后开放」。
+- **控制台**：新增 `/billing`（当前套餐、AI 草稿/设备/账号用量、四档对比、模拟购买确认）；概览套餐卡；设备额度用尽、自动化 auto 锁定、草稿额度用尽处均有升级入口。
+- **App**：设置页「套餐与用量」卡（当前档与用量、额度用尽提示、跳转控制台）；设备/账号/导出限额错误映射为中文升级提示。
+- **部署状态（2026-11-19）**：商业化 + 官方通道首次发布提交 `9670fc9` 已部署生产（迁移 0015–0017 success，admin/web dist 已同步）。后续 `93ae291`（模式 B conversation read + outbound 审计，迁移 `0018_official_conversation_read.sql`）已 push，**尚未部署**。
+- **待办**：生产 `.env` 尚未配置 `ONIA_META_APP_SECRET` / `ONIA_META_WEBHOOK_VERIFY_TOKEN` / `ONIA_OFFICIAL_TOKEN_KEY`，官方通道在配置前不可用；Meta App / Business Verification / App Review 仍待真实主体申请；App 新 APK 未分发。
