@@ -31,19 +31,19 @@ Onia 是 **Social Proxy（SP）**：
 | 私信同步 | 监听 / pull_inbox / pull_thread 已闭环 |
 | 自动回复 | Mock 真机出站已通；Kotlin Agent（DeepSeek 等）已接入管线；**真实模型真机完整验证仍可能待确认** |
 | 回复模式 | `review`（默认先审后发）/ `auto` / `suggest`；会话可人工接管 |
-| 硬安全叙事 | IG 请求只出设备；服务端不持 cookie、不代发、不反代 IG；Agent **只写草稿不投递** |
+| 硬安全叙事 | 私有 IG 请求只出设备；服务端不持 cookie、不反代 IG；官方通道只持加密 Graph token，默认不代发，Mode B 显式开启；Agent **只写草稿不投递** |
 
 ### Onia 不卖什么
 
 - **不是**独立创作者工作台（内容库 / 日历 / 深度分析默认不做）。
 - **不是**「无人值守、非官方群发 / 自动关注 / 刷互动」工具；这类能力即便脚本层有关系动作（如 `follow_user`），也**不应作为主卖点**。
-- **不是** Meta 官方 Messaging API / Business Suite 的替代品承诺；Onia 走的是本机 WebView + 私有接口路径，与官方 Partner 工具在合规、稳定性、账号类型覆盖上**不可互换**。
-- **不是**服务端代持 session / 云端代发 IG 消息的产品——这与现架构硬约束相反，写进材料即失真。
+- **不是** Meta 官方 Messaging API / Business Suite 的泛化替代品承诺；Onia 是 **Device Channel + 可选 Official Channel 的双通道**。官方通道走用户授权 + 加密 Graph token，与官方 Partner 工具在审核、覆盖、稳定性上仍**不可互换**。
+- **不是**服务端代持 WebView session / cookie 的产品。普通 DM 默认设备发送；只有用户显式开启 Mode B，服务端才经官方 Graph 代发。
 
 ### 一句话商业判断
 
-**Onia 卖的是：在会话不出设备的前提下，把「收信 → AI 草稿 → 人审/可配置发送」做成可调度产品。**  
-主客群应是需要控制发送权、介意会话材料上云、或官方 API 覆盖不到的个人/小团队运营者；不是去和 ManyChat 拼「官方 Partner + 评论转私信获客漏斗」的同一战场。
+**Onia 卖的是：把「收信 → AI 草稿 → 人审/可配置发送」做成可调度产品；默认 Device Channel 保会话不出设备，可选 Official Channel 补评论转私信与云端入站。**  
+主客群仍是需要控制发送权、介意会话材料上云、或官方 API 覆盖不到的个人/小团队运营者；Official Channel 是可选能力，不是转身去和 ManyChat 拼同一个 Partner 战场。
 
 ---
 

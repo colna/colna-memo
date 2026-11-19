@@ -240,7 +240,7 @@ Colna Bot 提供的 11-13 记忆在当时正确，但之后 memo/仓库已前进
 
 - 新增 **Official Channel**：Meta/Instagram Webhook 入站 + 评论转私信。实现为独立模块（`crates/onia-server/src/official/`）与独立迁移 `0016_official_channel.sql`，不复用 DeviceSession，不持有 WebView cookie/sessionid。
 - 入站映射：`messages` → `DM_RECEIVED`（幂等键 `instagram:{mid}`，与设备监听一致）；`comments` / `live_comments` → 评论 Signal；`messaging_postbacks` / `message_reactions` / `messaging_seen`；story reply / story mention。**Mode A**：`pull_thread` 由设备补全会话，`send_reply` 仍由设备发送。**Mode B**：Webhook 直接把入站消息写入 `igsid:<peer>` 的一对一会话视图，服务端生成草稿后按 Policy 经官方 Graph 发送；无需设备在线，但仍要求通道绑定过设备账号。
-- 官方出站：评论 `SEND_PRIVATE_REPLY`（Graph Private Replies，7 天窗口、一评论一次由唯一索引保证）、`REPLY_COMMENT`（公开回复）、Mode B `SEND_OFFICIAL_REPLY`。官方发送失败**不回落**私有接口，也不自动重试。
-- 控制台 `/official`：通道 CRUD、token 加密存储/轮换（不回显）、Mode A/B 切换、入站/Private Reply 开关、`INBOX_ACTIVITY` 兜底开关、关键词 + media_id 规则、最近 Webhook 审计。新建通道默认 `inbox_activity_fallback_enabled=false`，官方 Webhook 为权威来源。
+- 官方出站：评论 `SEND_PRIVATE_REPLY`（Graph Private Replies，7 天窗口、一评论一次由唯一索引保证）、`REPLY_COMMENT`（公开回复）、Mode B `SEND_OFFICIAL_REPLY`（24 小时窗口校验）。官方发送失败**不回落**私有接口，也不自动重试；DM 可人工重试，Private Reply 保持一次。
+- 控制台 `/official`：通道 CRUD、token 加密存储/轮换（不回显）、Mode A/B 切换、入站/Private Reply 开关、`INBOX_ACTIVITY` 兜底开关、实验性官方会话历史读取、关键词 + media_id 规则、最近 Webhook 与官方发送审计。新建通道默认 `inbox_activity_fallback_enabled=false`，官方 Webhook 为权威来源。
 - 环境：`ONIA_META_APP_SECRET`、`ONIA_META_WEBHOOK_VERIFY_TOKEN`、`ONIA_OFFICIAL_TOKEN_KEY`、`ONIA_GRAPH_BASE_URL`。Webhook 路径 `/v1/official/instagram/webhook`。
-- 仍未做：Official Conversation API 读历史、Flow 可视化、Handover Protocol、Story/mention 完整产品化、转化看板。Mode B 的 peer IGSID 依赖 Webhook 或最近一次设备/官方会话消息；对不上时只记录事实，不静默降级到设备。
+- 仍未做：Flow 可视化、Handover Protocol、Story/mention 完整产品化、转化看板。Mode B 的 peer IGSID 依赖 Webhook 或最近一次设备/官方会话消息；对不上时只记录事实，不静默降级到设备。官方会话历史读取为实验开关（`conversation_read_enabled`），失败时只用 Webhook 单条消息。

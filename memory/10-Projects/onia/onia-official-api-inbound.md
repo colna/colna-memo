@@ -456,3 +456,15 @@ Private Replies 是 `POST .../messages`，`recipient: { comment_id }`，**只能
 - **环境**：`ONIA_META_APP_SECRET`、`ONIA_META_WEBHOOK_VERIFY_TOKEN`、`ONIA_OFFICIAL_TOKEN_KEY`（base64 32B）、`ONIA_GRAPH_BASE_URL`、`ONIA_OFFICIAL_TIMEOUT_MS`。
 
 明确未做（与本文一致的部分）：模式 B 普通 DM 官方代发（接口存在但显式拒绝启用）；Official Conversation API 读历史；`INBOX_ACTIVITY` 收敛开关；Story/mention 产品化；Flow 可视化；多步跟进与转化看板。另：当前实现要求官方通道绑定一个已有设备账号，DM 仍靠设备补全会话；IGSID ↔ thread_fbid 映射仍是“对不上就人审”的降级路径。
+
+## 15. 模式 B 与收敛补齐（2026-11-19 追加）
+
+在 §14 的一期之上补齐：
+
+- **Mode B 普通 DM 官方代发**：`outbound_mode=official` 从“拒绝启用”改为显式可用。Webhook 入站 DM 会写入合成一对一会话 `igsid:<peer>`，服务端 Agent 生成草稿；Policy 在 channel mode B 且 `official_reply_peer_igsid` 已知时产出 `SEND_OFFICIAL_REPLY`，由 Official OutboundAdapter 调 `/{page_id or ig_user_id}/messages`。无 peer IGSID 时只记录事实，**不静默回落设备**。
+- **发送语义**：`official_outbound_messages` 对 DM 以 `inbound_message_id` 为唯一键（同一入站消息一次回复）；私回仍按 `comment_id` 唯一。官方发送失败不自动重试，草稿在成功后标记 `sent`。
+- **INBOX_ACTIVITY 收敛**：通道新增 `inbox_activity_fallback_enabled`，新建默认 false；Policy 在官方通道 active 且未开兜底时不再 `INBOX_ACTIVITY → pull_inbox`。需要补漏时可显式打开。
+- **草稿审核**：`igsid:` 会话的草稿审批使用通道绑定设备做身份校验，但跳过实时 account binding 检查，设备离线也可审批/发送。
+- **控制台**：Mode A/B 选择、INBOX 兜底开关、实验性官方会话历史读取、模式列、Webhook + 官方发送审计。
+- **窗口**：Private Reply 服务端二次校验 7 天；Mode B 普通 DM 发送前校验最近入站时间不超过 24 小时，过期直接失败并写 Todo 错误。
+- **仍未做**：Flow 可视化、Handover Protocol、Story/mention 完整产品化、转化看板。Conversation 历史读取已提供实验开关（`conversation_read_enabled`），失败时退回 Webhook 单条消息。
