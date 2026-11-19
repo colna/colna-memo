@@ -17,13 +17,14 @@ tags: onia, google, oauth, auth, android, flutter
 - OAuth 客户端：
   - `Onia Android`（已有）：包名 `com.colna.onia.onia_client`，SHA-1 `9B:F2:99:51:B5:0E:18:81:FE:D5:12:20:14:78:D7:ED:BD:D2:C1:EF`，client ID `328960377279-uvct4jlkb5c5ahhi6e83i6ioo9e24k0bp.apps.googleusercontent.com`。
   - `Onia Android Dev`（新建）：包名 `com.colna.onia.onia_client.dev`，同一 SHA-1，client ID `328960377279-mj6f9hpr8j7e65buptl9ms7f81e9ddad.apps.googleusercontent.com`。
-  - `Onia Web`（已有，作 serverClientId）：client ID `328960377279-salium6oef7gll6qkibqm62n99qcibcc.apps.googleusercontent.com`；JS 来源 onia.asia / admin.onia.asia / localhost:5173；重定向 URI 含 api.onia.asia/v1/auth/google/callback（当前 Android ID token 流程不用）。
+  - `Onia Web`（官网/控制台 GIS 用）：client ID `328960377279-salium6oef7gll6qkibqm62n99qcibcc.apps.googleusercontent.com`；JS 来源 onia.asia / admin.onia.asia / localhost:5173；重定向 URI 含 api.onia.asia/v1/auth/google/callback（当前不用）。
+  - `Onia App Browser`（新建，Desktop app 类型）：client ID `328960377279-6tgk506lkd92fntf3lmi07umde61k3g1.apps.googleusercontent.com`；App 浏览器 OAuth（loopback + PKCE）用，不需要 client secret。
 - 旧 release 包与 dev 包目前都用 debug keystore 签名，所以两个 Android client 可共用同一 SHA-1；换正式签名后要补新指纹。
 
 ## 配置
 
-- `apps/client/config/dev.json`、`config/prod.json` 已加 `ONIA_GOOGLE_SERVER_CLIENT_ID=<Onia Web client ID>`。
-- 本地 `.env` 已加 `ONIA_GOOGLE_CLIENT_IDS=<Onia Web client ID>`。
+- `apps/client/config/dev.json`、`config/prod.json` 已加 `ONIA_GOOGLE_OAUTH_CLIENT_ID=<Onia App Browser client ID>`（旧的 `ONIA_GOOGLE_SERVER_CLIENT_ID` 已移除）。
+- 本地与生产 `.env` 的 `ONIA_GOOGLE_CLIENT_IDS` 已包含 Web + Desktop 两个 client ID。
 - 服务端 `ONIA_GOOGLE_CLIENT_IDS` 为 `aud` 白名单；空则 `/v1/auth/google` 返回 422「not configured」。
 
 ## 代码实现
@@ -35,8 +36,8 @@ tags: onia, google, oauth, auth, android, flutter
   - 用户绑定：先按 `google_sub` 找，再按 email 找并补绑；都没有则新建（password_hash 用哨兵 `!google-sign-in-only`，`email_verified_at=now`）。
   - 迁移 `0014_google_identity.sql`：`users.google_sub` + partial unique index。
 - 客户端：
-  - 依赖 `google_sign_in 7.2.0`；登录页「使用 Google 继续」+ 或分割线。
-  - `runtime/google_auth.dart`：`initialize(serverClientId:)` + `authenticate()`，取消返回 null。
+  - 依赖 `url_launcher`（已移除 `google_sign_in`）；登录页「使用 Google 继续」启动系统浏览器。
+  - `runtime/google_auth.dart`：Desktop client + OAuth authorization code + PKCE + 本地 loopback HttpServer（`http://127.0.0.1:<随机端口>`）接收回调；用 code 换 `id_token`，取消/超时返回 null。不需要手机系统里有 Google 账户。
   - `session.loginWithGoogle` → `auth.google`。
   - 登录页改为 Google 优先：默认只显示「使用 Google 继续」+「使用其他方式登录」+「创建账户」；点前者展开邮箱/密码表单（服务地址也只在展开后显示），并有「返回 Google 登录」收回。新增 1 个 widget 测试覆盖默认/切换。
   - 登录页合法链接固定底部：服务条款/隐私政策从滚动内容移到页面底部，`SafeArea(top: false)` + 12px 最小底部间距。
@@ -47,6 +48,7 @@ tags: onia, google, oauth, auth, android, flutter
 - 官网：build + rsync 到 `/opt/onia/web`；headless Chrome 确认 `/privacy-policy`、`/terms-of-service` 渲染。
 - 服务端：`cargo test -p onia-server` 61 passed（google 模块 8 个）。
 - 本地服务端：重启新二进制后 POST `/v1/auth/google` + 假 token 返回 401 `invalid google token`（路由与配置生效）。
+- 浏览器 OAuth：OPPO 真机点「使用 Google 继续」能拉起系统浏览器（HeyTap Browser）；但该机无 VPN，`accounts.google.com` 不可达，页面停在加载中，待开启 VPN 后完成登录验证。
 - 客户端：`flutter analyze` 干净；`flutter test` 113 passed；dev debug APK 已用带 client ID 的 `config/dev.json` 重新构建。
 - 本地 dev API：`http://192.168.3.24:8080`；手机 serial `f7031061` 在线。
 
