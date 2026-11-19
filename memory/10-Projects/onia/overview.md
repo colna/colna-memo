@@ -1,6 +1,6 @@
 ---
 title: Onia
-date: 2026-11-13
+date: 2026-11-19
 tags: project, onia, social-proxy, architecture, rust, flutter, monorepo, agent, protocol
 ---
 
@@ -11,6 +11,7 @@ tags: project, onia, social-proxy, architecture, rust, flutter, monorepo, agent,
 - 技术架构：[architecture.md](architecture.md)
 - 文档只写在 colna-memo，不使用飞书。
 - 当前进展：[status.md](status.md)
+- 功能与技术现状梳理（独立成稿）：[onia-status-overview.md](onia-status-overview.md)
 - Instagram 动作与 Pipeline 方案：[instagram-actions-pipeline.md](instagram-actions-pipeline.md)
 - Signal 多动作串行与编辑页（产品口径）：[signal-multi-action.md](signal-multi-action.md)
 - Signal 多动作串行与编辑页（实现方案）：[signal-multi-action-impl.md](signal-multi-action-impl.md)
