@@ -18,7 +18,8 @@ tags: onia, google, oauth, auth, android, flutter
   - `Onia Android`（已有）：包名 `com.colna.onia.onia_client`，SHA-1 `9B:F2:99:51:B5:0E:18:81:FE:D5:12:20:14:78:D7:ED:BD:D2:C1:EF`，client ID `328960377279-uvct4jlkb5c5ahhi6e83i6ioo9e24k0bp.apps.googleusercontent.com`。
   - `Onia Android Dev`（新建）：包名 `com.colna.onia.onia_client.dev`，同一 SHA-1，client ID `328960377279-mj6f9hpr8j7e65buptl9ms7f81e9ddad.apps.googleusercontent.com`。
   - `Onia Web`（官网/控制台 GIS 用）：client ID `328960377279-salium6oef7gll6qkibqm62n99qcibcc.apps.googleusercontent.com`；JS 来源 onia.asia / admin.onia.asia / localhost:5173；重定向 URI 含 api.onia.asia/v1/auth/google/callback（当前不用）。
-  - `Onia App Browser`（新建，Desktop app 类型）：client ID `328960377279-6tgk506lkd92fntf3lmi07umde61k3g1.apps.googleusercontent.com`；App 浏览器 OAuth（loopback + PKCE）用，不需要 client secret。
+  - `Onia App Browser`（Desktop app，已建但最终未用）：client ID `328960377279-6tgk506lkd92fntf3lmi07umde61k3g1.apps.googleusercontent.com`；曾用于 loopback + PKCE 试跑。
+  - Android clients（最终使用）：prod `328960377279-uvct4jlkb5c5ahhi6e83i6ioo9e24k0bp` / dev `328960377279-mj6f9hpr8j7e65buptl9ms7f81e9ddad`；浏览器 OAuth 的自定义 scheme 回调基于它们。
 - 旧 release 包与 dev 包目前都用 debug keystore 签名，所以两个 Android client 可共用同一 SHA-1；换正式签名后要补新指纹。
 
 ## 配置
@@ -37,8 +38,8 @@ tags: onia, google, oauth, auth, android, flutter
   - 迁移 `0014_google_identity.sql`：`users.google_sub` + partial unique index。
 - 客户端：
   - 依赖 `url_launcher`（已移除 `google_sign_in`）；登录页「使用 Google 继续」启动系统浏览器。
-  - `runtime/google_auth.dart`：Desktop client + OAuth authorization code + PKCE + 本地 loopback HttpServer（`http://127.0.0.1:<随机端口>`）接收回调，返回 `GoogleAuthCode`；取消/超时返回 null。不需要手机系统里有 Google 账户。
-  - client secret 不放 App：`AuthBackend.loginWithGoogleCode` 先把 `code + code_verifier + redirect_uri` 发给服务端 `/v1/auth/google/exchange`，服务端用 `ONIA_GOOGLE_OAUTH_CLIENT_ID/SECRET` 换 `id_token`，再走 `/v1/auth/google`。
+  - `runtime/google_auth.dart`：使用 **Android OAuth client** + 自定义 scheme `com.googleusercontent.apps.<client-id>:/oauth2redirect`；`app_links` 接收回调，App 直接用 `code + PKCE verifier` 向 Google token endpoint 换 `id_token`（Android client 无 secret），再走 `/v1/auth/google`。不经过本地服务器，不需要系统 Google 账户。
+  - 早期 loopback + Desktop client 方案已放弃：真机上 VPN 会拦截 `127.0.0.1` 或 App 被后台冻结，浏览器报 `ERR_CONNECTION_TIMED_OUT`；服务端 `/v1/auth/google/exchange` 与 Desktop client/secret 目前保留但 App 不再使用。
   - `session.loginWithGoogle` → `auth.google`。
   - 登录页改为 Google 优先：默认只显示「使用 Google 继续」+「使用其他方式登录」+「创建账户」；点前者展开邮箱/密码表单（服务地址也只在展开后显示），并有「返回 Google 登录」收回。新增 1 个 widget 测试覆盖默认/切换。
   - 登录页合法链接固定底部：服务条款/隐私政策从滚动内容移到页面底部，`SafeArea(top: false)` + 12px 最小底部间距。
