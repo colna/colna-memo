@@ -232,3 +232,14 @@ Colna Bot 提供的 11-13 记忆在当时正确，但之后 memo/仓库已前进
 - 要改拉消息/监听 → [instagram-dm-sync.md](instagram-dm-sync.md)
 - 要追「哪天合了什么」→ [status.md](status.md) + `memory/50-Daily/`
 - 要做竞品 / 付费模式 → **不要用本文凑数**；交给商业助手另开，且不得把未证实的用量数字写进商业材料
+
+---
+
+## 9. 官方通道增量（2026-11-19）
+
+- 新增 **Official Channel**：Meta/Instagram Webhook 入站 + 评论转私信。实现为独立模块（`crates/onia-server/src/official/`）与独立迁移 `0016_official_channel.sql`，不复用 DeviceSession，不持有 WebView cookie/sessionid。
+- 入站映射：`messages` → `DM_RECEIVED`（幂等键 `instagram:{mid}`，与设备监听一致）；`comments` / `live_comments` → 评论 Signal；`messaging_postbacks` / `message_reactions` / `messaging_seen`；story reply / story mention。**普通 DM 仍走模式 A**：`pull_thread` 由设备补全会话，`send_reply` 仍由设备发送。
+- 官方出站：评论 `SEND_PRIVATE_REPLY`（Graph Private Replies，7 天窗口、一评论一次由唯一索引保证）与 `REPLY_COMMENT`（公开回复）。官方发送失败**不回落**私有接口，也不自动重试。
+- 控制台 `/official`：通道 CRUD、token 加密存储/轮换（不回显）、入站/Private Reply 开关、关键词 + media_id 规则、最近 Webhook 审计。模式 B（普通 DM 官方代发）显式拒绝启用，保留二期开关位。
+- 环境：`ONIA_META_APP_SECRET`、`ONIA_META_WEBHOOK_VERIFY_TOKEN`、`ONIA_OFFICIAL_TOKEN_KEY`、`ONIA_GRAPH_BASE_URL`。Webhook 路径 `/v1/official/instagram/webhook`。
+- 未做：Official Conversation API 读历史、`INBOX_ACTIVITY` 收敛开关、Story/mention 产品化、Flow 可视化、模式 B。官方通道仍需绑定已有设备账号，DM 自动回复依赖设备在线补会话。

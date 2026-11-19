@@ -443,3 +443,16 @@ Private Replies 是 `POST .../messages`，`recipient: { comment_id }`，**只能
 - [instagram-chat-agent-kotlin.md](instagram-chat-agent-kotlin.md) — Agent 只出草稿  
 - [onia-business-model.md](onia-business-model.md) — 商业叙事（上官方通道后需改「非官方替代品」表述）
 
+
+## 14. 落地状态（2026-11-19）
+
+已按本文 §11 顺序在 `/Users/colna/WORK/onia` 落地一期（模式 A + 评论 Private Reply）：
+
+- **协议**：新增 `COMMENT_RECEIVED` / `LIVE_COMMENT_RECEIVED` / `STORY_MENTION_RECEIVED` / `MENTION_RECEIVED` / `POSTBACK_RECEIVED` / `MESSAGE_SEEN` / `MESSAGE_REACTION`；`SOURCE_WEBHOOK`；`SEND_PRIVATE_REPLY` / `REPLY_COMMENT` 动作与 Todo；`outbound_channel` / `official_channel_id`。
+- **迁移 0016**：`official_channels`（Graph token AES-256-GCM 加密、token hint、模式/开关、绑定设备）、`official_comment_rules`、`official_outbound_messages`（channel+kind+comment 唯一，硬保证一条评论一次私回）、`official_webhook_events`（不含正文的审计）；`todos` / `behaviors` 增加官方通道字段。
+- **Official Channel 模块** `crates/onia-server/src/official/`：独立于 DeviceSession；Webhook HMAC-SHA256 验签 + hub challenge；messages/comments/live_comments/postback/reaction/seen/story mention 映射；IGSID/入口 id → 通道路由；评论规则匹配（关键词 + media_ids）；7 天窗口；分页审计。
+- **链路**：Webhook → Signal（`instagram:{mid}` 与设备监听同一幂等键）→ Policy → Todo。普通 DM 在模式 A 下仍 `pull_thread` + 设备 `send_reply`；评论产出官方 `SEND_PRIVATE_REPLY` / `REPLY_COMMENT`，由服务端 `OutboundAdapter` 直接调 Graph，失败不回落私有接口、不自动重试。
+- **控制台**：`/official` 页；通道 CRUD、token 轮换（不回显）、模式/入站/Private Reply 开关、评论规则编辑、最近 Webhook 审计。
+- **环境**：`ONIA_META_APP_SECRET`、`ONIA_META_WEBHOOK_VERIFY_TOKEN`、`ONIA_OFFICIAL_TOKEN_KEY`（base64 32B）、`ONIA_GRAPH_BASE_URL`、`ONIA_OFFICIAL_TIMEOUT_MS`。
+
+明确未做（与本文一致的部分）：模式 B 普通 DM 官方代发（接口存在但显式拒绝启用）；Official Conversation API 读历史；`INBOX_ACTIVITY` 收敛开关；Story/mention 产品化；Flow 可视化；多步跟进与转化看板。另：当前实现要求官方通道绑定一个已有设备账号，DM 仍靠设备补全会话；IGSID ↔ thread_fbid 映射仍是“对不上就人审”的降级路径。
