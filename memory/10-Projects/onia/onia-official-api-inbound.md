@@ -6,12 +6,22 @@ tags: project, onia, instagram, official-api, webhook, inbound, architecture, pr
 
 # Onia 官方 API 入站触发：可迁移事件与学习/设计清单
 
-更新于 2026-11-19（亚洲/上海）。本文回答两件事：
+更新于 2026-11-19（亚洲/上海）。
+
+> **已拍板（2026-11-19）**
+>
+> - **永久禁止** cookie / `sessionid` / 私有 GraphQL·Direct·CDN。
+> - **可选允许** OAuth 的 Graph / Page token，只打官方端点。
+> - **一期按模式 A 推进**：Webhook 入站 → Signal → 会话视图 → Agent 草稿 → Policy；`send_reply` 仍由设备发送；默认 `review`。
+> - **评论转私信**：官方 comments + Private Replies（模式 A 下的局部官方发送特例），**不做 WebView**。
+> - **模式 B**（普通 DM 官方代发）为**显式二期开关，不默认开启**。
+
+本文回答两件事：
 
 1. **哪些入站事件**可以从本机 WebView / 私有接口监听，迁到 Meta **官方云端实时触发（Webhook）**；
 2. 为实现「官方 API 获客触发」（尤其评论转私信），需要补齐哪些**技术学习与设计项**。
 
-本文是技术架构成稿，供用户决策与商业侧对齐。**不编造** QPS、延迟、容量或用量数字；不改 Onia 仓库；不把竞品商业模式写成已定产品。
+本文是技术架构成稿。**§8 硬约束改写已于 2026-11-19 拍板**，正文已按该决议修订。**不编造** QPS、延迟、容量或用量数字；本文不改 Onia 代码仓；不把竞品商业模式写成已定产品。
 
 **真源**：同目录 [onia-status-overview.md](onia-status-overview.md)、[architecture.md](architecture.md)、[instagram-auto-reply.md](instagram-auto-reply.md)、[instagram-dm-sync.md](instagram-dm-sync.md)、[instagram-actions-pipeline.md](instagram-actions-pipeline.md)、[instagram-chat-agent-kotlin.md](instagram-chat-agent-kotlin.md)、[onia-business-model.md](onia-business-model.md)。平台事实以 Meta 公开文档为准（链接见文末「出处」）；不确定处标 **假设**。
 
@@ -19,20 +29,20 @@ tags: project, onia, instagram, official-api, webhook, inbound, architecture, pr
 
 | # | 判断 |
 |---|------|
-| 1 | Instagram 官方消息 / 评论私信接口本身**一般不按条向 Meta 付费**（与 WhatsApp 不同）。但服务端持 access token 并代发，与现行硬约束「凡打向 IG 的请求只出设备、服务端不持 cookie、不代发」**冲突** → 必须给出架构分叉，**不得静默取消硬约束**。 |
+| 1 | Instagram 官方消息 / 评论私信接口本身**一般不按条向 Meta 付费**（与 WhatsApp 不同）。服务端持 access token 并代发，曾与旧硬约束「凡打向 IG 的请求只出设备、服务端不持 cookie、不代发」冲突。**已拍板（2026-11-19）**：永久禁止 cookie / 私有面；可选允许 OAuth token 只打官方端点；一期模式 A（普通 DM 不默认官方代发）；评论 Private Reply 为局部特例。不得把 Graph token 混成 cookie，也不得静默取消「永不持 cookie」一条。 |
 | 2 | 官方云端比本机 WebView / 私有接口更不易因「非官方脚本、异常登录态」被一刀切，但**滥用同样会被限**；不是零风险。官方路径通常需要**专业号 / 商业号**。 |
 | 3 | **24 小时消息窗口**：对方先有动作才可继续发；评论转私信通常**一条评论只能先私回一条**，对方回复后才进入窗口。 |
 | 4 | **一期不做**：营销广播 / 无限群发、WhatsApp 付费消息、粉丝积分 / 白标、用非官方脚本仿评论转私信或关注解锁。 |
 
 ---
 
-## 0. 结论先行（决策摘要）
+## 0. 结论先行（已拍板，2026-11-19）
 
 1. **最高优先迁移**：`DM_RECEIVED` 的触发源，从 WebView `start_dm_listener` 迁到 Instagram Messaging **`messages` Webhook**。设备离线仍可收到新私信事实。
-2. **推荐一期分叉 = 模式 A「仅云端入站」**：Webhook /（可选）官方 Conversation 读历史 → 仍走现有 Signal → 会话视图 → Agent 草稿 → Policy → **`send_reply` 仍由设备发送**。默认 **`review`**；`auto` 为显式开关 + 审计。
-3. **模式 B「云端入站 + 官方代发」**作为**显式二期开关**，需用户拍板改写硬约束后再做；不得默认打开。
-4. **评论转私信、Story 回复/提及等本地尚未闭环的获客触发，不要再做成 WebView 监听**——应直接官方 Webhook + Private Replies。
-5. **硬约束改写建议（供决策，未拍板）**：把「服务端不得碰 Instagram」细化为——**禁止**持 WebView `cookie` / `sessionid`、禁止打 **私有 GraphQL / Direct / CDN 反代**；**允许（可选）**经用户 OAuth 取得的 **Graph / Page access token**，仅调用 Meta **官方 Graph / Messenger 端点**。二者不可混为一谈。
+2. **一期已拍板 = 模式 A「仅云端入站」**：Webhook 入站 → 仍走现有 Signal → 会话视图 → Agent 草稿 → Policy → **`send_reply` 仍由设备发送**。默认 **`review`**；`auto` 为显式开关 + 审计。官方 Conversation 读历史不纳入一期默认（二期或实验开关且默认关）。
+3. **模式 B「云端入站 + 官方代发」**为**显式二期开关**，不默认打开。硬约束改写已拍板，但不等于一期默认开启模式 B。
+4. **评论转私信、Story 回复/提及等本地尚未闭环的获客触发，不要再做成 WebView 监听**——应直接官方 Webhook + Private Replies。评论转私信是模式 A 下的**局部官方发送特例**。
+5. **硬约束改写已拍板（2026-11-19）**：把「服务端不得碰 Instagram」细化为——**永久禁止**持 WebView `cookie` / `sessionid`、禁止打 **私有 GraphQL / Direct / CDN 反代**；**可选允许**经用户 OAuth 取得的 **Graph / Page access token**，仅调用 Meta **官方 Graph / Messenger 端点**。二者不可混为一谈。
 6. **计费口径**：Messenger Platform 文档写明 *「The Messenger Platform is free to use」*；未见 Instagram Messaging 按条向 Meta 收费的公开价目（与 WhatsApp 不同）。产品侧仍可能向用户收 SaaS 费；滥用与窗口违规仍会被平台限制。
 
 ---
@@ -48,14 +58,18 @@ tags: project, onia, instagram, official-api, webhook, inbound, architecture, pr
 | 拉会话 | `pull_thread`（GraphQL 全量/增量 + DOM 回退） | 设备 | 已有；不是实时触发 |
 | 自动回复 | 视图更新 → Agent 写草稿 → Policy → `send_reply` Behavior → 设备发 | 默认 `review` | Mock 真机闭环；Kotlin Agent 已接入 |
 
-### 1.2 现行硬约束（原文口径，见 status overview §4.1）
+### 1.2 硬约束（2026-11-19 已拍板；与 status overview §4.1 对齐）
 
-1. 凡打向 Instagram 域或其 CDN / GraphQL / Direct **私有接口**的请求，**只能由设备端发出**；服务端只调度与收结果。
-2. 服务端**不得**持 cookie / `sessionid` 等会话材料，不得反代 IG，不得用服务端出口拉 IG 媒体 URL。
-3. Agent **只写草稿**，不发消息、不持社媒会话、不操作 WebView、不直接创建发送 Todo。
-4. 禁止在 Behavior 里写死「拉完再回复」；必须事实 / 视图更新后再进 Policy。
-5. 不手造 `message_id`；敏感值不进日志 / 测试 / memo。
-6. 不迁入公司私有仓源码与内部接口。
+拍板前「凡打向 IG 的请求只出设备、服务端不持 cookie、不代发」的笼统表述，已按下列文案改写：
+
+1. 凡打向 Instagram **私有域 / CDN / GraphQL / Direct 私有接口**的请求，**只能由设备端发出**；服务端只调度与收结果。
+2. 服务端**永久不得**持 WebView cookie / `sessionid` 等会话材料，不得反代 IG，不得用服务端出口拉 IG **私有**媒体 URL。
+3. **可选允许**：经用户 OAuth 取得的 Graph / Page access token，仅调用 Meta **官方 Graph / Messenger 端点**（Official Channel）。不得用该 token 打私有接口。
+4. 一期默认**不代发**普通 DM：`send_reply` 仍走设备（模式 A）。评论转私信走官方 Private Replies（局部官方发送特例）。模式 B 全量官方代发为显式二期开关，不默认开。官方发送失败不得静默回落私有接口。
+5. Agent **只写草稿**，不发消息、不持社媒会话、不操作 WebView、不直接创建发送 Todo。
+6. 禁止在 Behavior 里写死「拉完再回复」；必须事实 / 视图更新后再进 Policy。
+7. 不手造 `message_id`；敏感值不进日志 / 测试 / memo。
+8. 不迁入公司私有仓源码与内部接口。
 
 ### 1.3 与「学官方 API 获客」的张力
 
@@ -107,14 +121,14 @@ Signal → Policy → Todo → Scheduler → OutboundAdapter → 结果回写
      （永不上传服务端）                            （OAuth，加密存放）
 ```
 
-### 2.2 两种模式（供用户决策）
+### 2.2 两种模式（已拍板）
 
 | 模式 | 入站 | 出站 | 服务端持有物 | 与硬约束关系 | 推荐阶段 |
 |------|------|------|--------------|--------------|----------|
-| **A：仅云端触发** | Webhook → Signal | **仍走设备** `send_reply` 等 | Webhook 验签密钥；**若**要云端拉历史则另需 Graph token（只读） | **不**持 cookie；**不**打私有接口。若启用「官方拉历史」，则需**改写**「服务端绝不向 Meta 发任何 IG 相关请求」的笼统表述，但仍可守住「不持 cookie、不代发」 | **一期推荐默认** |
-| **B：云端触发 + 官方代发** | 同 A | Official Send / Private Replies | Graph / Page token（读写） | **明确冲突**现行「不代发」；须用户拍板后改写硬约束第 1/2 条的「代发」部分 | **二期显式开关** |
+| **A：仅云端触发** | Webhook → Signal | **仍走设备** `send_reply` 等 | Webhook 验签密钥；官方 Conversation 读历史**不纳入一期默认**（二期或实验开关且默认关） | **不**持 cookie；**不**打私有接口。评论 Private Reply 为一期局部官方发送特例 | **一期已拍板默认** |
+| **B：云端触发 + 官方代发** | 同 A | Official Send / Private Replies | Graph / Page token（读写） | 硬约束已拍板改写：允许官方端点代发，但**不得默认打开**；失败不得静默回落私有接口 | **二期显式开关** |
 
-**一期推荐（未拍板）**：模式 A。理由：
+**一期已拍板**：模式 A。理由：
 
 - 解决「设备离线收不到新私信 / 评论」的最大痛点；
 - Agent、Policy、`review` 默认、审计链可原样复用；
@@ -130,11 +144,11 @@ Private Replies 是 `POST .../messages`，`recipient: { comment_id }`，**只能
 - **评论 → 首条私信**：若产品要做，**必须**走 Official Outbound（局部模式 B），即使 DM 普通回复仍走设备。
 - **对方回复之后的续聊**：可继续模式 A（设备发）或模式 B（官方发）；需在账号设置里写清，避免同一会话双通道乱序。
 
-**推荐默认**（供决策）：
+**已拍板默认（2026-11-19）**：
 
 1. 账号未开通官方通道 → 仅 Device Channel（现状）。
-2. 开通官方通道但未开「官方代发」→ 模式 A：Webhook 入站 + 设备发送；**评论转私信能力显示为「需开启官方 Private Reply」**。
-3. 显式开启「允许官方代发」→ 模式 B 或「仅 Private Reply 代发、普通 DM 仍设备」。
+2. 开通官方通道（一期默认，模式 A）→ Webhook 入站 + 普通 DM 仍设备发送；**评论转私信直接走官方 Private Replies**（局部官方发送特例），不做 WebView。
+3. 显式开启「允许官方代发」（模式 B，普通 DM 也走官方 Send）→ **二期显式开关，不默认开启**。
 
 ### 2.4 Graph access token ≠ WebView cookie
 
@@ -142,7 +156,7 @@ Private Replies 是 `POST .../messages`，`recipient: { comment_id }`，**只能
 |--|---------------------------|----------------------------|
 | 来源 | 用户 OAuth / Facebook Login for Business / Instagram Login | 浏览器登录态，私有 |
 | 调用面 | `graph.facebook.com` / `graph.instagram.com` 官方端点 | Instagram Web GraphQL、Direct、CDN 等私有面 |
-| 现行硬约束 | **今日禁止**（因「服务端不代发、不持会话」笼统表述）；**建议改写后可选允许** | **永久禁止**上传与服务端持有 |
+| 硬约束（已拍板） | **可选允许**，且只打官方端点 | **永久禁止**上传与服务端持有 |
 | 风险 | App Review、权限、窗口与速率限制、token 泄露 | 非官方自动化、异常登录态、封号叙事更敏感 |
 | 媒体 | 官方 CDN / 附件上传 API（有平台规则） | 设备本机拉再上传（现行） |
 
@@ -362,22 +376,50 @@ Private Replies 是 `POST .../messages`，`recipient: { comment_id }`，**只能
 
 ---
 
-## 8. 硬约束冲突清单与改写建议（供用户决策）
+## 8. 硬约束改写（已拍板，2026-11-19）
 
-| ID | 现行约束 | 与官方路径的冲突 | 建议处置（未拍板） |
+**已拍板日期：2026-11-19。** 下列改写取代拍板前「凡打向 IG 的请求只出设备、服务端不持 cookie、不代发」的笼统表述。
+
+| ID | 拍板前约束 | 与官方路径的冲突 | 已拍板处置（2026-11-19） |
 |----|----------|------------------|--------------------|
-| C1 | 打向 IG 的请求只能由设备发出 | 模式 B 的 Send / Private Reply；模式 A+ 的 Conversation 读 | **改写**：仅禁止**私有** Web/GraphQL/Direct/CDN；**允许**可选 Official Channel 调官方 Graph |
-| C2 | 服务端不持 cookie / sessionid、不代发 | 持 **Graph token** 并代发 ≠ 持 cookie；但「不代发」字面冲突模式 B | **拆分**：「永不持 cookie」保持；「代发」改为「默认不代发；官方代发为显式开通」 |
-| C3 | 服务端不反代 IG、不拉 IG 媒体 URL | 官方附件 / CDN 规则不同 | 官方媒体走官方方式；私有 CDN URL **仍禁止**服务端直拉 |
+| C1 | 打向 IG 的请求只能由设备发出 | 模式 B 的 Send / Private Reply；模式 A+ 的 Conversation 读 | **已改写**：永久禁止**私有** GraphQL / Direct / CDN；**可选允许** Official Channel 调官方 Graph 端点 |
+| C2 | 服务端不持 cookie / sessionid、不代发 | 持 **Graph token** 并代发 ≠ 持 cookie；「不代发」字面冲突模式 B 与 Private Reply | **已拆分**：永久不持 cookie / sessionid；一期默认不代发普通 DM（模式 A）；评论 Private Reply 为一期局部官方发送特例；模式 B 全量代发为显式二期开关，不默认开 |
+| C3 | 服务端不反代 IG、不拉 IG 媒体 URL | 官方附件 / CDN 规则不同 | 官方媒体走官方方式；私有 CDN URL **仍永久禁止**服务端直拉 |
 | C4 | Agent 只写草稿 | 无冲突 | **保持** |
 | C5 | 不手造 message_id | 无冲突（用官方 mid / comment_id） | **保持** |
 | C6 | 商业材料曾写「不是官方 Messaging 替代品」 | 若上官方通道，定位变为「双通道」 | 更新 [onia-business-model.md](onia-business-model.md) 叙事：**可选 Official 获客 + Device 执行**，而非否认官方 |
 
-**推荐决策序**：
+**已拍板结论**：
 
-1. 先批 **C1/C2 改写文案**（仍禁止 cookie）；  
-2. 批 **一期只上模式 A + Private Reply 局部官方发送**；  
-3. 模式 B 全量代发另开产品开关与审计，再改默认叙事。
+1. 永久禁止 cookie / `sessionid` / 私有 GraphQL·Direct·CDN。
+2. 可选允许 OAuth 的 Graph / Page token，只打官方端点。
+3. 一期按模式 A 推进：Webhook → Signal → 会话视图 → Agent 草稿 → Policy；`send_reply` 仍设备；默认 `review`。
+4. 评论转私信按官方 comments + Private Replies，作为模式 A 下的局部官方发送特例；不做 WebView。
+5. 模式 B 保持显式二期开关，不默认开启。
+
+### 8.1 一期工程启动边界
+
+一期工程**可以启动**的范围（与已拍板模式 A 对齐；现码进度见 §14 / §15，不以现码提前把模式 B 当成一期默认）：
+
+1. 按已拍板文案同步协议与文档：Official Channel 与 Device Channel 分叉，禁止复用 DeviceSession 的 cookie / `sessionid` 路径。
+2. Official Channel 模块：Webhook 验签与订阅校验、token 保险库（仅 OAuth Graph / Page token，加密存放、不回显、不进日志）、入站事件映射为平台中立 Signal。
+3. 官方 Graph 调用面只允许 `graph.facebook.com` / `graph.instagram.com` 等官方端点；禁止用该 token 打私有 GraphQL / Direct / CDN。
+4. 接通 `messages` Webhook → `DM_RECEIVED`（幂等键与设备监听一致）→ 会话视图 → Agent 只出草稿 → Policy；默认 `review`，`auto` 须显式开关 + 审计。
+5. 普通 DM 的 `send_reply` / `send_message` / `send_greet` 仍走设备 Behavior，不在一期默认改为官方代发。
+6. 评论转私信：官方 `comments`（及可选公开评论回复）+ Private Replies；一条评论先私回一条、窗口校验；**不要**再做 WebView 监听或非官方脚本仿制。
+7. 控制台：官方通道开关与状态、评论规则、审核模式、Webhook / 官方发送审计；官方失败不得静默回落私有接口，也不得自动改走另一通道。
+8. 未开通官方通道的个人号 / 设备账号，继续只走 Device Channel。
+9. 设备 listener / `pull_inbox` 可作为官方 Webhook 漏报时的兜底，不得重新成为官方通道账号的主触发（收敛策略可配置，默认不高频轮询）。
+
+一期**明确不启动或不得当作默认交付**的：
+
+1. 模式 B：普通 DM 官方代发。可在协议与控制台预留显式开关，但默认关闭，属二期能力；不得在一期默认打开，也不得在官方发送失败时静默回落设备或私有接口。现码若已预留该开关（见 §15），仍按本条约束，不改变分期。
+2. 用 Official Conversation API 云端拉历史替代大部分 `pull_thread`：属二期（或实验开关且默认关）。
+3. 营销广播 / 无限群发、WhatsApp 付费消息、粉丝积分 / 白标。
+4. 非官方脚本仿评论转私信、仿关注解锁。
+5. Story 完整产品化、历史评论补发、Flow 可视化、转化看板、Handover Protocol：二期或更后。
+
+拍板范围只授权上述一期边界，不构成「已完成 Meta App Review / 生产 token 已配置」的承诺。
 
 ---
 
@@ -407,15 +449,17 @@ Private Replies 是 `POST .../messages`，`recipient: { comment_id }`，**只能
 
 ---
 
-## 11. 建议落地顺序（工程，不改现仓承诺）
+## 11. 建议落地顺序（工程）
 
-1. 文档与硬约束改写提案评审（本文 §8）→ 用户拍板模式 A / Private Reply 特例。  
-2. `onia-protocol` 增加官方入站 Signal 类型与 `outbound_channel` 字段（设计评审）。  
-3. 独立 `Official Channel` 模块：Webhook 入口、token 保险库、映射器——**禁止**复用 DeviceSession 的 cookie 路径。  
-4. 先接通 `messages` → `DM_RECEIVED` 与现有回复包（模式 A）。  
-5. 再接通 `comments` + Private Reply 获客包。  
-6. 控制台：通道状态、审核模式、审计、失败不静默降级私有接口。  
-7. 模式 B 全量代发另立里程碑。
+§8 已于 2026-11-19 拍板。一期启动边界以 §8.1 为准。
+
+1. 文档与硬约束改写提案评审（本文 §8）→ **已完成**：用户拍板模式 A / Private Reply 特例，模式 B 留作二期显式开关。
+2. `onia-protocol` 增加官方入站 Signal 类型与 `outbound_channel` 字段（设计评审）。
+3. 独立 `Official Channel` 模块：Webhook 入口、token 保险库、映射器——**禁止**复用 DeviceSession 的 cookie 路径。
+4. 先接通 `messages` → `DM_RECEIVED` 与现有回复包（模式 A）。
+5. 再接通 `comments` + Private Reply 获客包（不做 WebView）。
+6. 控制台：通道状态、审核模式、审计、失败不静默降级私有接口。
+7. 模式 B 全量代发另立里程碑（显式开关，默认关）。
 
 ---
 
@@ -458,6 +502,8 @@ Private Replies 是 `POST .../messages`，`recipient: { comment_id }`，**只能
 明确未做（与本文一致的部分）：模式 B 普通 DM 官方代发（接口存在但显式拒绝启用）；Official Conversation API 读历史；`INBOX_ACTIVITY` 收敛开关；Story/mention 产品化；Flow 可视化；多步跟进与转化看板。另：当前实现要求官方通道绑定一个已有设备账号，DM 仍靠设备补全会话；IGSID ↔ thread_fbid 映射仍是“对不上就人审”的降级路径。
 
 ## 15. 模式 B 与收敛补齐（2026-11-19 追加）
+
+说明：下列现码已预留模式 B 显式开关与部分收敛能力，**仍属二期**，默认关闭，**不改变** §8 已拍板的一期边界。
 
 在 §14 的一期之上补齐：
 

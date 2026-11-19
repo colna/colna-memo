@@ -12,13 +12,14 @@ tags: project, onia, social-proxy, architecture, rust, flutter, monorepo, agent,
 
 - **仓库**：GitHub **私有**（命名约定 `github.com/colna/onia`，未创建前仅作约定）。
 - **数据库**：**PostgreSQL** 为唯一业务主库。账号、设备、Signal / Todo / Behavior、入站消息、回复草稿、审计与脚本清单都落在 PostgreSQL；不用 SQLite 或其它库做主存储。访问用 `sqlx`，schema 变更只走 `sqlx migrate`，且必须向前兼容。媒体文件走对象存储，不进数据库。
+- **官方通道硬约束（2026-11-19 已拍板）**：服务端**永久禁止**持有 WebView cookie / `sessionid`，禁止打私有 GraphQL / Direct / CDN。可选允许经用户 OAuth 取得的 Graph / Page token，**只调用官方 Graph / Messenger 端点**。一期模式 A：Webhook 入站 → Signal → 视图 → Agent 草稿 → Policy，`send_reply` 仍走设备，默认 `review`。评论转私信走官方 Private Replies（模式 A 局部官方发送特例），不做 WebView。模式 B 普通 DM 官方代发为显式二期开关，不默认开。详见 [onia-official-api-inbound.md](onia-official-api-inbound.md)。
 
 其余未确认项见文末，实现按下列假设推进，产品定义若不同再改。
 
 ## 假设
 
-1. Onia 是个人项目的 Social Proxy：本机登录社媒，服务端决策，原设备 WebView 注入脚本执行，结果回传。
-2. Agent 处理对方用户的入站消息（首期默认私信）。生成在服务端，发送仍走原设备脚本。默认 **先审后发**，兼支持自动发送与只生成。
+1. Onia 是个人项目的 Social Proxy：本机登录社媒，服务端决策；打向 Instagram **私有接口**的请求由原设备 WebView 注入脚本执行，结果回传。专业号可另开 Official Channel（官方 Webhook / Graph），与 Device Channel 分叉，不得混成服务端打私有接口。
+2. Agent 处理对方用户的入站消息（首期默认私信）。生成在服务端。一期（模式 A）普通发送仍走原设备脚本；评论转私信走官方 Private Replies。模式 B 官方代发为显式二期开关，不默认开。默认 **先审后发**，兼支持自动发送与只生成。
 3. 客户端先做 Android / iOS（Flutter UI + Rust 核心）；另有官网、后台、脚本，全部放在同一 monorepo。
 4. 首期平台 Instagram，协议按多社媒预留，平台只作为字段，不写进类型名。
 5. 个人可运维，首期单进程部署。不编造 QPS、延迟、容量或可用性数字。
@@ -29,7 +30,7 @@ tags: project, onia, social-proxy, architecture, rust, flutter, monorepo, agent,
 
 - 三层管线语义：Signal 只记录已发生的事实，Todo 是可调度决策，Behavior 是一次设备执行。
 - 设备 WebSocket 长连下发执行，断线或进程冻结时用系统推送叫醒并重连，积压由服务端在重连后推下，不另建一套「拉命令」主路径。
-- 脚本是动作真源，经统一入口执行；发送、登录态不出原设备。
+- 脚本是动作真源，经统一入口执行；**私有接口**的发送与登录态不出原设备，服务端永不持 cookie / `sessionid`。Official Channel 只持 OAuth 官方 token、只打官方端点；一期普通发送仍走设备，评论 Private Reply 除外（见已定决策）。
 - 追踪按 `signal_id → todo_id → behavior_id` 贯通。
 
 **精简与优化（针对现有 SP 已出现的耦合）**
@@ -196,7 +197,7 @@ Signal 类型平台中立，首期最小集：
 
 仍是「决策辅助」，不是执行器。Agent 只产出草稿；是否生成 `SEND_REPLY` Todo 由 Policy 在收到 `REPLY_DRAFT_READY` 或 `REPLY_DRAFT_APPROVED` 之后按模式决定。链路保持精简：
 
-1. 设备上报入站事实（`DM_RECEIVED`，幂等键 = `platform + message_id`）。阶段 B 仍先产出 `pull_thread`，拉回正文并写入会话视图后再进入回复包。
+1. 入站事实（`DM_RECEIVED`，幂等键 = `platform + message_id`）可由设备上报，也可由官方 Webhook 映射后 ingest。阶段 B / 模式 A 下普通会话仍可先产出 `pull_thread`，拉回正文并写入会话视图后再进入回复包。
 2. 编排层过滤后调用 Agent：过滤自己发出的、已回复的、接管中的。Agent 只写入 `reply_drafts`，不创建 Todo。
 3. 用版本化人设 + 安全策略 + 会话摘要调用 LLM（OpenAI 兼容，密钥只在服务端）。入站文本当数据字段，不拼进系统指令。首期 **无工具调用**，只输出结构化草稿。
 4. 系统 ingest `REPLY_DRAFT_READY` 后，由 **Policy** 按模式决定：`review` 保持待审，批准或改写后再 ingest `REPLY_DRAFT_APPROVED` 才产 `SEND_REPLY`；`auto` 且安全通过、有非空正文时产 `SEND_REPLY`；`suggest` 只留草稿。无正文的生成或安全失败不得变成可批准草稿。
