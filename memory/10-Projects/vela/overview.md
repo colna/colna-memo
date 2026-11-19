@@ -26,3 +26,9 @@ tags: project, vela, product, live-assist, tts, voice-clone, architecture, mvp
 - 启动：`docker compose -f docker/docker-compose.yml up -d postgres` → `cd apps/server && cargo run` → `pnpm --filter @vela/admin dev` (5173) → `pnpm --filter @vela/web dev` (5175)
 
 **仍未做**：真实抖音/直播平台、碎片音频与二创、其余模式、训练微调、支付卡密/多租户、App、VoiceStudio 商用清关。
+
+## AI 与 VoiceStudio clone（2026-11-19 20:18）
+
+- **AI**：`apps/script-agent`（Node 22）接 DeepSeek，server 代理 `/v1/ai/{generate,rewrite,reply,status}`；控制台支持 AI 生成/改写话术、助播 AI 回复入队。DeepSeek key 只在本机 `.env`（gitignored）。
+- **VoiceStudio clone**：`POST /api/profiles`（兼容 `/profiles`）multipart → 写 `provider_voice_id`；`/ws/tts` 按上游源码对齐为 JSON `{text,voice,speed}` → PCM16 mono 24k → `done`/`error`。已有 mock HTTP 单测；**真实实例未联调**。
+- 验证追加：AI 真实调用、控制台 AI 生成/采用/AI 回复、`cargo test` 7 项、e2e AI 分支均通过。
