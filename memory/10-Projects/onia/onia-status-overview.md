@@ -119,14 +119,15 @@ Signal 支持**多动作串行**（一条定义展开为有序 Todo）与**定�
 
 ## 4. 关键技术约束与现阶段边界
 
-### 4.1 硬约束（不变）
+### 4.1 硬约束（2026-11-19 细化）
 
-1. **凡打向 Instagram 域或其 CDN / GraphQL / Direct 私有接口的请求，只能由设备端发出**（WebView 脚本或宿主本机）。服务端只调度、存游标/事实/会话视图、校验并收 `behavior.result` / `signal.report`。
-2. 服务端**不得**持 cookie / `sessionid` 等会话材料，不得反向代理 IG，不得用服务端出口去拉 IG 媒体 URL（媒体若入库：设备本机拉再上传）。
-3. **Agent 只写草稿，不发消息、不持社媒会话、不操作 WebView、不直接创建发送 Todo**；是否发送由 Policy 决定。
+1. **凡打向 Instagram 私有域 / CDN / GraphQL / Direct 私有接口的请求，只能由设备端发出**（WebView 脚本或宿主本机）。服务端只调度、存游标/事实/会话视图、校验并收 `behavior.result` / `signal.report`。**例外**：用户显式创建的 Official Channel 可调用 Meta **官方 Graph/Messenger 端点**；这不等于私有接口，也不允许用该 token 打私有接口。
+2. 服务端**不得**持 WebView cookie / `sessionid` 等会话材料，不得反向代理 IG，不得用服务端出口去拉 IG 私有媒体 URL。Official Channel 只持**加密的官方 Graph access token**（AES-256-GCM），token 不回显、不进日志。
+3. **Agent 只写草稿，不发消息、不持社媒会话、不操作 WebView、不直接创建发送 Todo**；是否发送由 Policy 决定。Official Channel 的入站事实可触发 Agent，但发送仍由 Policy 的官方 Todo 决定。
 4. **禁止在 Behavior 里写死「拉完再回复」**；必须事实/视图更新后再进 Policy。
-5. 不手造 `message_id` 或入站事实；sessionid 等敏感值不进日志、测试、memo、回复。
-6. 不迁入公司私有仓源码、内部接口、TIM / Nacos / 公司身份字段等。
+5. **默认不代发**：普通 DM 默认 `device`（Mode A）；只有通道显式设为 `official`（Mode B）且用户确认后，服务端才经官方 Graph 代发。官方发送失败不静默回落私有接口。
+6. 不手造 `message_id` 或入站事实；sessionid 等敏感值不进日志、测试、memo、回复。
+7. 不迁入公司私有仓源码、内部接口、TIM / Nacos / 公司身份字段等。
 
 ### 4.2 技术栈与仓库边界（现码核对）
 
@@ -140,7 +141,7 @@ Monorepo `/Users/colna/WORK/onia` 主要结构：
 
 ### 4.3 现阶段产品边界
 
-- 平台：Instagram 私信自动回复为主；评论等频道字段预留，未作为首期闭环。
+- 平台：Instagram 私信自动回复为主；评论转私信已通过 Official Channel 接入（关键词 + media 范围 + 首条 Private Reply），公开评论回复可选。
 - 默认回复模式仍是 **`review`**；测试账号可切 `auto`。
 - 一对一以外不自动回复。
 - 内容发布：计划与下发框架在，**帖子/快拍上传链路未打通**。
@@ -238,8 +239,8 @@ Colna Bot 提供的 11-13 记忆在当时正确，但之后 memo/仓库已前进
 ## 9. 官方通道增量（2026-11-19）
 
 - 新增 **Official Channel**：Meta/Instagram Webhook 入站 + 评论转私信。实现为独立模块（`crates/onia-server/src/official/`）与独立迁移 `0016_official_channel.sql`，不复用 DeviceSession，不持有 WebView cookie/sessionid。
-- 入站映射：`messages` → `DM_RECEIVED`（幂等键 `instagram:{mid}`，与设备监听一致）；`comments` / `live_comments` → 评论 Signal；`messaging_postbacks` / `message_reactions` / `messaging_seen`；story reply / story mention。**普通 DM 仍走模式 A**：`pull_thread` 由设备补全会话，`send_reply` 仍由设备发送。
-- 官方出站：评论 `SEND_PRIVATE_REPLY`（Graph Private Replies，7 天窗口、一评论一次由唯一索引保证）与 `REPLY_COMMENT`（公开回复）。官方发送失败**不回落**私有接口，也不自动重试。
-- 控制台 `/official`：通道 CRUD、token 加密存储/轮换（不回显）、入站/Private Reply 开关、关键词 + media_id 规则、最近 Webhook 审计。模式 B（普通 DM 官方代发）显式拒绝启用，保留二期开关位。
+- 入站映射：`messages` → `DM_RECEIVED`（幂等键 `instagram:{mid}`，与设备监听一致）；`comments` / `live_comments` → 评论 Signal；`messaging_postbacks` / `message_reactions` / `messaging_seen`；story reply / story mention。**Mode A**：`pull_thread` 由设备补全会话，`send_reply` 仍由设备发送。**Mode B**：Webhook 直接把入站消息写入 `igsid:<peer>` 的一对一会话视图，服务端生成草稿后按 Policy 经官方 Graph 发送；无需设备在线，但仍要求通道绑定过设备账号。
+- 官方出站：评论 `SEND_PRIVATE_REPLY`（Graph Private Replies，7 天窗口、一评论一次由唯一索引保证）、`REPLY_COMMENT`（公开回复）、Mode B `SEND_OFFICIAL_REPLY`。官方发送失败**不回落**私有接口，也不自动重试。
+- 控制台 `/official`：通道 CRUD、token 加密存储/轮换（不回显）、Mode A/B 切换、入站/Private Reply 开关、`INBOX_ACTIVITY` 兜底开关、关键词 + media_id 规则、最近 Webhook 审计。新建通道默认 `inbox_activity_fallback_enabled=false`，官方 Webhook 为权威来源。
 - 环境：`ONIA_META_APP_SECRET`、`ONIA_META_WEBHOOK_VERIFY_TOKEN`、`ONIA_OFFICIAL_TOKEN_KEY`、`ONIA_GRAPH_BASE_URL`。Webhook 路径 `/v1/official/instagram/webhook`。
-- 未做：Official Conversation API 读历史、`INBOX_ACTIVITY` 收敛开关、Story/mention 产品化、Flow 可视化、模式 B。官方通道仍需绑定已有设备账号，DM 自动回复依赖设备在线补会话。
+- 仍未做：Official Conversation API 读历史、Flow 可视化、Handover Protocol、Story/mention 完整产品化、转化看板。Mode B 的 peer IGSID 依赖 Webhook 或最近一次设备/官方会话消息；对不上时只记录事实，不静默降级到设备。
