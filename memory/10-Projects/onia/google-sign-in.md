@@ -24,7 +24,7 @@ tags: onia, google, oauth, auth, android, flutter
 ## 配置
 
 - `apps/client/config/dev.json`、`config/prod.json` 已加 `ONIA_GOOGLE_OAUTH_CLIENT_ID=<Onia App Browser client ID>`（旧的 `ONIA_GOOGLE_SERVER_CLIENT_ID` 已移除）。
-- 本地与生产 `.env` 的 `ONIA_GOOGLE_CLIENT_IDS` 已包含 Web + Desktop 两个 client ID。
+- 本地与生产 `.env` 的 `ONIA_GOOGLE_CLIENT_IDS` 已包含 Web + Desktop 两个 client ID；另加 `ONIA_GOOGLE_OAUTH_CLIENT_ID` 与 `ONIA_GOOGLE_OAUTH_CLIENT_SECRET`（仅服务端，secret 不入库）。
 - 服务端 `ONIA_GOOGLE_CLIENT_IDS` 为 `aud` 白名单；空则 `/v1/auth/google` 返回 422「not configured」。
 
 ## 代码实现
@@ -37,7 +37,8 @@ tags: onia, google, oauth, auth, android, flutter
   - 迁移 `0014_google_identity.sql`：`users.google_sub` + partial unique index。
 - 客户端：
   - 依赖 `url_launcher`（已移除 `google_sign_in`）；登录页「使用 Google 继续」启动系统浏览器。
-  - `runtime/google_auth.dart`：Desktop client + OAuth authorization code + PKCE + 本地 loopback HttpServer（`http://127.0.0.1:<随机端口>`）接收回调；用 code 换 `id_token`，取消/超时返回 null。不需要手机系统里有 Google 账户。
+  - `runtime/google_auth.dart`：Desktop client + OAuth authorization code + PKCE + 本地 loopback HttpServer（`http://127.0.0.1:<随机端口>`）接收回调，返回 `GoogleAuthCode`；取消/超时返回 null。不需要手机系统里有 Google 账户。
+  - client secret 不放 App：`AuthBackend.loginWithGoogleCode` 先把 `code + code_verifier + redirect_uri` 发给服务端 `/v1/auth/google/exchange`，服务端用 `ONIA_GOOGLE_OAUTH_CLIENT_ID/SECRET` 换 `id_token`，再走 `/v1/auth/google`。
   - `session.loginWithGoogle` → `auth.google`。
   - 登录页改为 Google 优先：默认只显示「使用 Google 继续」+「使用其他方式登录」+「创建账户」；点前者展开邮箱/密码表单（服务地址也只在展开后显示），并有「返回 Google 登录」收回。新增 1 个 widget 测试覆盖默认/切换。
   - 登录页合法链接固定底部：服务条款/隐私政策从滚动内容移到页面底部，`SafeArea(top: false)` + 12px 最小底部间距。
@@ -49,6 +50,7 @@ tags: onia, google, oauth, auth, android, flutter
 - 服务端：`cargo test -p onia-server` 61 passed（google 模块 8 个）。
 - 本地服务端：重启新二进制后 POST `/v1/auth/google` + 假 token 返回 401 `invalid google token`（路由与配置生效）。
 - 浏览器 OAuth：OPPO 真机点「使用 Google 继续」能拉起系统浏览器（HeyTap Browser）；但该机无 VPN，`accounts.google.com` 不可达，页面停在加载中，待开启 VPN 后完成登录验证。
+- 服务端换码：生产新镜像已部署；假 code 调 `/v1/auth/google/exchange` 返回 401，服务端日志显示 Google token endpoint 返回 400，说明 client secret + 换码链路已打通。
 - 客户端：`flutter analyze` 干净；`flutter test` 113 passed；dev debug APK 已用带 client ID 的 `config/dev.json` 重新构建。
 - 本地 dev API：`http://192.168.3.24:8080`；手机 serial `f7031061` 在线。
 
