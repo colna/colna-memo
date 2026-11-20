@@ -10,6 +10,7 @@ tags: project, onia, social-proxy, architecture, rust, flutter, monorepo, agent,
 
 - 技术架构：[architecture.md](architecture.md)
 - 文档只写在 colna-memo，不使用飞书。
+- 后台全面重规划（产品评审稿，社媒代理与日常运营）：[admin-product-replan.md](admin-product-replan.md)
 - 当前进展：[status.md](status.md)
 - 功能与技术现状梳理（独立成稿）：[onia-status-overview.md](onia-status-overview.md)
 - 竞品调研与商业模式建议：[onia-business-model.md](onia-business-model.md)
