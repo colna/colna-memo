@@ -144,7 +144,7 @@ Monorepo `/Users/colna/WORK/onia` 主要结构：
 - 平台：Instagram 私信自动回复为主；评论转私信已通过 Official Channel 接入（关键词 + media 范围 + 首条 Private Reply），公开评论回复可选。
 - 默认回复模式仍是 **`review`**；测试账号可切 `auto`。
 - 一对一以外不自动回复。
-- 内容发布：计划与下发框架在，**帖子/快拍上传链路未打通**。
+- 内容发布：计划与下发框架在；**快拍（图片/视频）已接入 live `rupload_igphoto`/`rupload_igvideo` + `configure_to_story`，待真机发布验证**；帖子 live 上传仍未打通。
 - 脚本 OTA：生产热更新已通；**无签名、无灰度**。
 - iOS：双端同步约定已立；Google 登录在 iOS 上需换 `ASWebAuthenticationSession`（Custom Tab / inAppBrowserView 不支持 custom scheme）——属已知遗留。
 - 客户端 Code Review（2026-11-19）仍标出若干工程债（如 `DeviceRuntime.stop` dispose 后 notify、token 明文 SharedPreferences、默认 API base 曾为 http 等）；不在此展开为性能数字。
