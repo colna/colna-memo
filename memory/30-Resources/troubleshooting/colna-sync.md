@@ -252,3 +252,14 @@ git -c http.version=HTTP/1.1 push https://github.com/colna/colna-memo.git main
 - **不要**因此改走 PR、**不要** `--force`（`non_fast_forward` 必拒，且会把问题变成真失败）；
 - 成功判据只有一条：**push 后用 `git ls-remote <url> main` 比对 sha**，而不是看 push 输出里有没有 `-> main`（错误串里也会出现 `main -> main`）；
 - 失败尝试不改变远端：`ls-remote` 在三次尝试期间始终是 `47c3e84`，直到第 3 次才变成 `49b21dd` ⇒ 重试是安全的，不会产生半推状态。
+
+## `colna search` 自己会触发全量重建：debug 二进制下 31 分钟持锁（2026-11-24 20:30 实测）
+
+- **现象**：Grok Bot 19:59 发起 `colna search "pwa-partner-instagram-product-post-tech …" -t 8`，31 分钟无返回；同一时间其它 colna 命令（sync / kb_*）全部静默等待，看起来就是「memo 又卡死了」。
+- **根因**：`.colna/state.json` 不存在 → `indexer::ensure` 判定索引不可用，**search 自己直接整库重建**（`cmd_search → ensure → full_rebuild → embed_and_write_chunks`）。`colna` 包装脚本默认 `COLNA_PROFILE=debug`，e5-base 在 debug 下嵌入 6955 块用了 **31 分钟**（2026-10-30 记的 20 分钟是 4586 块）；全过程持 `.colna/index.zvec/LOCK` 与 `.colna/index.lock.d/pid`，所以并发的 colna 命令不是死锁，是在排队等锁。
+- **判据（区分「在干活」和「真卡死」）**：
+  - `ps -o pid,etime,%cpu,rss -p <pid>`：CPU 几百 % + `0.wal` 持续增长 = 在嵌入/写 WAL，等它；
+  - `sample <pid> 2` 看栈：停在 `embed_and_write_chunks` 是重建，停在 `__psynch_cvwait` 且 WAL 不涨才是真等锁/僵死。
+- **结果**：20:30:37 落盘 `state.json`（405 files / 6955 chunks / `multilingual-e5-base` / chunker 3 / format 5），`scalar.0.ipc` 8.9MB（非 0，没重演 2026-09-21 的 flush 失败），重建成功；随后同一句 search 10.4 秒返回。
+- **对策**：需要整库重建时先 `cargo build --release` 并 `COLNA_PROFILE=release`，别用 debug 陪跑半小时；`kill` 之前必须确认 WAL 已停止增长（半途 kill 会留下无 `state.json` 的半成品，下次 search 又整库重建）。
+- **未查明**：本次 `state.json` 为何丢失（`.colna/` 里只剩两个 9-21 的坏索引备份 + `skills.zvec`），推测是上一次重建中断或被手工清理。
