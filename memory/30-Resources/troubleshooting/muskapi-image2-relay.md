@@ -105,3 +105,22 @@ POST /v1/images/generations  model=gpt-image-2.6-sunburst  output_format=gif  fr
 ```
 
 结论：中转**接受** gif 参数但不透传 GIF 能力，静默降级成 PNG 并给 `fallback_reason`。判断方法：请求后必须读顶层 `output_format`（或 `data[].format`），不能只看 HTTP 200。要真 GIF 只能走官方 OpenAI key（本机未配 `OPENAI_API_KEY`）或有 GIF 权限的中转。
+
+## 各图像模型可用性实测（2026-11-24，512×512 探针）
+
+同一句 prompt、`n=1`、无 quality 参数、串行请求，结果：
+
+| 模型 | HTTP | 耗时 | 结果 |
+| --- | --- | --- | --- |
+| `gpt-image-2` | 200 | 28.7s | 出图（旧版响应，无 output_format/size 字段） |
+| `gpt-image-2.5-sunburst` | 200（首次 300s 客户端超时） | 20.7s（重试） | 出图 PNG 185KB；不是坏，是排队慢 |
+| `gpt-image-2.5-flare` | 200 | 118.6s | 出图 |
+| `gpt-image-2.6` | 200 | 51.3s | 出图 |
+| `gpt-image-2.6-sunburst` | 200 | 12.8s | 出图 PNG 244KB，最快 |
+| `gpt-image-2.6-flare` | 502 → 503 | 70.3s / 1.0s | `system service temporarily unavailable` → `No available compatible accounts`，上游无号 |
+
+- 结论：11-12 记的「分组未开通」已恢复，2/2.5/2.6 的 sunburst 与 `gpt-image-2.6` 可用；**2.6-flare 无可用上游账号**。
+- 客户端超时至少给 600s，300s 会把还在排队的 2.5-sunburst 误判为失败。
+- 成本观测：7 次请求（含 1 次 GIF 探测、1 次超时）共扣 **$0.84**（6.6892 → 5.8492），512×512 单张约 $0.1~0.12。
+- 余额查询：`GET /v1/dashboard/billing/subscription` → `hard_limit_usd` 即剩余额度；`/dashboard/billing/usage` 恒为 0，不可用。
+- 站点：主站 `muskapi.cc`（MuskAI），控制台 `elonai.cc`，文档 `docs.muskapi.cc`，API 页标题 `ElonAI - AI API Gateway`。
