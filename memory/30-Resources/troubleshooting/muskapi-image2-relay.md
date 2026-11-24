@@ -74,3 +74,34 @@ Python `urllib`（gen_image.py 走的库）默认读 `HTTP_PROXY` / `HTTPS_PROXY
 - [image-gen 参考图怎么选、prompt 怎么配套](image-gen-reference-image.md)
 - [AIGC-Studio 生图接口排错](aigc-studio-image-gen.md)
 - [浏览器直连 LLM API 的 CORS](browser-direct-llm-api-cors.md)
+
+## image2.6 GIF 输出：官方参数 vs 本机中转实测（2026-11-24）
+
+**官方口径**（OpenAI `developers.openai.com/api/docs/guides/image-generation` + API reference）：
+
+| 字段 | 值 | 默认 |
+| --- | --- | --- |
+| `model` | `gpt-image-2.6-sunburst` / `gpt-image-2.6-flare`（2.6 没有日期快照） | — |
+| `output_format` | `png` / `jpeg` / `webp` / `gif` / `svg` | `png` |
+| `frame_count` | 2–16（整数），仅 gif 生效 | 9 |
+| `frame_duration_ms` | 20–2000，四舍五入到 10ms，编码上限 655350ms | 200 |
+| `size` | `auto` 或 `WIDTHxHEIGHT`（两侧 16 的倍数，描述单帧）；边长 ≤3840、宽高比 1:3~3:1、总像素 655,360–8,294,400 | `auto` |
+| `n` | 1–10，帧数×尺寸×n 要一起过像素预算 | 1 |
+
+- 端点是 `/images/generations`；guide 也写了 `/images/edits` 可出 GIF，但 API reference 注明 GIF 不支持 mask。
+- GIF 不支持：streaming、`partial_images`、`output_compression`、`prompt_rewriter`；`background: transparent` 只能配 png/webp。
+- 有账号级门槛：reference 写「Requires access to the GIF 预览 for the selected model」。
+- 回复里 `data[].b64_json` 解码后按 `.gif` 存；`quality` 对 2.6 支持 `low/medium/high/xhigh/max`，另有 `complexity: low/medium/high`（2.6 新增，控制规划开销）。
+- 计费与 2.5 同价：$8/1M 图像输入 token、$30/1M 输出 token；2.6 不进 Batch。
+- 注意博客口径混乱：有文章写 `frame_count` 上限 64、或 `frame_size` 单独字段——官方当前文档是 2–16 且只有 `size`，不要照抄。
+
+**本机 muskapi 中转实测（11-24）**：
+
+```
+POST /v1/images/generations  model=gpt-image-2.6-sunburst  output_format=gif  frame_count=4  frame_duration_ms=200  size=512x512
+→ HTTP 200, 175s, model 回显 gpt-image-2.6-sunburst
+→ 顶层 output_format: "png"，data[0].format: "png"，fallback_reason: "upstream_output_mismatch"
+→ 落盘是标准 PNG（无 acTL，不是 APNG）
+```
+
+结论：中转**接受** gif 参数但不透传 GIF 能力，静默降级成 PNG 并给 `fallback_reason`。判断方法：请求后必须读顶层 `output_format`（或 `data[].format`），不能只看 HTTP 200。要真 GIF 只能走官方 OpenAI key（本机未配 `OPENAI_API_KEY`）或有 GIF 权限的中转。
