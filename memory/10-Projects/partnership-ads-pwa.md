@@ -60,3 +60,7 @@ tags: [sitin-next, app-pwa, partnership-ads, 任务, 技术方案]
 - 前端落点：`PartnerAdsSection`（首页 Become a partner 区块）、`usePartnerTasks`、`partnerTasksStore`（只存列表原始快照 + 按 bizDate 的 claimedIds）、`partnerLinkTaskStore`（2004 按钮态）。2004 跳 `instagram://editprofile`，回前台/Received 单次查，不轮询。
 - 关键坑：`taskStore` 会合并 `ListUserCommonTask` 历史完成记录，每日任务第二天会被旧记录标成 finish 永久隐藏 → 伙伴区块改用独立快照 + bizDate；`finishTask` 加 `force` 跳过历史 finish 短路。
 - 待办：proto `extra=9` / `biz_date=4` 需在 presence-io/proto 提 MR；2004 的 wa.me 号码与 4 步引导未提供；需真实后端数据联调。
+
+## 2026-11-24 相关产品文档
+
+- 新增任务类「发布 Instagram 商品帖」的产品说明见 [pwa-partner-instagram-product-post](pwa-partner-instagram-product-post.md)。只出产品方案，未改仓库。建议 taskid 2006，不复用 2000–2005。
