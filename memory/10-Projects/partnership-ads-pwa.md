@@ -63,4 +63,4 @@ tags: [sitin-next, app-pwa, partnership-ads, 任务, 技术方案]
 
 ## 2026-11-24 相关产品文档
 
-- 新增任务类「发布 Instagram 商品帖」的产品说明见 [pwa-partner-instagram-product-post](pwa-partner-instagram-product-post.md)。只出产品方案，未改仓库。建议 taskid 2006，不复用 2000–2005。
+- 新增任务类「发布 Instagram 商品帖」的产品说明见 [pwa-partner-instagram-product-post](pwa-partner-instagram-product-post.md)；技术方案 / 实现方案见 [pwa-partner-instagram-product-post-tech](pwa-partner-instagram-product-post-tech.md)。只出方案，未改仓库。建议 taskid 2006，不复用 2000–2005。

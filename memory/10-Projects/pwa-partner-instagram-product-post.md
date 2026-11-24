@@ -10,7 +10,7 @@ tags: [sitin-next, app-pwa, partner, instagram, 商品帖, 产品文档]
 - 成稿日期：2026-11-24。
 - 状态：产品评审稿。本文只出方案，不开发、不改仓库。
 - 目标飞书页（本文不直接写入，齐套后由飞书助手落页）：[Partner 相关 wiki](https://presence.feishu.cn/wiki/VWvHwUrBRii5AIk7V0QcUNDEnmf)
-- 相关已有记录：[Partnership Ads · PWA 任务技术方案](partnership-ads-pwa.md)
+- 相关已有记录：[Partnership Ads · PWA 任务技术方案](partnership-ads-pwa.md)；[技术方案 / 实现方案](pwa-partner-instagram-product-post-tech.md)
 
 ## 1. 关键假设与对齐说明
 
