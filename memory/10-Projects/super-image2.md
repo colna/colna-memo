@@ -10,8 +10,8 @@ tags: project, ai, image-generation, react, turborepo, gpt-image
 
 ## 基本信息
 
-- 仓库:`git@github-colna:colna/super-image2.git`(个人 colna 名下)
-- 路径:`/Users/user/Dev2/zhangzheng/super-image2`
+- 仓库:`git@github.com:colna/super-image2.git`(个人 colna 名下)
+- 路径:`/Users/colna/WORK/super-image2`(2026-11-24 起)
 - 当前分支:`main`
 - monorepo:Turborepo + pnpm workspaces
 
