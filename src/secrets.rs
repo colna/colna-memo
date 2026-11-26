@@ -53,7 +53,9 @@ pub fn fix(root: &Path, findings: &[Finding]) -> Result<usize> {
         next.clear();
     }
     if changed > 0 {
-        indexer::ensure(root, false, false, None)?;
+        if let Err(error) = indexer::ensure_readable(root, false, None) {
+            eprintln!("⚠️ 脱敏已生效,但索引未更新: {error}");
+        }
     }
     Ok(changed)
 }

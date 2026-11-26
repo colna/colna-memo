@@ -34,7 +34,10 @@ pub fn ingest(root: &Path, path: &Path, title: Option<&str>, tags: &str) -> Resu
         ("content_hash", content_hash.as_str()),
     ];
     write::add_note(root, &title, tags, &text, &extra, |root| {
-        indexer::ensure(root, false, false, None).map(|_| ())
+        if let Err(error) = indexer::ensure_readable(root, false, None) {
+            eprintln!("⚠️ 笔记已写入,但索引未更新: {error}");
+        }
+        Ok(())
     })
 }
 

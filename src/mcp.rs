@@ -316,7 +316,14 @@ fn ensure_embedder(emb: &mut Option<Embedder>) -> Result<()> {
 
 fn reindex_after_write(root: &Path, emb: &mut Option<Embedder>) -> Result<bool> {
     ensure_embedder(emb)?;
-    indexer::ensure(root, false, true, emb.as_mut())
+    match indexer::ensure_readable(root, true, emb.as_mut()) {
+        Ok(changed) => Ok(changed),
+        Err(error) => {
+            // 文件已经写入成功,索引留给下一次 `colna index` / `sync` 补。
+            eprintln!("⚠️ 写入已生效,但索引未更新: {error}");
+            Ok(false)
+        }
+    }
 }
 
 fn tool_kb_search(root: &Path, emb: &mut Option<Embedder>, args: &Value) -> Result<Value> {
@@ -388,7 +395,9 @@ fn tool_kb_search(root: &Path, emb: &mut Option<Embedder>, args: &Value) -> Resu
 
     ensure_embedder(emb)?;
     if ensure_index {
-        indexer::ensure(root, false, true, emb.as_mut())?;
+        if let Err(error) = indexer::ensure_readable(root, true, emb.as_mut()) {
+            return Ok(tool_error(&format!("索引不可用: {error}")));
+        }
     }
     let link_counts = if link_boost > 0.0 {
         Some(graph::in_degree(root)?)

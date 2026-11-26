@@ -20,7 +20,7 @@ pub fn build_with_embedder(
     embedder: &mut Embedder,
     scope: Option<String>,
 ) -> Result<String> {
-    indexer::ensure(root, false, true, Some(embedder))?;
+    indexer::ensure_readable(root, true, Some(embedder))?;
 
     let query_vec = embedder.embed_query(task)?;
     let collection = store::open(&root.join(indexer::INDEX_PATH).to_string_lossy())?;

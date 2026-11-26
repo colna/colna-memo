@@ -32,7 +32,13 @@ struct WatchEntry {
 
 pub fn watch_index(root: &Path, interval: u64, once: bool, digest: bool) -> Result<()> {
     loop {
-        let changed = indexer::ensure(root, false, true, None)?;
+        let changed = match indexer::ensure_readable(root, true, None) {
+            Ok(changed) => changed,
+            Err(error) => {
+                eprintln!("[watch] 索引未更新: {error}");
+                false
+            }
+        };
         if changed {
             println!("[watch] {} 索引已更新", util::now_beijing());
             if digest {
@@ -192,7 +198,9 @@ fn append_alert(root: &Path, note: Option<&str>, line: &str) -> Result<()> {
         content.push_str(&format!("\n## 观察\n\n{line}\n"));
     }
     write::replace_file(root, &rel, &content)?;
-    indexer::ensure(root, false, false, None)?;
+    if let Err(error) = indexer::ensure_readable(root, false, None) {
+        eprintln!("⚠️ 观察已写入,但索引未更新: {error}");
+    }
     Ok(())
 }
 

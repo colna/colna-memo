@@ -51,7 +51,9 @@ pub fn start(
     );
     let preview = write::put_at(root, &rel, &content, confirm)?;
     if confirm {
-        indexer::ensure(root, false, true, None)?;
+        if let Err(error) = indexer::ensure_readable(root, true, None) {
+            eprintln!("⚠️ 任务已写入,但索引未更新: {error}");
+        }
     }
     Ok(preview)
 }
@@ -66,7 +68,9 @@ pub fn checkpoint(
     let heading = format!("Checkpoint {}", util::now_beijing());
     let preview = write::append(root, path, note, Some(&heading), Some(&hash), confirm)?;
     if confirm {
-        indexer::ensure(root, false, true, None)?;
+        if let Err(error) = indexer::ensure_readable(root, true, None) {
+            eprintln!("⚠️ 任务已写入,但索引未更新: {error}");
+        }
     }
     Ok(preview)
 }
@@ -91,7 +95,9 @@ pub fn finish(
     }
     let preview = write::update(root, path, &next, &hash, confirm)?;
     if confirm {
-        indexer::ensure(root, false, true, None)?;
+        if let Err(error) = indexer::ensure_readable(root, true, None) {
+            eprintln!("⚠️ 任务已写入,但索引未更新: {error}");
+        }
     }
     Ok(preview)
 }

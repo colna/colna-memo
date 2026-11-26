@@ -187,7 +187,7 @@ pub fn write_digest(root: &Path, report: &Report) -> Result<std::path::PathBuf> 
         render(report)
     );
     write::replace_file(root, &rel, &content)?;
-    indexer::ensure(root, false, false, None)?;
+    indexer::ensure_readable(root, false, None)?;
     Ok(root.join(indexer::MEMORY_DIR).join(rel))
 }
 
@@ -213,7 +213,7 @@ pub fn carry_over_todos(root: &Path, date: &str) -> Result<Vec<String>> {
         return Ok(added);
     }
     write::replace_file(root, &rel, &content)?;
-    indexer::ensure(root, false, false, None)?;
+    indexer::ensure_readable(root, false, None)?;
     Ok(added)
 }
 
@@ -303,7 +303,7 @@ pub fn sync_open_work(root: &Path) -> Result<std::path::PathBuf> {
     }
     let rel = "00-Inbox/open-work.md";
     write::replace_file(root, rel, &content)?;
-    indexer::ensure(root, false, false, None)?;
+    indexer::ensure_readable(root, false, None)?;
     Ok(root.join(indexer::MEMORY_DIR).join(rel))
 }
 
@@ -316,7 +316,7 @@ pub fn annotate_similar(
     if report.lessons.is_empty() {
         return Ok(Vec::new());
     }
-    indexer::ensure(root, false, true, Some(embedder))?;
+    indexer::ensure_readable(root, true, Some(embedder))?;
     let collection = store::open(&root.join(indexer::INDEX_PATH).to_string_lossy())?;
     let mut result = Vec::new();
     for lesson in report.lessons.iter().take(8) {

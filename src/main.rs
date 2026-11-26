@@ -13,6 +13,7 @@ mod chunker;
 mod clip;
 mod context;
 mod digest;
+mod embedcache;
 mod embedder;
 mod encrypt;
 mod eval;
@@ -442,7 +443,7 @@ fn cmd_search(root: &Path, request: &SearchRequest<'_>) -> Result<()> {
 
     let mut embedder = embedder::Embedder::new()?;
     if !request.no_ensure_index {
-        indexer::ensure(root, false, false, Some(&mut embedder))?;
+        indexer::ensure_readable(root, false, Some(&mut embedder))?;
     }
     let link_counts = if request.link_boost > 0.0 {
         Some(graph::in_degree(root)?)
@@ -694,7 +695,7 @@ fn cmd_related(root: &Path, path: &str, topk: usize, json: bool) -> Result<()> {
     let inbound = graph.inbound(path);
     let outbound = graph.outbound(path);
     let mut embedder = embedder::Embedder::new()?;
-    indexer::ensure(root, false, false, Some(&mut embedder))?;
+    indexer::ensure_readable(root, false, Some(&mut embedder))?;
     let query = write::read_note(root, path)
         .map(|content| content.chars().take(1_000).collect::<String>())
         .unwrap_or_else(|_| path.to_string());

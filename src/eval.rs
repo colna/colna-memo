@@ -50,7 +50,7 @@ pub fn load(path: &Path) -> Result<Vec<EvalCase>> {
 
 pub fn run(root: &Path, cases: &[EvalCase], topk: usize) -> Result<EvalReport> {
     let mut embedder = Embedder::new_quiet()?;
-    indexer::ensure(root, false, true, Some(&mut embedder))?;
+    indexer::ensure_readable(root, true, Some(&mut embedder))?;
     let collection = store::open(&root.join(indexer::INDEX_PATH).to_string_lossy())?;
 
     let mut results = Vec::new();

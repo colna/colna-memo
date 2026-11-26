@@ -63,14 +63,18 @@ impl IndexState {
             .with_context(|| format!("解析索引状态失败: {}", path.display()))
     }
 
-    /// 写回 state.json。
+    /// 写回 state.json(tmp + rename,避免写到一半留下损坏文件触发全量重建)。
     pub fn save(&self, path: &Path) -> Result<()> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
                 .with_context(|| format!("创建索引状态目录失败: {}", parent.display()))?;
         }
         let s = serde_json::to_string_pretty(self).context("序列化索引状态失败")?;
-        std::fs::write(path, s).with_context(|| format!("写入状态文件失败: {}", path.display()))?;
+        let tmp = path.with_extension("tmp");
+        std::fs::write(&tmp, s)
+            .with_context(|| format!("写入状态临时文件失败: {}", tmp.display()))?;
+        std::fs::rename(&tmp, path)
+            .with_context(|| format!("提交状态文件失败: {}", path.display()))?;
         Ok(())
     }
 }

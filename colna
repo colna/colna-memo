@@ -3,12 +3,19 @@
 # 用法与子命令同 ./target/<profile>/colna,如:  ./colna index   ./colna search "xxx"
 set -euo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROFILE="${COLNA_PROFILE:-debug}"
+PROFILE="${COLNA_PROFILE:-release}"
 BIN="$DIR/target/$PROFILE/colna"
 
+# 默认走 release(全量重建快一个数量级);未构建时回退 debug 并提示。
+if [[ ! -x "$BIN" && -z "${COLNA_PROFILE:-}" && -x "$DIR/target/debug/colna" ]]; then
+  echo "未找到 release 二进制,回退 debug(较慢;建议 cargo build --release)" >&2
+  PROFILE=debug
+  BIN="$DIR/target/debug/colna"
+fi
+
 if [[ ! -x "$BIN" ]]; then
-  echo "未找到二进制 $BIN,请先运行: cargo build${PROFILE:+ }${PROFILE/debug/}" >&2
-  echo "  (release 版用 cargo build --release 并设 COLNA_PROFILE=release)" >&2
+  echo "未找到二进制 $BIN,请先运行: cargo build --release" >&2
+  echo "  (自定义 profile: COLNA_PROFILE=debug ./colna ...)" >&2
   exit 1
 fi
 
