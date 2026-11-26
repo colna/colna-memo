@@ -263,3 +263,23 @@ git -c http.version=HTTP/1.1 push https://github.com/colna/colna-memo.git main
 - **结果**：20:30:37 落盘 `state.json`（405 files / 6955 chunks / `multilingual-e5-base` / chunker 3 / format 5），`scalar.0.ipc` 8.9MB（非 0，没重演 2026-09-21 的 flush 失败），重建成功；随后同一句 search 10.4 秒返回。
 - **对策**：需要整库重建时先 `cargo build --release` 并 `COLNA_PROFILE=release`，别用 debug 陪跑半小时；`kill` 之前必须确认 WAL 已停止增长（半途 kill 会留下无 `state.json` 的半成品，下次 search 又整库重建）。
 - **未查明**：本次 `state.json` 为何丢失（`.colna/` 里只剩两个 9-21 的坏索引备份 + `skills.zvec`），推测是上一次重建中断或被手工清理。
+
+## 为什么索引「经常需要重建」：一条正反馈链（2026-11-26 根因梳理）
+
+不是 zvec 坏了，是四个设计选择叠成闭环：
+
+1. **全量重建先毁后建，state 最后才落盘**：`full_rebuild`（`src/indexer.rs:323-330`）先删 `state.json` + `index.zvec` 再建新的，`state.json` 只在全部写完 + `close()` 后才 save（`:359`）。中途被 kill → 旧索引和 state 一起没了；`needs_full_rebuild` 见 `saved_state=None` 恒为 true（`:127-145`），下次只能从零重来。**没有 checkpoint、没有原子换名**。
+2. **重建慢到大概率会被超时打断**：包装脚本默认 `COLNA_PROFILE=debug`；e5-base/768 在 debug 下 6955 块 ≈ 31 分钟（11-24 实测），agent 工具调用常 180s–几分钟超时。慢 → 被杀 → 没 state → 下次更慢。
+3. **只读命令也会自己发起全量重建**：`search` / `context` / MCP `kb_*` 都走 `indexer::ensure`（`main.rs:445,697`、`mcp.rs:319,391`、`context.rs:23`）。state 缺失时一条查询就整库重建并持锁 30 分钟，其它会话全部排队或撞锁（11-24 的 31 分钟「卡死」）。
+4. **校验 fail-closed 且要求严格相等**：format/model/chunker 版本不符、`chunk_count != doc_count`、向量索引 completeness < 1.0、schema 缺 `text`/`embedding`，任一条都升级为全量（`state.rs:49-56`、`store.rs:150-175`）。增量写到一半被杀也会让 doc_count 与 state 对不上 → 同样升级全量；zvec 0.5.0 的 flush/delete 本身出过问题（9-21 `scalar.0.ipc` 0 字节、delete 成功但 doc_count 不变）。
+
+放大器：多会话共用一份 `.colna`（opencode / Grok Bot / MetaBot），撞 zvec 排他锁与 `.colna/index.lock.d`；半途 kill 还留孤儿进程互抢（9-17 退化到 1 batch/分钟）。索引是机器本地派生物，多环境各自重建，不会互相修复。`state.json` 用 `std::fs::write` 直接覆盖（`state.rs:67-75`），写到一半被杀也会损坏 → 全量。
+
+**判据**：`./colna index` 打印「自动执行全量重建」、`ls .colna/state.json` 不存在、`git rev-list --count origin/main..HEAD` 有积压的 `colna sync` 提交 = 这条链在跑。
+
+**修法方向（2026-11-26 未实施）**：
+
+- 全量重建写到 `.colna/index.zvec.new` 再原子换名；state 写 tmp + rename。中断只丢新索引，旧索引仍可用。
+- 包装脚本默认 release（需先 `cargo build --release`；当前 release 二进制是 8-05 的，已过期）。
+- `ensure()` 增加 `allow_full_rebuild`：search/context/MCP 只报「索引不可用，请运行 colna index」，不自己重建。
+- 重建进度落 `.colna/rebuild.json`（batch/total/pid/started），支持续跑与 ETA。
