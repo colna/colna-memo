@@ -12,10 +12,10 @@ tags:
 
 # aichat-hindsight：去掉 Nacos 通道并清理公司基础设施
 
-> 状态：技术方案成稿，**已按 2026-11-26 Code Reviewer 意见修订**（只出方案，未改 `aichat-hindsight` 代码，未 commit/push，未写飞书）。
-> 依据：本机仓库 `/Users/colna/WORK/aichat-hindsight`，`main` @ `8f86340`（`origin` → `https://github.com/colna/aichat-hindsight`）。工作区另有未提交改动 `src/main/resources/chat-config.jsonc`（审查时 `git diff --stat` 为 224 行：+4 / −220，范围大于「打字速度参数」）。本方案不触及该文件；落地时必须把它从清理提交的变更集中排除，或单独处理，禁止夹带。
+> 状态：技术方案成稿，**已按 2026-11-26 Code Reviewer 意见修订，并按同日复审意见再修订**（只出方案，未改 `aichat-hindsight` 代码，未 commit/push，未写飞书，未开工落地）。
+> 依据：本机仓库 `/Users/colna/WORK/aichat-hindsight`，`main` @ `8f86340`（`origin` → `https://github.com/colna/aichat-hindsight`）。工作区另有未提交改动 `src/main/resources/chat-config.jsonc`（该 diff 在历次审查中仍在变化，不要把某一时刻的行数写成固定事实；**以落地当时 `git diff --stat` 为准，禁止夹带**）。本方案不触及该文件；落地时必须把它从清理提交的变更集中排除，或单独处理。
 > 知识库检索：今日 Daily 与 `30-Resources/troubleshooting/aichat-v2-hindsight.md` 记录了本地 DeepSeek + Hindsight 接入与踩坑；**未查到「彻底删除 Nacos」的既有决策文档**。以下以现码为准，既有笔记仅作背景。
-> 修订：按审查 I1/I2 与 M1–M5 补全契约（双向 env 覆盖、可执行的测试隔离、`./gradlew run` 已注入 `.env`、gRPC HOST 全清单与 9099 监听、HangUp 默认理由、子目录 `CLAUDE.md`、第二期依赖保留结论）。分层删除、分期、DeepSeek 正式化、Redis 不默认 localhost、安全纪律和回归底线保持不变；不把第三期业务域塞进第一期。
+> 修订：第一轮按审查 I1/I2 与 M1–M5 补全契约。本轮按复审补明：`tasks.test` 必须以 `environment("AICHAT_DOTENV", "<不存在路径>")` 注入，不得用 `systemProperty()`（`LocalEnv.locateDotEnv()` 只读 `System.getenv`）。分层删除、分期、DeepSeek 正式化、Redis 不默认 localhost、安全纪律、回归底线与 I1 / 已落实的建议项保持不变；不把第三期业务域塞进第一期。
 
 ## 1. 结论摘要
 
@@ -65,7 +65,7 @@ tags:
      - `scripts/local-chat.sh` 会先把仓库 `.env` 导出到进程环境；
      - `./gradlew run` 亦然：`build.gradle.kts` 的 `tasks.named<JavaExec>("run")`（约 L47–L54）已把仓库根 `.env` 注入进程环境（已存在的环境变量优先，不覆盖），因此直接 `./gradlew run` 时 `System.getenv("REDIS_URI")` **能**读到；
      - `tasks.test`（约 L254–L259）以及不经过该 `run` 任务的入口（例如直接 `java`）**不会**注入 `.env`，此时即使仓库里有 `.env`，`System.getenv` 也读不到这些 URI。
-     统一改走 `LocalEnv` 仍然有价值（`test` / 非 Gradle 入口、以及 `resolveAppConfig` 自身读文件），但不能据此假定所有入口今天都读不到 `.env`。测试隔离见 §10.6 / §13.3，必须用 `AICHAT_DOTENV` 等可执行手段，而不是要求测试目录不放 `.env`。
+     统一改走 `LocalEnv` 仍然有价值（`test` / 非 Gradle 入口、以及 `resolveAppConfig` 自身读文件），但不能据此假定所有入口今天都读不到 `.env`。测试隔离见 §10.6 / §13.3：必须在 `tasks.test` 用 `environment("AICHAT_DOTENV", "<不存在路径>")` 注入环境变量，不能用 `systemProperty()`，也不能靠「测试目录不放 `.env`」。
    - DeepSeek / Hindsight：已走 `LocalEnv`（`getenv` 优先，然后向上查找 `.env`）。
    - FeatureFlags：仅部分键支持 `System.getenv` 覆盖，且方向并不统一。`PROACTIVE_HOURLY_ENABLED` / `PROACTIVE_MINUTE_ENABLED`（`AppConfig.kt` L965–L971）只认 `"false"`，不能用 env 把默认值打开；同文件的 `VIDEO_TIPS_ENABLED`、`MSG_INGESTED_CONSUMER_ENABLED`、`HANGUP_GATE_ENABLED` 等（L984–L1003）已是双向（`"true"` / `"false"` 都认）。第一期若把 hourly/minute 默认改为 false，必须同步把这两项改成双向，否则「可用 env 再打开」不成立，见 §10.3。
    - Tianshu / BytePlus AB / obs_config / router profiles / overlay / recovery_config：**没有 env 入口**。Nacos 关闭后这些就是默认值或直接不启动。
@@ -144,7 +144,7 @@ chat-config.jsonc（classpath；prompt / persona / autocorrect / archetypes 等�
 
 具体规则：
 
-1. **统一读配置入口为 `LocalEnv`**（已有实现：`getenv` 非空优先，否则解析 `AICHAT_DOTENV` 或从 `user.dir` 向上最多 6 层找 `.env`；不打日志打值）。Redis / FeatureFlags / Postgres 今天走 `System.getenv` 的地方都改过来，避免 `local-chat.sh` / `./gradlew run`（二者今天已注入 `.env`）与 `tasks.test` / 非 Gradle 入口行为分叉。测试如何隔离真实 `.env` 见 §10.6。
+1. **统一读配置入口为 `LocalEnv`**（已有实现：`getenv` 非空优先，否则解析 `AICHAT_DOTENV` 或从 `user.dir` 向上最多 6 层找 `.env`；不打日志打值）。Redis / FeatureFlags / Postgres 今天走 `System.getenv` 的地方都改过来，避免 `local-chat.sh` / `./gradlew run`（二者今天已注入 `.env`）与 `tasks.test` / 非 Gradle 入口行为分叉。测试如何隔离真实 `.env` 见 §10.6（必须用 Gradle `environment()`，不能用 `systemProperty()`）。
 2. **不再出现 Nacos 分支**，包括 `nacosDisabled`、`nacosLoader` 字段、`if (nacosLoader != null)`。
 3. **不把公司集群地址写进默认值**（包括 `api.nacos.archat.us`、gRPC 的 k8s 主机名若按第 8.3 节处理）。
 4. `chat-config.jsonc` 继续做 prompt 与静态内容真源；第一期不必把 FeatureFlags 或 LLM router 强行塞进该文件。若二期要可编辑开关，可新增顶层分区（例如 `featureFlags` / `llmProviders`），但那是增强，不是删除 Nacos 的前置条件。
@@ -317,7 +317,7 @@ Male-DH / ChatRound / RiskEvent 的**非 Kafka 领域代码**是否整包删除�
 2. `AppConfig` 去掉 `nacosLoader`；`tianshuConfig` / `abTestConfig` / `bytePlusEventConfig` 若对应模块按 8.1 删除，则一并去掉字段。
 3. FeatureFlags 启动赋值：默认值 + `LocalEnv` 覆盖。第一期把**公司向、且当前默认 true** 的开关改为本地默认 false，并保证每项都能用 env **双向**打开或关闭（与现码 `VIDEO_TIPS_ENABLED` 相同：`"true"` / `"false"` 都认，经 `LocalEnv`）。现码 `AppConfig.kt` L965–L971 对 hourly/minute **只认 `"false"`**，若不改覆盖方向，默认改 false 后设置 `PROACTIVE_HOURLY_ENABLED=true` 会静默无效，§13.1「可用 env 再打开」的承诺就不成立。
 
-    本次收紧的全部开关及其 env 键名：
+    本次收紧的开关及其 env 键名（**以本表为准，仅此 5 项**）：
 
     | 字段（改为默认 `false`） | env 键 | 现码覆盖方向 | 第一期要求 |
     |--------------------------|--------|----------------|------------|
@@ -327,11 +327,13 @@ Male-DH / ChatRound / RiskEvent 的**非 Kafka 领域代码**是否整包删除�
     | `videoTipsConsumerEnabled` | `MSG_INGESTED_CONSUMER_ENABLED` | 已是双向（L988–L991） | 同上 |
     | `hangUpGateEnabled` | `HANGUP_GATE_ENABLED` | 已是双向（L1000–L1003） | 默认改为 `false`，以免在没有 msgcenter 时仍对主动消息启用挂断查询。**不要**用这个 flag 解决建连问题：现码 HangUp gRPC 客户端在启动时无条件创建（`Application.kt` L975–L988），不受该 flag 控制；建连改由第 10.4 条「显式 HOST 才建连」负责。该 flag 只决定闸是否被使用。 |
 
+    未列入本表的默认 `true` 开关不在本次收紧范围（例如 `proactiveHistoryWriteEnabled`、`riskRedContactBlockEnabled`：本地不注册本方案所关心的后台任务，也不额外建连）。落地时不要按「公司向且当前默认 true」的笼统准则自行扩大。
+
     这是行为变化，须在回归说明里写明：「本地不再默认启动小时/分钟主动消息扫描；若要打开，必须设置对应 env 为 true（hourly/minute 的覆盖在本期内改为双向后才生效）」。
 4. gRPC **客户端**（暂留代码，不整包删除）：改为「环境变量显式给出 HOST 才创建 `ManagedChannel`」，去掉 k8s 默认主机名。完整清单（见 §3.5）：`MSGCENTER_GRPC_HOST`（历史、RAG、HangUp 三个客户端同一地址，HangUp 为独立 channel）、`CONTACT_EXCHANGE_HOST`、`LIVE_SERVICE_HOST` / `LIVE_GRPC_HOST`、`CHAT_SERVICE_HOST`、`CHECKER_GRPC_HOST`。未显式设置对应 HOST 时不建连、相关 client 为 `null`（fail-open）。
 5. **`Aichatv2SyncReply` 服务端 9099（方案建议，第一期执行）：** 这不是客户端建连，第 10.4 条的 `*_HOST` 规则覆盖不到。现码只要有 Redis 历史库就监听 `AICHATV2_GRPC_PORT`（未设则 9099），而 `local-chat.sh` 会起 Redis，因此本地会默认占用 9099 并暴露 sitin sync-reply。本地主路径是 HTTP `:8080`，不需要这条服务端。建议：**默认不监听 9099**；仅当显式设置 `AICHAT_SYNC_REPLY_LISTEN=true`（或等价开关）时才启动该 gRPC server；端口仍可用 `AICHATV2_GRPC_PORT` 覆盖，未设开关时即使仓库或环境里有端口值也不监听。不要只靠「设置了 `AICHATV2_GRPC_PORT` 才监听」——现码未设置也会默认 9099，容易误开。
-6. 单测与 `LocalEnv` 隔离（第一期必须做，与改走 `LocalEnv` 同时落地）：凡构造 `AppConfig(..., nacosLoader=...)` 或依赖 Nacos 文本的夹具要改。`EndToEndTest` / `ProactiveDebugRoutesTest` 已用 `kafkaBootstrap=null`，应继续可编译。当前不少测试靠注入 `testConfig` 绕过 `resolveAppConfig`，这是偶然保护，不是策略。Redis / FeatureFlags / Postgres 改走 `LocalEnv` 后，仓库根仍必须保留开发者 `.env`（`local-chat.sh` 依赖它），而单模块 Gradle 测试的 `user.dir` 通常就是仓库根，`LocalEnv.locateDotEnv()` 会读到该文件，可能连上真实 Redis 或读到真实密钥。可执行隔离：在 `tasks.test` 把 `AICHAT_DOTENV` 指到一个**不存在的路径**（`LocalEnv.kt` L33–L35 已支持该覆盖：设置了该变量就只认这一条，不再向上查找 `.env`）。也可另增测试期禁用文件读取的开关，但优先用已有的 `AICHAT_DOTENV`，避免再造配置面。不要把开发者 `.env` 注入测试 JVM。
-7. **禁止夹带**工作区已有的未提交 `src/main/resources/chat-config.jsonc`。审查时该文件 `git diff --stat` 为 224 行变更（+4 / −220），范围大于「打字速度参数」，可能含无关的 prompt / persona 改动。落地时必须先把它从变更集中排除（例如不 `git add` 该文件），或单独另开处理；**禁止**并进第一期 Nacos 清理提交。第一期也不要为了去 Nacos 去改该文件的 prompt 内容。最多在二期加分区，第一期不必动。
+6. 单测与 `LocalEnv` 隔离（第一期必须做，与改走 `LocalEnv` 同时落地）：凡构造 `AppConfig(..., nacosLoader=...)` 或依赖 Nacos 文本的夹具要改。`EndToEndTest` / `ProactiveDebugRoutesTest` 已用 `kafkaBootstrap=null`，应继续可编译。当前不少测试靠注入 `testConfig` 绕过 `resolveAppConfig`，这是偶然保护，不是策略。Redis / FeatureFlags / Postgres 改走 `LocalEnv` 后，仓库根仍必须保留开发者 `.env`（`local-chat.sh` 依赖它），而单模块 Gradle 测试的 `user.dir` 通常就是仓库根，`LocalEnv.locateDotEnv()` 会读到该文件，可能连上真实 Redis 或读到真实密钥。可执行隔离：在 `tasks.test` 必须使用 Gradle **`environment("AICHAT_DOTENV", "<不存在路径>")`** 注入环境变量（例如指向一个保证不存在的路径）。**不能用 `systemProperty()`。** 原因：`LocalEnv.locateDotEnv()`（`LocalEnv.kt` L33–L35）只读 `System.getenv("AICHAT_DOTENV")`，不读 JVM 系统属性；设置了该环境变量后只认这一条路径（文件不存在则视为无 `.env`），不再从 `user.dir` 向上查找。现码 `tasks.test`（`build.gradle.kts` L254–L259）惯用法是 `systemProperty(...)`（用于 `RUN_LIVE_LLM_TESTS` / `OPENROUTER_API_KEY`），那些行可以保留给原用途，但隔离 `AICHAT_DOTENV` **不得**照抄成 `systemProperty`，否则隔离会静默失效，测试仍会读到仓库根真实 `.env`。也可另增测试期禁用文件读取的开关，但优先用已有的 `AICHAT_DOTENV` + `environment()`，避免再造配置面。不要把开发者 `.env` 注入测试 JVM。
+7. **禁止夹带**工作区已有的未提交 `src/main/resources/chat-config.jsonc`。该文件的未提交 diff 在历次审查中仍在变化，不要把某一时刻的行数写成固定事实；**以落地当时 `git diff --stat` 为准**，可能含无关的 prompt / persona 改动。落地时必须先把它从变更集中排除（例如不 `git add` 该文件），或单独另开处理；**禁止**并进第一期 Nacos 清理提交。第一期也不要为了去 Nacos 去改该文件的 prompt 内容。最多在二期加分区，第一期不必动。
 
 ## 11. 迁移后配置来源表
 
@@ -360,7 +362,7 @@ Male-DH / ChatRound / RiskEvent 的**非 Kafka 领域代码**是否整包删除�
 | OTel 手动 span / `/metrics` | 代码默认或 env | 本地可继续暴露 `:8080/metrics` | 不依赖 Nacos |
 | `AICHAT_SYNC_REPLY_LISTEN` | `LocalEnv`（新增，第一期） | 非 true 则不启动 `Aichatv2SyncReply` 服务端 | 见 §10.5；默认本地不监听 9099 |
 | `AICHATV2_GRPC_PORT` | `LocalEnv`（仅当上一开关为 true） | 9099 | 只在显式打开监听时生效 |
-| `AICHAT_DOTENV` | 已有；`tasks.test` 指到不存在的路径 | 未设则 `LocalEnv` 仍可能从 `user.dir` 向上找 `.env` | 测试隔离，见 §10.6；不要在测试里指向开发者真实 `.env` |
+| `AICHAT_DOTENV` | 已有；`tasks.test` 必须用 `environment("AICHAT_DOTENV", "<不存在路径>")`，不能用 `systemProperty()` | 未设该**环境变量**则 `LocalEnv` 仍可能从 `user.dir` 向上找 `.env` | 测试隔离，见 §10.6。`LocalEnv.locateDotEnv()` 只读 `System.getenv`；不要在测试里指向开发者真实 `.env` |
 | gRPC 客户端 `*_HOST` | `LocalEnv`，必须显式设置才建连 | 不设则不建连 | 完整清单见 §3.5 / §10.4 |
 | `NACOS_*` / `RAM_ROLE_NAME` / `infra.nacos` | **删除，不再识别** | — | |
 
@@ -371,7 +373,7 @@ Male-DH / ChatRound / RiskEvent 的**非 Kafka 领域代码**是否整包删除�
 **第一期（必须，对应「去掉 Nacos 通道 + DeepSeek 正式路径」）**
 
 - 删除第 9.1 节与 8.1 A、第 6 节 Redis/Postgres 的 Nacos 路径、第 5 节 DeepSeek 正式化、文档与 `.env.example` / `local-chat.sh`、`application.yaml` 凭证。
-- FeatureFlags / gRPC / SyncReply 按第 10 节调整默认姿态：公司向开关默认关；`PROACTIVE_HOURLY_ENABLED` / `PROACTIVE_MINUTE_ENABLED` 改为双向覆盖（§10.3）；客户端显式 HOST 才建连（§10.4）；默认不监听 9099（§10.5）；`tasks.test` 用 `AICHAT_DOTENV` 隔离真实 `.env`（§10.6）。点名改写 `proactive/chase/CLAUDE.md` 与 `proactive/simpdog/CLAUDE.md`（§9.3）。
+- FeatureFlags / gRPC / SyncReply 按第 10 节调整默认姿态：公司向开关默认关；`PROACTIVE_HOURLY_ENABLED` / `PROACTIVE_MINUTE_ENABLED` 改为双向覆盖（§10.3）；客户端显式 HOST 才建连（§10.4）；默认不监听 9099（§10.5）；`tasks.test` 用 `environment("AICHAT_DOTENV", "<不存在路径>")` 隔离真实 `.env`，不能用 `systemProperty()`（§10.6）。点名改写 `proactive/chase/CLAUDE.md` 与 `proactive/simpdog/CLAUDE.md`（§9.3）。
 - 不要夹带工作区已有的 `chat-config.jsonc` 未提交改动（§10.7）。
 - 回归第 14 节。
 - 不要把第 8.3 节 / 第三期的业务域整包删除塞进第一期。
@@ -392,10 +394,10 @@ Male-DH / ChatRound / RiskEvent 的**非 Kafka 领域代码**是否整包删除�
 
 1. **默认开关变化：** 今天本地只要 Redis 起来，小时/分钟主动扫描和 VideoTips 会按默认 true 注册。改成默认 false 后，行为与「现在的 Nacos-less 启动」不完全相同。这是有意收紧，应在发布说明里写清；若有人依赖本地主动消息，可用 env 再打开——**前提是第一期已按 §10.3 把 `PROACTIVE_HOURLY_ENABLED` / `PROACTIVE_MINUTE_ENABLED` 改成双向覆盖**。现码只认 `"false"`，若不改覆盖方向，设置 `=true` 会静默无效。
 2. **编译扇出：** 删除 Tianshu / Kafka / BytePlus SDK 会碰到大量 import。必须分期或先留门面，避免一次改动无法通过 `./gradlew test`。第二期删依赖时遵守 §8.1 C（不得误删 `caffeine` / `protobuf-java`）。
-3. **Redis / FeatureFlags 改走 `LocalEnv` 后的测试隔离：** 把 `System.getenv` 改成 `LocalEnv` 后，未由 Gradle `run` 或脚本导出、但能被 `locateDotEnv()` 找到的 `.env` 也会生效。这会让非 `run` 入口与脚本行为更一致，但也让测试更容易读到仓库根的真实 `.env`。仓库根**必须**保留开发者 `.env`（本地聊天依赖它），单模块 Gradle 测试的 `user.dir` 通常就是仓库根。因此不可把「测试目录不放 `.env`」当作隔离策略，这与主路径冲突且不可执行。必须按 §10.6 做隔离：`tasks.test` 将 `AICHAT_DOTENV` 指向不存在的路径，或等价的测试期禁用文件读取开关。当前靠 `testConfig` 绕过 `resolveAppConfig` 的测试只是偶然保护，一旦为新的配置解析补测并直接调用 `resolveAppConfig()`，就会连上真实 Redis，甚至读到真实密钥。
+3. **Redis / FeatureFlags 改走 `LocalEnv` 后的测试隔离：** 把 `System.getenv` 改成 `LocalEnv` 后，未由 Gradle `run` 或脚本导出、但能被 `locateDotEnv()` 找到的 `.env` 也会生效。这会让非 `run` 入口与脚本行为更一致，但也让测试更容易读到仓库根的真实 `.env`。仓库根**必须**保留开发者 `.env`（本地聊天依赖它），单模块 Gradle 测试的 `user.dir` 通常就是仓库根。因此不可把「测试目录不放 `.env`」当作隔离策略，这与主路径冲突且不可执行。必须按 §10.6 做隔离：`tasks.test` 使用 `environment("AICHAT_DOTENV", "<不存在路径>")` 注入环境变量；**不能用 `systemProperty()`**，因为 `LocalEnv` 只读 `System.getenv`，按现码 `tasks.test` 的 `systemProperty` 惯用法照抄会让隔离静默失效。也可另增测试期禁用文件读取的开关，但优先用 `environment()`。当前靠 `testConfig` 绕过 `resolveAppConfig` 的测试只是偶然保护，一旦为新的配置解析补测并直接调用 `resolveAppConfig()`，就会连上真实 Redis，甚至读到真实密钥。
 4. **不要默认写死 localhost Redis：** 以免单测或无 Redis 启动路径被破坏。
 5. **`application.yaml` 明文凭证：** 删除时不要把旧密码复制到 memo、commit message 或新文件。若该文件历史已进 git，清理只保证工作树不再含明文；是否改写 git 历史不在本方案范围。
-6. **工作区已有 `chat-config.jsonc` 未提交修改：** 审查时实际 diff 为 224 行（+4 / −220），范围大于「打字速度参数」。落地时必须把它从第一期清理提交的变更集中排除，或单独处理，**禁止夹带**（见 §10.7）。
+6. **工作区已有 `chat-config.jsonc` 未提交修改：** 该 diff 在历次审查中仍在变化，不要把某一时刻的行数写成固定事实；**以落地当时 `git diff --stat` 为准**。落地时必须把它从第一期清理提交的变更集中排除，或单独处理，**禁止夹带**（见 §10.7）。
 7. **包名与 sitin 依赖暂留：** 删除 Nacos 后，构建仍可能需要公司 Nexus/GAR 才能解析部分 proto SDK。这不阻碍运行时去 Nacos，但「完全离线构建」不是本方案承诺（见假设）。
 8. **文档残留：** archive 与部分专题设计文档仍会提到 Nacos。现行入口文档必须改准，包括根 `CLAUDE.md` 以及 `proactive/chase/CLAUDE.md`、`proactive/simpdog/CLAUDE.md`，否则后续 agent 会按旧指令再去连 Nacos。落地时检索扫一遍非 archive 现行文档即可。
 9. **本地默认会监听 9099：** 现码在有 Redis 历史库时启动 `Aichatv2SyncReply` 服务端。若不按 §10.5 改为显式开关才监听，第一期去 Nacos 后本地仍会占用 9099。这与客户端 `*_HOST` 规则是两件事，不要漏改。
@@ -409,7 +411,7 @@ Male-DH / ChatRound / RiskEvent 的**非 Kafka 领域代码**是否整包删除�
 3. 启动日志不得出现向 `api.nacos.archat.us` 或 Nacos namespace `dora-*` 的拉取。建议用 `rg` 确认源码与新日志格式已无这些字符串。
 4. 按 `docs/local-chat.md` 或 `./scripts/local-chat-repl.sh` 完成至少两轮对话：`POST /api/agent/run` 返回成功；同一 `conversationId` + `userId` 能延续 Redis 历史；Hindsight bank 能 retain，并可在后续轮次 recall（具体断言方式沿用现有本地验证习惯，不编造指标）。
 5. `DEEPSEEK_API_KEY` 缺失时，启动或首轮有明确失败，而不是去连 Nacos。
-6. `./gradlew test`（或至少 `compileKotlin` + 受影响模块测试）通过。删除模块后，对应测试应删除或改写，不得留编译失败。测试 JVM 不得读取仓库根真实 `.env`（`tasks.test` 已设置 `AICHAT_DOTENV` 指向不存在路径，或等价隔离生效）。
+6. `./gradlew test`（或至少 `compileKotlin` + 受影响模块测试）通过。删除模块后，对应测试应删除或改写，不得留编译失败。测试 JVM 不得读取仓库根真实 `.env`（`tasks.test` 已用 `environment("AICHAT_DOTENV", "<不存在路径>")` 注入，且没有误用 `systemProperty()`；或等价的环境变量级隔离已生效）。
 7. 未设置 `AICHAT_SYNC_REPLY_LISTEN=true` 时，进程不监听 9099（可用 `lsof`/`ss` 或启动日志确认未启动 `Aichatv2SyncReply`）。未显式设置各 `*_HOST` 时，不向 k8s 默认主机建连。
 8. 在已按 §10.3 改为双向覆盖的前提下，设置 `PROACTIVE_HOURLY_ENABLED=true` / `PROACTIVE_MINUTE_ENABLED=true` 应能打开对应扫描；不设时保持默认关闭。不要用「设了 true 但代码只认 false」的旧行为。
 9. 若执行了第二期：进程在未设 Kafka / Tianshu / BytePlus 时，不创建 KafkaConsumer、不轮询 Tianshu、不初始化 DataTester SDK。
