@@ -287,4 +287,13 @@ git -c http.version=HTTP/1.1 push https://github.com/colna/colna-memo.git main
 - **锁归属校验**：`IndexLock::drop` 只在 `pid` 文件等于自己时才删锁。旧代码在「锁目录被手工删掉后重跑」的场景里，会让旧进程退出时误删新持有者的锁。
 - **包装脚本默认 release**（缺失时回退 debug 并提示），`cargo build --release` 已重编。
 
-**实测纠正（2026-11-26 16:08 起）**：本机 release 与 debug 的重建耗时**没有数量级差异**——瓶颈不是代码优化，而是内存/swap（`vm.swapusage` 21.2/22.5 GB，ONNX 推理在换页）。所以「减少重建时间」真正靠的是嵌入缓存，不是 release。另实测到一个更隐蔽的坑：16:04 有个孤儿 debug `colna sync`（ppid 1）在旧代码下重建，和新 release 进程同时抢 CPU；`ps aux | sort -k6 -rn` 才看出来。**重建前先 `pgrep -fl "colna (sync|index)"` 确认只有一个进程**。
+**实测（2026-11-26）**：
+
+| 场景 | 耗时 |
+|---|---|
+| 冷重建（缓存为空，409 files / 7023 块，release） | **45:15** |
+| 缓存命中后 `colna index --full`（7031 块，命中 7021） | **7.5 秒** |
+
+- 冷重建慢的主因不是代码优化，而是**内存/swap**（`vm.swapusage` 21.2/22.5 GB，ONNX 推理在换页），所以 release 与 debug 差距远小于预期；真正的杠杆是嵌入缓存。
+- 冷重建那 45 分钟里，**前 31 分钟有个 16:04 起的孤儿 debug `colna sync`（ppid 1）在旧代码下重建**，与新 release 进程同时抢 CPU。是靠 `ps aux | sort -k6 -rn` 才看出来的。**重建前先 `pgrep -fl "colna (sync|index)"` 确认只有一个进程**。
+- 这也验证了旧锁的另一个坑：孤儿进程退出时会 `remove_dir_all(.colna/index.lock.d)`，把新持有者的锁一起删掉。现已按 pid 校验归属。
