@@ -8,6 +8,8 @@ tags: [troubleshooting, aichat-v2, hindsight, deepseek, gradle, rosetta, maven]
 
 本地项目：`/Users/colna/WORK/aichat-v2-hindsight`（clone 自私有仓 `presence-io/aichat-v2`，未提交/未推送）。
 
+> 2026-11-26 16:13 更新：该目录已被整理/合并为 `/Users/colna/WORK/aichat-hindsight`（更完整实现，见 `docs/local-chat.md`），原路径已不存在；下文命令中的路径请替换为 `aichat-hindsight`。
+
 ## 1. Maven Central 经本机代理 TLS handshake 断开
 
 - **现象**：Gradle `Could not download ... > Remote host terminated the handshake`，构建卡在 `Calculating task graph` 十几分钟。
