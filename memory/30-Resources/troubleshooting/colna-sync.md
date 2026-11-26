@@ -277,9 +277,14 @@ git -c http.version=HTTP/1.1 push https://github.com/colna/colna-memo.git main
 
 **判据**：`./colna index` 打印「自动执行全量重建」、`ls .colna/state.json` 不存在、`git rev-list --count origin/main..HEAD` 有积压的 `colna sync` 提交 = 这条链在跑。
 
-**修法方向（2026-11-26 未实施）**：
+**已实施（2026-11-26，`cargo test` 68 passed）**：
 
-- 全量重建写到 `.colna/index.zvec.new` 再原子换名；state 写 tmp + rename。中断只丢新索引，旧索引仍可用。
-- 包装脚本默认 release（需先 `cargo build --release`；当前 release 二进制是 8-05 的，已过期）。
-- `ensure()` 增加 `allow_full_rebuild`：search/context/MCP 只报「索引不可用，请运行 colna index」，不自己重建。
-- 重建进度落 `.colna/rebuild.json`（batch/total/pid/started），支持续跑与 ETA。
+- **原子替换**（`src/indexer.rs`）：全量重建写到 `.colna/index.zvec.new`，成功后再 `旧→.old`、`新→index.zvec`、`state.json.new→state.json`；`recover_interrupted_swap` 在拿锁后清理/回滚（旧索引已改名但新索引未就位时恢复 `.old`）。中断只丢 `.new`，旧索引与 state 原样可用。
+- **state 原子写**（`src/state.rs`）：`save` 改为 tmp + rename。
+- **文档数不一致先修后降级**：`plan_index` 不再把 `doc_count != chunk_count` 直接判全量；先重放增量 diff，由 `finalize_collection` 的严格校验兜底，失败再降级全量。
+- **只读路径不重建**：新增 `indexer::ensure_readable`，search / context / MCP 查询 / digest / eval 遇到「需要全量」立即报错「请运行 colna index」；写入类路径（kb_put / task / ingest / watch / secrets）出错只告警，不阻塞写入。
+- **嵌入缓存**（`src/embedcache.rs`，`.colna/embed.cache`）：key = `sha256("passage: " + embed_text)`，header 绑定模型与维度；全量重建只对 miss 的块跑 ONNX，命中数会打印。上限 40k 条（约 120MB）。
+- **锁归属校验**：`IndexLock::drop` 只在 `pid` 文件等于自己时才删锁。旧代码在「锁目录被手工删掉后重跑」的场景里，会让旧进程退出时误删新持有者的锁。
+- **包装脚本默认 release**（缺失时回退 debug 并提示），`cargo build --release` 已重编。
+
+**实测纠正（2026-11-26 16:08 起）**：本机 release 与 debug 的重建耗时**没有数量级差异**——瓶颈不是代码优化，而是内存/swap（`vm.swapusage` 21.2/22.5 GB，ONNX 推理在换页）。所以「减少重建时间」真正靠的是嵌入缓存，不是 release。另实测到一个更隐蔽的坑：16:04 有个孤儿 debug `colna sync`（ppid 1）在旧代码下重建，和新 release 进程同时抢 CPU；`ps aux | sort -k6 -rn` 才看出来。**重建前先 `pgrep -fl "colna (sync|index)"` 确认只有一个进程**。
